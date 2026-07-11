@@ -1,4 +1,4 @@
-import type { JobCard, JobStatus, InventoryItem, InventoryLocation, InventoryStock, Technician } from "./types";
+import type { JobCard, JobStatus, InventoryItem, InventoryLocation, InventoryStock, Technician, Appliance, Brand } from "./types";
 import { tatHours } from "./utils";
 
 export function filterByBranch<T extends { branchId: string }>(items: T[], branchId: string | "all"): T[] {
@@ -97,4 +97,70 @@ export function avgTat(jobCards: JobCard[]) {
   const delivered = jobCards.filter((j) => j.status === "Delivered");
   if (!delivered.length) return 0;
   return Math.round(delivered.reduce((acc, j) => acc + tatHours(j.createdAt, j.updatedAt), 0) / delivered.length);
+}
+
+export interface PredictiveMaintenanceCandidate {
+  appliance: Appliance;
+  ageMonths: number;
+  cohortAvgMonths: number;
+  cohortSize: number;
+  urgencyScore: number;
+}
+
+// Heuristic predictive-maintenance scan: for every brand+category combo that has
+// enough repair history, work out the average appliance age (in months) at first
+// service. Appliances with no job card yet that are approaching that same age are
+// flagged — the same "similar units failed around this age" signal real IoT
+// telemetry programs use, derived here purely from job-card history instead.
+export function predictiveMaintenanceCandidates(
+  appliances: Appliance[],
+  jobCards: JobCard[],
+  brands: Brand[],
+  { minCohortSize = 3, windowRatio = 0.22 }: { minCohortSize?: number; windowRatio?: number } = {}
+): PredictiveMaintenanceCandidate[] {
+  const monthsBetween = (a: string, b: string) => (new Date(b).getTime() - new Date(a).getTime()) / (1000 * 60 * 60 * 24 * 30);
+  const firstJobByAppliance = new Map<string, string>();
+  for (const j of jobCards) {
+    const existing = firstJobByAppliance.get(j.applianceId);
+    if (!existing || new Date(j.createdAt) < new Date(existing)) firstJobByAppliance.set(j.applianceId, j.createdAt);
+  }
+
+  const cohortAges = new Map<string, number[]>();
+  for (const a of appliances) {
+    const firstJob = firstJobByAppliance.get(a.id);
+    if (!firstJob) continue;
+    const key = `${a.brandId}|${a.category}`;
+    const age = monthsBetween(a.purchaseDate, firstJob);
+    if (age <= 0) continue;
+    if (!cohortAges.has(key)) cohortAges.set(key, []);
+    cohortAges.get(key)!.push(age);
+  }
+
+  const cohortAvg = new Map<string, { avg: number; size: number }>();
+  for (const [key, ages] of cohortAges) {
+    if (ages.length < minCohortSize) continue;
+    cohortAvg.set(key, { avg: ages.reduce((a, b) => a + b, 0) / ages.length, size: ages.length });
+  }
+
+  const now = new Date().toISOString();
+  const candidates: PredictiveMaintenanceCandidate[] = [];
+  for (const a of appliances) {
+    if (firstJobByAppliance.has(a.id)) continue; // already has service history
+    const key = `${a.brandId}|${a.category}`;
+    const cohort = cohortAvg.get(key);
+    if (!cohort) continue;
+    const ageMonths = monthsBetween(a.purchaseDate, now);
+    const window = cohort.avg * windowRatio;
+    if (Math.abs(ageMonths - cohort.avg) <= window) {
+      candidates.push({
+        appliance: a,
+        ageMonths: Math.round(ageMonths),
+        cohortAvgMonths: Math.round(cohort.avg),
+        cohortSize: cohort.size,
+        urgencyScore: 1 - Math.abs(ageMonths - cohort.avg) / window,
+      });
+    }
+  }
+  const brandName = (id: string) => brands.find((b) => b.id === id)?.name ?? "";
+  return candidates.sort((x, y) => y.urgencyScore - x.urgencyScore || brandName(x.appliance.brandId).localeCompare(brandName(y.appliance.brandId)));
 }

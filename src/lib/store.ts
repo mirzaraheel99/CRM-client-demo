@@ -32,6 +32,7 @@ interface DemoState {
   theme: "light" | "dark";
   lang: "en" | "ar";
   sidebarCollapsed: boolean;
+  maintenanceRemindersSent: Record<string, string>;
 
   setRole: (r: Role) => void;
   setBranch: (b: string | "all") => void;
@@ -60,6 +61,7 @@ interface DemoState {
   sendCommunication: (jobcardId: string, channel: CommunicationLog["channel"], message: string) => void;
   updateWorkflowStep: (workflowId: string, stepOrder: number, patch: Partial<WorkflowDefinition["steps"][number]>) => void;
   addWorkflowStep: (workflowId: string, step: WorkflowDefinition["steps"][number]) => void;
+  sendMaintenanceReminder: (applianceId: string) => void;
 
   resetDemoData: () => void;
 }
@@ -108,6 +110,7 @@ export const useStore = create<DemoState>()(
       theme: "light",
       lang: "en",
       sidebarCollapsed: false,
+      maintenanceRemindersSent: {},
 
       setRole: (r) => set({ role: r }),
       setBranch: (b) => set({ selectedBranchId: b }),
@@ -264,7 +267,11 @@ export const useStore = create<DemoState>()(
         }));
       },
 
-      resetDemoData: () => set({ ...initialSlice() }),
+      sendMaintenanceReminder: (applianceId) => {
+        set((s) => ({ maintenanceRemindersSent: { ...s.maintenanceRemindersSent, [applianceId]: new Date().toISOString() } }));
+      },
+
+      resetDemoData: () => set({ ...initialSlice(), maintenanceRemindersSent: {} }),
     }),
     { name: "crm-demo-store-v1" }
   )

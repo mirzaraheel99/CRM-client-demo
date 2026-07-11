@@ -2,7 +2,7 @@ import { NavLink, Link } from "react-router-dom";
 import {
   LayoutDashboard, ClipboardList, Users, PackageSearch, Tag, Boxes,
   UserCog, GitBranch, MessageSquare, BarChart3, Smartphone, Sun, Moon,
-  Languages, ChevronDown, Wrench, Menu, RotateCcw,
+  Languages, ChevronDown, Wrench, Menu, RotateCcw, Radar,
 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { t } from "../lib/i18n";
@@ -13,6 +13,7 @@ import type { Role } from "../lib/types";
 
 const NAV: { to: string; labelKey: Parameters<typeof t>[1]; icon: ReactNode; roles?: Role[] }[] = [
   { to: "/", labelKey: "dashboard", icon: <LayoutDashboard size={18} /> },
+  { to: "/predictive-maintenance", labelKey: "predictiveMaintenance", icon: <Radar size={18} />, roles: ["admin", "manager", "supervisor"] },
   { to: "/jobcards", labelKey: "jobCards", icon: <ClipboardList size={18} /> },
   { to: "/customers", labelKey: "customers", icon: <Users size={18} /> },
   { to: "/appliances", labelKey: "appliances", icon: <PackageSearch size={18} /> },

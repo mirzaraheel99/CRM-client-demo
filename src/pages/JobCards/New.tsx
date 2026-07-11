@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useStore } from "../../lib/store";
 import { Card, CardHeader, Field, Select, Textarea, Button } from "../../components/ui";
 import { JobTypeBadge } from "../../components/StatusBadge";
@@ -7,9 +7,10 @@ import type { JobType } from "../../lib/types";
 
 export default function NewJobCard() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { customers, appliances, brands, branches, createJobCard } = useStore();
-  const [customerId, setCustomerId] = useState("");
-  const [applianceId, setApplianceId] = useState("");
+  const [customerId, setCustomerId] = useState(searchParams.get("customerId") ?? "");
+  const [applianceId, setApplianceId] = useState(searchParams.get("applianceId") ?? "");
   const [branchId, setBranchId] = useState(branches[0]?.id ?? "");
   const [problem, setProblem] = useState("");
   const [jobTypeOverride, setJobTypeOverride] = useState<JobType | "auto">("auto");

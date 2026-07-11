@@ -1,6 +1,7 @@
 export const translations = {
   en: {
     dashboard: "Dashboard",
+    predictiveMaintenance: "Predictive Maintenance",
     jobCards: "Job Cards",
     customers: "Customers",
     appliances: "Appliances",
@@ -28,6 +29,7 @@ export const translations = {
   },
   ar: {
     dashboard: "لوحة التحكم",
+    predictiveMaintenance: "الصيانة التنبؤية",
     jobCards: "بطاقات العمل",
     customers: "العملاء",
     appliances: "الأجهزة",

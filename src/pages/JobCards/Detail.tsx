@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, MessageCircle, Smartphone, Mail, CheckCircle2, XCircle, ImagePlus, Printer } from "lucide-react";
+import { ArrowLeft, MessageCircle, Smartphone, Mail, CheckCircle2, XCircle, ImagePlus, Printer, Sparkles } from "lucide-react";
 import { useStore } from "../../lib/store";
 import { Card, CardHeader, Tabs, Button, Select, Textarea, Badge, Avatar } from "../../components/ui";
 import { JobStatusBadge, JobTypeBadge } from "../../components/StatusBadge";
 import { PartsGrid } from "../../components/PartsGrid";
+import { TrackingShare } from "../../components/TrackingShare";
 import { formatCurrency, formatDateTime, relativeTime } from "../../lib/utils";
 import { totalStockByItem } from "../../lib/selectors";
 import { MESSAGE_TEMPLATES, renderTemplate } from "../../lib/templates";
 import { printEstimate } from "../../lib/print";
+import { printTaxInvoice } from "../../lib/zatca";
+import { suggestDiagnosis } from "../../lib/diagnosisAI";
 import type { StageName, Channel } from "../../lib/types";
 
 const TAB_LIST = ["Timeline", "Details", "Parts", "Attachments", "Communication"];
@@ -51,6 +54,7 @@ export default function JobCardDetail() {
   const jobComms = useMemo(() => communicationLogs.filter((c) => c.jobcardId === id), [communicationLogs, id]);
   const bill = useMemo(() => purchaseBills.find((b) => b.jobcardId === id), [purchaseBills, id]);
   const stockByItem = useMemo(() => totalStockByItem(inventoryStock), [inventoryStock]);
+  const diagnosisSuggestions = useMemo(() => suggestDiagnosis(job?.problemDescription ?? ""), [job?.problemDescription]);
 
   useEffect(() => {
     if (job) applyTemplate("received");
@@ -256,19 +260,61 @@ export default function JobCardDetail() {
                     <Button variant="danger" onClick={() => approveCustomer(job.id, false)}><XCircle size={14} /> Decline</Button>
                   </div>
                 )}
-                <div className="border-t pt-4 [border-color:var(--color-border)]">
+                <div className="border-t pt-4 [border-color:var(--color-border)] flex gap-2 flex-wrap">
                   <Button
                     variant="secondary"
                     onClick={() => printEstimate({ job, customer, appliance, brand, parts: jobParts, inventoryItems })}
                   >
                     <Printer size={14} /> Print Estimate
                   </Button>
+                  {job.finalAmount != null && (
+                    <Button
+                      variant="secondary"
+                      onClick={() => printTaxInvoice({ job, customer, appliance, brand, parts: jobParts, inventoryItems })}
+                    >
+                      <Printer size={14} /> Print Tax Invoice (ZATCA)
+                    </Button>
+                  )}
                 </div>
               </div>
             )}
 
             {tab === "Parts" && (
               <div className="space-y-5">
+                {diagnosisSuggestions.length > 0 && (
+                  <Card className="!bg-[var(--color-brand-1)]/[0.04]">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <Sparkles size={14} className="text-[var(--color-brand-1)]" />
+                      <p className="text-sm font-semibold">AI Diagnosis Assistant</p>
+                    </div>
+                    <div className="space-y-3">
+                      {diagnosisSuggestions.map((s, i) => (
+                        <div key={i} className={i > 0 ? "border-t pt-3 [border-color:var(--color-border)]" : ""}>
+                          <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                            <p className="text-sm text-[var(--color-ink-primary)]">{s.cause}</p>
+                            <Badge tone="brand">{Math.round(s.confidence * 100)}% match</Badge>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {s.partNames.map((name) => {
+                              const item = inventoryItems.find((i) => i.name === name);
+                              if (!item) return null;
+                              return (
+                                <button
+                                  key={name}
+                                  onClick={() => addPartUsed(job.id, item.id, 1)}
+                                  className="rounded-full border px-2.5 py-1 text-xs text-[var(--color-ink-secondary)] hover:text-[var(--color-brand-1)] hover:border-[var(--color-brand-1)] [border-color:var(--color-border)]"
+                                >
+                                  + {name}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                      <p className="text-[11px] text-[var(--color-ink-muted)]">Suggested from symptom pattern-matching against historical repairs, not a live model call.</p>
+                    </div>
+                  </Card>
+                )}
                 <PartsGrid
                   items={inventoryItems}
                   stockByItem={stockByItem}
@@ -346,6 +392,11 @@ export default function JobCardDetail() {
 
         {/* Right panel */}
         <div className="space-y-4">
+          <Card className="space-y-3">
+            <CardHeader title="Customer Tracking" subtitle="Self-service link — no login required" />
+            <TrackingShare jobId={job.id} />
+          </Card>
+
           <Card className="space-y-3">
             <CardHeader title="Workflow" />
             <p className="text-xs text-[var(--color-ink-muted)]">Current stage</p>

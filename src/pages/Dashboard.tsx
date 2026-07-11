@@ -1,16 +1,16 @@
 import { Link } from "react-router-dom";
-import { ClipboardList, Clock, ShieldCheck, PackageX, Users } from "lucide-react";
+import { ClipboardList, Clock, ShieldCheck, PackageX, Users, Sparkles, ArrowRight } from "lucide-react";
 import { useStore } from "../lib/store";
 import { Card, CardHeader, StatTile, Button } from "../components/ui";
 import { HorizontalBarChart, VerticalBarChart, DonutChart, TrendAreaChart } from "../components/charts";
 import { JobStatusBadge } from "../components/StatusBadge";
-import { filterByBranch, jobsByStatus, technicianWorkload, warrantyRatio, tatTrend, inventoryAlerts, avgTat } from "../lib/selectors";
+import { filterByBranch, jobsByStatus, technicianWorkload, warrantyRatio, tatTrend, inventoryAlerts, avgTat, predictiveMaintenanceCandidates } from "../lib/selectors";
 import { formatDate } from "../lib/utils";
 import { t } from "../lib/i18n";
 
 export default function Dashboard() {
   const {
-    jobCards, technicians, customers, appliances, inventoryItems, inventoryLocations, inventoryStock,
+    jobCards, technicians, customers, appliances, brands, inventoryItems, inventoryLocations, inventoryStock,
     selectedBranchId, lang,
   } = useStore();
 
@@ -18,6 +18,7 @@ export default function Dashboard() {
   const scopedTechs = filterByBranch(technicians, selectedBranchId);
   const activeJobs = scopedJobs.filter((j) => j.status !== "Delivered");
   const alerts = inventoryAlerts(inventoryItems, inventoryLocations, inventoryStock, selectedBranchId);
+  const maintenanceCandidates = predictiveMaintenanceCandidates(appliances, jobCards, brands);
   const custMap = new Map(customers.map((c) => [c.id, c]));
   const appMap = new Map(appliances.map((a) => [a.id, a]));
   const techMap = new Map(technicians.map((tc) => [tc.id, tc]));
@@ -37,6 +38,23 @@ export default function Dashboard() {
           <Button>+ {t(lang, "newJobCard")}</Button>
         </Link>
       </div>
+
+      {maintenanceCandidates.length > 0 && (
+        <Link to="/predictive-maintenance">
+          <Card className="!bg-[var(--color-brand-1)]/[0.05] hover:!bg-[var(--color-brand-1)]/[0.08] transition-colors">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2.5">
+                <Sparkles size={18} className="text-[var(--color-brand-1)] shrink-0" />
+                <p className="text-sm">
+                  <span className="font-semibold">{maintenanceCandidates.length} predictive maintenance opportunities</span>
+                  <span className="text-[var(--color-ink-muted)]"> flagged from repair-history patterns — no breakdown call needed.</span>
+                </p>
+              </div>
+              <span className="text-xs font-medium text-[var(--color-brand-1)] flex items-center gap-1 shrink-0">View <ArrowRight size={13} /></span>
+            </div>
+          </Card>
+        </Link>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
         <StatTile label="Active Jobs" value={String(activeJobs.length)} icon={<ClipboardList size={16} />} accent="var(--color-series-1)" />

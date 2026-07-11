@@ -2,14 +2,15 @@ import { useMemo, useState } from "react";
 import { Download } from "lucide-react";
 import { useStore } from "../lib/store";
 import { Card, CardHeader, Tabs, Button } from "../components/ui";
-import { HorizontalBarChart, VerticalBarChart, TrendAreaChart } from "../components/charts";
+import { HorizontalBarChart, VerticalBarChart, TrendAreaChart, DonutChart } from "../components/charts";
 import { formatCurrency, downloadCsv, tatHours } from "../lib/utils";
 import { tatTrend } from "../lib/selectors";
+import { PAYMENT_METHOD_LABELS } from "../lib/payments";
 
 const TABS = ["Job TAT", "Technician Performance", "Inventory Consumption", "Warranty Claims", "Revenue"];
 
 export default function Reports() {
-  const { jobCards, technicians, partsUsed, inventoryItems, customers, brands, appliances } = useStore();
+  const { jobCards, technicians, partsUsed, inventoryItems, customers, brands, appliances, payments } = useStore();
   const [tab, setTab] = useState(TABS[0]);
 
   const tatByBrand = useMemo(() => {
@@ -60,6 +61,14 @@ export default function Reports() {
   const totalRevenue = revenueJobs.reduce((acc, j) => acc + (j.finalAmount ?? 0), 0);
   const revenueTrend = tatTrend(jobCards).map((d) => ({ day: d.day, avgHours: d.avgHours }));
 
+  const paidPayments = payments.filter((p) => p.status === "paid");
+  const totalCollected = paidPayments.reduce((acc, p) => acc + p.amount, 0);
+  const paymentsByMethod = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const p of paidPayments) map.set(PAYMENT_METHOD_LABELS[p.method], (map.get(PAYMENT_METHOD_LABELS[p.method]) ?? 0) + p.amount);
+    return Array.from(map.entries()).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+  }, [paidPayments]);
+
   function exportCsv() {
     if (tab === "Job TAT") downloadCsv("job-tat-report.csv", tatByBrand.map((r) => ({ Brand: r.brand, "Avg TAT (hrs)": r.avgHours })));
     if (tab === "Technician Performance") downloadCsv("technician-performance.csv", techPerf.map((r) => ({ Technician: r.name, Jobs: r.jobs, Delivered: r.delivered, "Avg TAT (hrs)": r.avgHours })));
@@ -106,11 +115,21 @@ export default function Reports() {
             </>
           )}
           {tab === "Revenue" && (
-            <>
-              <CardHeader title="Non-warranty revenue" subtitle={`Total: ${formatCurrency(totalRevenue)}`} />
-              <TrendAreaChart data={revenueTrend} dataKey="avgHours" categoryKey="day" color="var(--color-series-3)" />
-              <p className="text-xs text-[var(--color-ink-muted)] mt-2">Chart shows daily average TAT as a proxy trend; export CSV for the full per-job revenue ledger.</p>
-            </>
+            <div className="space-y-6">
+              <div>
+                <CardHeader title="Non-warranty revenue" subtitle={`Invoiced: ${formatCurrency(totalRevenue)} · Collected: ${formatCurrency(totalCollected)}`} />
+                <TrendAreaChart data={revenueTrend} dataKey="avgHours" categoryKey="day" color="var(--color-series-3)" />
+                <p className="text-xs text-[var(--color-ink-muted)] mt-2">Chart shows daily average TAT as a proxy trend; export CSV for the full per-job revenue ledger.</p>
+              </div>
+              <div className="border-t pt-6 [border-color:var(--color-border)]">
+                <CardHeader title="Payments collected by method" subtitle="mada, STC Pay, Apple Pay, and BNPL (Tabby/Tamara) split" />
+                {paymentsByMethod.length > 0 ? (
+                  <DonutChart data={paymentsByMethod} height={260} centerValue={formatCurrency(totalCollected)} centerLabel="Collected" />
+                ) : (
+                  <p className="text-sm text-[var(--color-ink-muted)]">No payments recorded yet.</p>
+                )}
+              </div>
+            </div>
           )}
         </div>
       </Card>

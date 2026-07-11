@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Search } from "lucide-react";
+import { Search, Wifi } from "lucide-react";
 import { useStore } from "../../lib/store";
 import { Card, Button, Input, Select, Modal, Field } from "../../components/ui";
 import { Badge } from "../../components/ui";
@@ -36,6 +36,7 @@ export default function ApplianceList() {
     addAppliance({
       ...form,
       imeiNo: form.imeiNo || undefined,
+      isSmartConnected: false,
       warrantyStatus: months < brand.warrantyMonths ? "In Warranty" : "Out of Warranty",
     });
     setForm({ customerId: "", brandId: "", category: "AC", model: "", serialNo: "", imeiNo: "", purchaseDate: "" });
@@ -83,6 +84,7 @@ export default function ApplianceList() {
               <tr key={a.id} className="border-b last:border-0 [border-color:var(--color-border)] hover:bg-black/[0.02] dark:hover:bg-white/[0.03]">
                 <td className="px-5 py-3">
                   <Link to={`/appliances/${a.id}`} className="font-medium text-[var(--color-brand-1)]">{a.model}</Link>
+                  {a.isSmartConnected && <Wifi size={12} className="inline ml-1.5 mb-0.5 text-[var(--color-status-good)]" />}
                 </td>
                 <td className="px-3 py-3 text-[var(--color-ink-secondary)]">{a.category}</td>
                 <td className="px-3 py-3 text-[var(--color-ink-secondary)]">{brandMap.get(a.brandId)?.name ?? "—"}</td>

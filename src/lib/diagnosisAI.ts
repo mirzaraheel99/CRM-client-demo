@@ -42,3 +42,28 @@ export function suggestDiagnosis(problemDescription: string): DiagnosisSuggestio
     .slice(0, 2)
     .map((m) => ({ cause: m.cause, confidence: m.confidence, partNames: m.partNames }));
 }
+
+// Maps a connected-appliance telemetry error code straight to the spare parts a
+// technician would carry for it — the value of pulling diagnostics before the
+// truck rolls, per LG ThinQ Care / Samsung SmartThings-style service portals.
+const TELEMETRY_PART_HINTS: Record<string, string[]> = {
+  E1: ["Refrigerant Gas R410a (kg)", "Compressor Relay"],
+  E5: ["Compressor Relay", "Capacitor 35uF"],
+  F0: ["PCB Control Board"],
+  "Er FF": ["Fan Motor"],
+  "Er dh": ["Heating Element"],
+  "Er 5C": ["Compressor Relay"],
+  E4: ["Drain Pump"],
+  UE: ["Belt Drive"],
+  E2: ["Water Inlet Valve"],
+  E101: ["LED Backlight Strip", "Display Screen Assembly"],
+  E204: ["PCB Control Board"],
+  "E-3": ["Door Gasket"],
+  "F-1": ["Magnetron"],
+};
+
+export function suggestFromTelemetry(errorCode: string, errorDescription: string): DiagnosisSuggestion | null {
+  const partNames = TELEMETRY_PART_HINTS[errorCode];
+  if (!partNames) return null;
+  return { cause: `${errorDescription} (error ${errorCode}, pulled from device telemetry)`, confidence: 0.93, partNames };
+}

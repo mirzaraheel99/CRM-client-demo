@@ -3,6 +3,7 @@ import { CheckCircle2, XCircle, Wrench, ImagePlus, MessageCircle, Smartphone, Ma
 import { useStore } from "../lib/store";
 import { Card, Badge, Button } from "../components/ui";
 import { JobStatusBadge } from "../components/StatusBadge";
+import { PaymentPanel } from "../components/PaymentPanel";
 import { formatCurrency, formatDate, cx } from "../lib/utils";
 import type { Channel } from "../lib/types";
 
@@ -16,7 +17,7 @@ export default function TrackingPage() {
   const { jobId } = useParams();
   const {
     jobCards, customers, appliances, brands, technicians, workflows,
-    stageHistory, attachments, communicationLogs, approveCustomer,
+    stageHistory, attachments, communicationLogs, approveCustomer, payments,
   } = useStore();
 
   const job = jobCards.find((j) => j.id === jobId);
@@ -40,9 +41,11 @@ export default function TrackingPage() {
   const history = stageHistory.filter((h) => h.jobcardId === job.id).sort((a, b) => +new Date(a.timestamp) - +new Date(b.timestamp));
   const photos = attachments.filter((a) => a.jobcardId === job.id);
   const comms = communicationLogs.filter((c) => c.jobcardId === job.id).sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp));
+  const jobPayments = payments.filter((p) => p.jobcardId === job.id);
 
   const stepIdx = workflow?.steps.findIndex((s) => s.stepName === job.currentStage) ?? -1;
   const needsApproval = job.currentStage === "Customer Approval" && job.customerApproved == null;
+  const canPay = job.jobType === "non_warranty" && (job.status === "Ready" || job.status === "Delivered") && job.finalAmount != null;
 
   return (
     <div className="min-h-screen bg-[var(--color-surface-page)] text-[var(--color-ink-primary)]">
@@ -126,6 +129,8 @@ export default function TrackingPage() {
             <Badge tone={job.customerApproved ? "good" : "critical"}>{job.customerApproved ? "You approved this estimate" : "You declined this estimate"}</Badge>
           </Card>
         )}
+
+        {canPay && <PaymentPanel jobcardId={job.id} amount={job.finalAmount} payments={jobPayments} />}
 
         <Card>
           <p className="text-sm font-semibold mb-3">Progress timeline</p>

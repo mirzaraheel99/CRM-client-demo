@@ -11,7 +11,9 @@ import { totalStockByItem } from "../../lib/selectors";
 import { MESSAGE_TEMPLATES, renderTemplate } from "../../lib/templates";
 import { printEstimate } from "../../lib/print";
 import { printTaxInvoice } from "../../lib/zatca";
-import { suggestDiagnosis } from "../../lib/diagnosisAI";
+import { suggestDiagnosis, suggestFromTelemetry } from "../../lib/diagnosisAI";
+import { PaymentPanel } from "../../components/PaymentPanel";
+import { Wifi } from "lucide-react";
 import type { StageName, Channel } from "../../lib/types";
 
 const TAB_LIST = ["Timeline", "Details", "Parts", "Attachments", "Communication"];
@@ -33,8 +35,8 @@ export default function JobCardDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const {
-    jobCards, customers, appliances, brands, technicians, workflows,
-    stageHistory, attachments, partsUsed, communicationLogs, inventoryItems, inventoryStock, purchaseBills,
+    jobCards, customers, appliances, applianceTelemetry, brands, technicians, workflows,
+    stageHistory, attachments, partsUsed, communicationLogs, inventoryItems, inventoryStock, purchaseBills, payments,
     role, advanceStage, assignTechnician, setEstimate, approveCustomer, addPartUsed, addAttachment, sendCommunication,
   } = useStore();
 
@@ -54,7 +56,15 @@ export default function JobCardDetail() {
   const jobComms = useMemo(() => communicationLogs.filter((c) => c.jobcardId === id), [communicationLogs, id]);
   const bill = useMemo(() => purchaseBills.find((b) => b.jobcardId === id), [purchaseBills, id]);
   const stockByItem = useMemo(() => totalStockByItem(inventoryStock), [inventoryStock]);
-  const diagnosisSuggestions = useMemo(() => suggestDiagnosis(job?.problemDescription ?? ""), [job?.problemDescription]);
+  const jobPayments = useMemo(() => payments.filter((p) => p.jobcardId === id), [payments, id]);
+  const telemetry = useMemo(() => applianceTelemetry.find((t) => t.applianceId === job?.applianceId), [applianceTelemetry, job?.applianceId]);
+  const diagnosisSuggestions = useMemo(() => {
+    const base = suggestDiagnosis(job?.problemDescription ?? "");
+    const telemetrySuggestion = telemetry?.lastErrorCode && telemetry.lastErrorDescription
+      ? suggestFromTelemetry(telemetry.lastErrorCode, telemetry.lastErrorDescription)
+      : null;
+    return telemetrySuggestion ? [telemetrySuggestion, ...base] : base;
+  }, [job?.problemDescription, telemetry]);
 
   useEffect(() => {
     if (job) applyTemplate("received");
@@ -151,6 +161,25 @@ export default function JobCardDetail() {
             <p className="text-xs text-[var(--color-ink-secondary)]">Serial {appliance?.serialNo}</p>
             {appliance?.imeiNo && <p className="text-xs text-[var(--color-ink-secondary)]">IMEI {appliance.imeiNo}</p>}
           </div>
+          {appliance?.isSmartConnected && (
+            <div className="border-t pt-3 [border-color:var(--color-border)]">
+              <div className="flex items-center gap-1.5 mb-1">
+                <Wifi size={13} className="text-[var(--color-status-good)]" />
+                <p className="text-xs font-medium">Smart Diagnostics</p>
+              </div>
+              {telemetry?.lastErrorCode ? (
+                <>
+                  <Badge tone="serious">Error {telemetry.lastErrorCode}</Badge>
+                  <p className="text-xs text-[var(--color-ink-secondary)] mt-1">{telemetry.lastErrorDescription}</p>
+                </>
+              ) : (
+                <p className="text-xs text-[var(--color-ink-secondary)]">No errors reported</p>
+              )}
+              <p className="text-[11px] text-[var(--color-ink-muted)] mt-1">
+                {telemetry?.cycleCount.toLocaleString()} cycles · synced {telemetry ? relativeTime(telemetry.lastSyncAt) : "—"}
+              </p>
+            </div>
+          )}
           <div className="border-t pt-3 [border-color:var(--color-border)]">
             <p className="text-xs text-[var(--color-ink-muted)] mb-1">Warranty</p>
             <Badge tone={appliance?.warrantyStatus === "In Warranty" ? "good" : "neutral"}>{appliance?.warrantyStatus}</Badge>
@@ -276,6 +305,12 @@ export default function JobCardDetail() {
                     </Button>
                   )}
                 </div>
+                {job.jobType === "non_warranty" && (job.finalAmount != null || jobPayments.length > 0) && (
+                  <div className="border-t pt-4 [border-color:var(--color-border)]">
+                    <p className="text-xs text-[var(--color-ink-muted)] mb-2">Payment</p>
+                    <PaymentPanel jobcardId={job.id} amount={job.finalAmount} payments={jobPayments} />
+                  </div>
+                )}
               </div>
             )}
 

@@ -1,19 +1,20 @@
 import { useMemo, useState } from "react";
-import { PackagePlus, PackageMinus, ArrowLeftRight, Undo2 } from "lucide-react";
+import { PackagePlus, PackageMinus, ArrowLeftRight, Undo2, Sparkles } from "lucide-react";
 import { useStore } from "../lib/store";
 import { Card, CardHeader, Tabs, Button, Input, Select, Field, Modal, Badge } from "../components/ui";
 import { HorizontalBarChart } from "../components/charts";
 import { formatCurrency, formatDateTime } from "../lib/utils";
-import { stockByBranch } from "../lib/selectors";
+import { stockByBranch, smartReorderSuggestions } from "../lib/selectors";
 import type { InventoryTransaction } from "../lib/types";
 
-const TABS = ["Item Master", "Stock Ledger", "Locations & Van Stock", "Stock by Branch"];
+const TABS = ["Item Master", "Stock Ledger", "Locations & Van Stock", "Stock by Branch", "Smart Reorder"];
 
 export default function Inventory() {
   const { branches, inventoryItems, inventoryLocations, inventoryStock, inventoryTransactions, addInventoryItem, addInventoryTransaction } = useStore();
   const [tab, setTab] = useState(TABS[0]);
   const [txnModal, setTxnModal] = useState<InventoryTransaction["type"] | null>(null);
   const [itemModal, setItemModal] = useState(false);
+  const [orderedItems, setOrderedItems] = useState<Set<string>>(new Set());
 
   const [txnForm, setTxnForm] = useState({ itemId: "", locationId: "", destLocationId: "", qty: 1 });
   const [itemForm, setItemForm] = useState({ name: "", category: "Electrical", brand: "", partNo: "", unitPrice: 0, reorderLevel: 5 });
@@ -29,6 +30,10 @@ export default function Inventory() {
     [inventoryItems, inventoryLocations, inventoryStock, branches]
   );
   const branchValueChart = branchStock.map((b) => ({ branch: b.branch.name, value: b.totalValue }));
+  const reorderSuggestions = useMemo(
+    () => smartReorderSuggestions(inventoryItems, inventoryTransactions, inventoryStock),
+    [inventoryItems, inventoryTransactions, inventoryStock]
+  );
 
   function submitTxn() {
     if (!txnForm.itemId || !txnForm.locationId || txnForm.qty <= 0) return;
@@ -180,6 +185,59 @@ export default function Inventory() {
                   </Card>
                 ))}
               </div>
+            </div>
+          )}
+
+          {tab === "Smart Reorder" && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-1.5">
+                <Sparkles size={14} className="text-[var(--color-brand-1)]" />
+                <p className="text-xs text-[var(--color-ink-muted)]">
+                  Ranked by consumption velocity over the last 30 days, not just a static reorder level — items closest to running out appear first.
+                </p>
+              </div>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-[var(--color-ink-muted)] border-b [border-color:var(--color-border)]">
+                    <th className="py-2 font-medium">Part</th>
+                    <th className="py-2 font-medium">Current Stock</th>
+                    <th className="py-2 font-medium">Weekly Usage</th>
+                    <th className="py-2 font-medium">Weeks of Cover</th>
+                    <th className="py-2 font-medium">Suggested Reorder</th>
+                    <th className="py-2 font-medium">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reorderSuggestions.map((s) => (
+                    <tr key={s.item.id} className="border-b last:border-0 [border-color:var(--color-border)]">
+                      <td className="py-2.5">
+                        <p className="font-medium">{s.item.name}</p>
+                        <p className="text-xs text-[var(--color-ink-muted)]">{s.item.partNo}</p>
+                      </td>
+                      <td className="py-2.5 tabular-nums">{s.currentStock}</td>
+                      <td className="py-2.5 tabular-nums">{s.weeklyVelocity}/wk</td>
+                      <td className="py-2.5">
+                        <Badge tone={s.weeksOfCover == null ? "neutral" : s.weeksOfCover < 1.5 ? "critical" : "warning"}>
+                          {s.weeksOfCover == null ? "No recent usage" : `${s.weeksOfCover} wks`}
+                        </Badge>
+                      </td>
+                      <td className="py-2.5 tabular-nums font-medium">{s.suggestedQty} units</td>
+                      <td className="py-2.5">
+                        {orderedItems.has(s.item.id) ? (
+                          <Badge tone="good">Order placed</Badge>
+                        ) : (
+                          <Button size="sm" variant="secondary" onClick={() => setOrderedItems((prev) => new Set(prev).add(s.item.id))}>
+                            Create Purchase Order
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {reorderSuggestions.length === 0 && (
+                    <tr><td colSpan={6} className="py-8 text-center text-[var(--color-ink-muted)]">Stock levels are healthy across all tracked parts.</td></tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

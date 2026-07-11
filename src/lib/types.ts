@@ -62,6 +62,18 @@ export interface Appliance {
   imeiNo?: string;
   purchaseDate: string;
   warrantyStatus: "In Warranty" | "Out of Warranty" | "Unknown";
+  isSmartConnected: boolean;
+}
+
+// Simulated IoT telemetry — in production this would come from the brand's
+// own platform (Samsung SmartThings, LG ThinQ, GE SmartHQ) via their service
+// API, keyed by appliance serial number.
+export interface ApplianceTelemetry {
+  applianceId: string;
+  lastErrorCode: string | null;
+  lastErrorDescription: string | null;
+  cycleCount: number;
+  lastSyncAt: string;
 }
 
 export interface Technician {
@@ -191,4 +203,16 @@ export interface WorkflowDefinition {
   active: boolean;
   description: string;
   steps: WorkflowStep[];
+}
+
+export type PaymentMethod = "mada" | "apple_pay" | "stc_pay" | "tabby" | "tamara" | "cash";
+
+export interface Payment {
+  id: string;
+  jobcardId: string;
+  method: PaymentMethod;
+  amount: number;
+  installments?: number;
+  status: "paid" | "failed";
+  timestamp: string;
 }

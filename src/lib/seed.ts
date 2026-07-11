@@ -3,6 +3,7 @@ import type {
   Customer,
   Brand,
   Appliance,
+  ApplianceTelemetry,
   Technician,
   InventoryLocation,
   InventoryItem,
@@ -17,6 +18,7 @@ import type {
   WorkflowDefinition,
   ApplianceCategory,
   StageName,
+  Payment,
 } from "./types";
 
 // Deterministic PRNG so the demo dataset is stable across reloads.
@@ -33,6 +35,14 @@ function mulberry32(seed: number) {
 
 const rand = mulberry32(20260711);
 const pick = <T,>(arr: T[]): T => arr[Math.floor(rand() * arr.length)];
+const pickN = <T,>(arr: T[], n: number): T[] => {
+  const copy = [...arr];
+  const out: T[] = [];
+  for (let i = 0; i < n && copy.length; i++) {
+    out.push(copy.splice(Math.floor(rand() * copy.length), 1)[0]);
+  }
+  return out;
+};
 const int = (min: number, max: number) => Math.floor(rand() * (max - min + 1)) + min;
 const daysAgo = (n: number) => {
   const d = new Date();
@@ -78,11 +88,15 @@ export const CUSTOMERS: Customer[] = Array.from({ length: 60 }, (_, i) => {
 
 const modelSuffixes = ["Pro", "Neo", "X2", "Max", "Lite", "Plus", "Ultra", "SE", "Turbo", "Eco"];
 
+const SMART_CAPABLE_BRANDS = new Set(["Samsung", "LG", "Apple"]);
+
 export const APPLIANCES: Appliance[] = Array.from({ length: 90 }, (_, i) => {
   const category = pick(CATEGORIES);
   const brand = category === "Mobile" ? BRANDS.find((b) => b.name === "Apple")! : pick(BRANDS.filter((b) => b.name !== "Apple"));
   const purchaseDate = daysAgo(int(20, 900));
   const monthsSince = (Date.now() - new Date(purchaseDate).getTime()) / (1000 * 60 * 60 * 24 * 30);
+  // Newer appliances from brands with a real connected-app ecosystem (SmartThings/ThinQ) are more likely IoT-enabled.
+  const isSmartConnected = category !== "Mobile" && SMART_CAPABLE_BRANDS.has(brand.name) && monthsSince < 30 && rand() > 0.45;
   return {
     id: id("app", i + 1),
     customerId: pick(CUSTOMERS).id,
@@ -93,6 +107,29 @@ export const APPLIANCES: Appliance[] = Array.from({ length: 90 }, (_, i) => {
     imeiNo: category === "Mobile" ? `${int(100000000000000, 999999999999999)}` : undefined,
     purchaseDate,
     warrantyStatus: monthsSince < brand.warrantyMonths ? "In Warranty" : "Out of Warranty",
+    isSmartConnected,
+  };
+});
+
+const ERROR_CODES: Record<string, { code: string; desc: string }[]> = {
+  AC: [{ code: "E1", desc: "Refrigerant pressure sensor fault" }, { code: "E5", desc: "Compressor overcurrent" }, { code: "F0", desc: "Indoor/outdoor unit communication error" }],
+  Refrigerator: [{ code: "Er FF", desc: "Freezer fan fault" }, { code: "Er dh", desc: "Defrost heater fault" }, { code: "Er 5C", desc: "Compressor start failure" }],
+  Washer: [{ code: "E4", desc: "Drain blockage detected" }, { code: "UE", desc: "Unbalanced load" }, { code: "E2", desc: "Water inlet timeout" }],
+  Mobile: [{ code: "—", desc: "No diagnostic codes reported" }],
+  TV: [{ code: "E101", desc: "Panel backlight driver fault" }, { code: "E204", desc: "HDMI port communication error" }],
+  Microwave: [{ code: "E-3", desc: "Door switch fault" }, { code: "F-1", desc: "Magnetron overheat" }],
+};
+
+export const APPLIANCE_TELEMETRY: ApplianceTelemetry[] = APPLIANCES.filter((a) => a.isSmartConnected).map((a) => {
+  const codes = ERROR_CODES[a.category] ?? [];
+  const hasError = codes.length > 0 && rand() > 0.55;
+  const chosen = hasError ? pick(codes) : null;
+  return {
+    applianceId: a.id,
+    lastErrorCode: chosen?.code ?? null,
+    lastErrorDescription: chosen?.desc ?? null,
+    cycleCount: int(40, 2200),
+    lastSyncAt: daysAgo(int(0, 3)),
   };
 });
 
@@ -166,6 +203,32 @@ export const INVENTORY_TRANSACTIONS: InventoryTransaction[] = Array.from({ lengt
     destLocationId: type === "transfer" ? pick(INVENTORY_LOCATIONS.filter((l) => l.id !== loc.id)).id : undefined,
   };
 });
+
+// Deliberately seed a couple of "fast movers": parts whose stock looks fine
+// against a static reorder level, but whose recent consumption velocity means
+// they'll run out well before a lead-time restock — the exact case a
+// velocity-based reorder view catches that a static threshold misses.
+let fastMoverTxnId = 1000;
+const stockTotalByItem = new Map<string, number>();
+for (const s of INVENTORY_STOCK) stockTotalByItem.set(s.itemId, (stockTotalByItem.get(s.itemId) ?? 0) + s.qty);
+const fastMoverCandidates = INVENTORY_ITEMS.filter((i) => (stockTotalByItem.get(i.id) ?? 0) > 60 && !LOW_STOCK_ITEM_IDS.has(i.id));
+for (const item of pickN(fastMoverCandidates, 3)) {
+  const totalStock = stockTotalByItem.get(item.id) ?? 100;
+  const targetWeeksOfCover = 1 + rand() * 1.5; // lands between 1.0 and 2.5 weeks
+  const weeklyVelocity = Math.max(4, Math.round(totalStock / targetWeeksOfCover));
+  for (let week = 0; week < 4; week++) {
+    const loc = pick(INVENTORY_LOCATIONS.filter((l) => l.type === "van"));
+    INVENTORY_TRANSACTIONS.push({
+      id: id("txn", 900 + fastMoverTxnId++),
+      itemId: item.id,
+      locationId: loc.id,
+      type: "issue",
+      qty: Math.max(1, Math.round(weeklyVelocity / 2)),
+      timestamp: daysAgo(week * 7 + int(0, 5)),
+      createdBy: pick(TECHNICIANS).name,
+    });
+  }
+}
 
 const STAGES_WARRANTY: StageName[] = ["Received", "Warranty Validation", "Diagnosis", "Repair", "QA", "Ready for Handover", "Delivered"];
 const STAGES_NONWARRANTY: StageName[] = ["Received", "Diagnosis", "Estimate", "Customer Approval", "Repair", "QA", "Ready for Handover", "Delivered"];
@@ -304,6 +367,42 @@ for (let i = 0; i < 130; i++) {
       timestamp: daysAgo(int(0, 40)),
     });
   }
+}
+
+export const PAYMENTS: Payment[] = [];
+let paymentId = 1;
+const PAYMENT_METHOD_WEIGHTS: { method: Payment["method"]; weight: number }[] = [
+  { method: "mada", weight: 40 },
+  { method: "stc_pay", weight: 20 },
+  { method: "apple_pay", weight: 18 },
+  { method: "tabby", weight: 10 },
+  { method: "tamara", weight: 7 },
+  { method: "cash", weight: 5 },
+];
+function pickPaymentMethod(): Payment["method"] {
+  const total = PAYMENT_METHOD_WEIGHTS.reduce((a, w) => a + w.weight, 0);
+  let roll = rand() * total;
+  for (const w of PAYMENT_METHOD_WEIGHTS) {
+    if (roll < w.weight) return w.method;
+    roll -= w.weight;
+  }
+  return "mada";
+}
+
+for (const job of JOB_CARDS) {
+  if (job.jobType !== "non_warranty" || job.status !== "Delivered" || job.finalAmount == null) continue;
+  if (rand() > 0.82) continue; // a few delivered jobs remain unpaid, realistically
+  const method = pickPaymentMethod();
+  const isBnpl = method === "tabby" || method === "tamara";
+  PAYMENTS.push({
+    id: id("pay", paymentId++),
+    jobcardId: job.id,
+    method,
+    amount: job.finalAmount,
+    installments: isBnpl ? pick([3, 4]) : undefined,
+    status: rand() > 0.05 ? "paid" : "failed",
+    timestamp: job.updatedAt,
+  });
 }
 
 export const WORKFLOWS: WorkflowDefinition[] = [

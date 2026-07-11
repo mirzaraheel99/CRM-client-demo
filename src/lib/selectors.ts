@@ -1,4 +1,4 @@
-import type { JobCard, JobStatus, InventoryItem, InventoryLocation, InventoryStock, Technician, Appliance, Brand } from "./types";
+import type { JobCard, JobStatus, InventoryItem, InventoryLocation, InventoryStock, InventoryTransaction, Technician, Appliance, Brand } from "./types";
 import { tatHours } from "./utils";
 
 export function filterByBranch<T extends { branchId: string }>(items: T[], branchId: string | "all"): T[] {
@@ -163,4 +163,54 @@ export function predictiveMaintenanceCandidates(
   }
   const brandName = (id: string) => brands.find((b) => b.id === id)?.name ?? "";
   return candidates.sort((x, y) => y.urgencyScore - x.urgencyScore || brandName(x.appliance.brandId).localeCompare(brandName(y.appliance.brandId)));
+}
+
+export interface SmartReorderSuggestion {
+  item: InventoryItem;
+  currentStock: number;
+  weeklyVelocity: number;
+  weeksOfCover: number | null;
+  suggestedQty: number;
+}
+
+// Consumption-velocity reorder planning: looks at "issue" transactions over the
+// trailing window to estimate how fast each part actually moves, then flags
+// anything that will run out before a replacement lead time — sharper than a
+// static reorder-level threshold, and closer to what parts-vendor integrations
+// (RepairDesk/MobileSentrix) are approximating from the supply side.
+export function smartReorderSuggestions(
+  items: InventoryItem[],
+  transactions: InventoryTransaction[],
+  stock: InventoryStock[],
+  { windowDays = 30, leadTimeWeeks = 3, targetCoverWeeks = 6 }: { windowDays?: number; leadTimeWeeks?: number; targetCoverWeeks?: number } = {}
+): SmartReorderSuggestion[] {
+  const cutoff = Date.now() - windowDays * 24 * 60 * 60 * 1000;
+  const issuedByItem = new Map<string, number>();
+  for (const t of transactions) {
+    if (t.type !== "issue") continue;
+    if (new Date(t.timestamp).getTime() < cutoff) continue;
+    issuedByItem.set(t.itemId, (issuedByItem.get(t.itemId) ?? 0) + t.qty);
+  }
+  const stockByItem = new Map<string, number>();
+  for (const s of stock) stockByItem.set(s.itemId, (stockByItem.get(s.itemId) ?? 0) + s.qty);
+
+  const weeks = windowDays / 7;
+  const suggestions: SmartReorderSuggestion[] = [];
+  for (const item of items) {
+    const issued = issuedByItem.get(item.id) ?? 0;
+    const currentStock = stockByItem.get(item.id) ?? 0;
+    const weeklyVelocity = issued / weeks;
+    const weeksOfCover = weeklyVelocity > 0 ? currentStock / weeklyVelocity : null;
+    const needsReorder = weeklyVelocity > 0 ? weeksOfCover !== null && weeksOfCover < leadTimeWeeks : currentStock <= item.reorderLevel;
+    if (!needsReorder) continue;
+    const targetStock = weeklyVelocity > 0 ? Math.ceil(weeklyVelocity * targetCoverWeeks) : item.reorderLevel * 2;
+    suggestions.push({
+      item,
+      currentStock,
+      weeklyVelocity: Math.round(weeklyVelocity * 10) / 10,
+      weeksOfCover: weeksOfCover != null ? Math.round(weeksOfCover * 10) / 10 : null,
+      suggestedQty: Math.max(0, targetStock - currentStock),
+    });
+  }
+  return suggestions.sort((a, b) => (a.weeksOfCover ?? 99) - (b.weeksOfCover ?? 99));
 }

@@ -2,10 +2,10 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import * as seed from "./seed";
 import type {
-  Customer, Appliance, Brand, Technician, InventoryItem, InventoryLocation,
+  Customer, Appliance, ApplianceTelemetry, Brand, Technician, InventoryItem, InventoryLocation,
   InventoryStock, InventoryTransaction, JobCard, JobCardStageHistory,
   JobCardAttachment, JobCardPartUsed, PurchaseBill, CommunicationLog,
-  WorkflowDefinition, Role, StageName, Branch,
+  WorkflowDefinition, Role, StageName, Branch, Payment, PaymentMethod,
 } from "./types";
 
 interface DemoState {
@@ -13,6 +13,7 @@ interface DemoState {
   customers: Customer[];
   brands: Brand[];
   appliances: Appliance[];
+  applianceTelemetry: ApplianceTelemetry[];
   technicians: Technician[];
   inventoryItems: InventoryItem[];
   inventoryLocations: InventoryLocation[];
@@ -25,6 +26,7 @@ interface DemoState {
   purchaseBills: PurchaseBill[];
   communicationLogs: CommunicationLog[];
   workflows: WorkflowDefinition[];
+  payments: Payment[];
 
   // UI/global chrome state
   role: Role;
@@ -62,6 +64,7 @@ interface DemoState {
   updateWorkflowStep: (workflowId: string, stepOrder: number, patch: Partial<WorkflowDefinition["steps"][number]>) => void;
   addWorkflowStep: (workflowId: string, step: WorkflowDefinition["steps"][number]) => void;
   sendMaintenanceReminder: (applianceId: string) => void;
+  recordPayment: (jobcardId: string, method: PaymentMethod, amount: number, installments?: number) => Payment;
 
   resetDemoData: () => void;
 }
@@ -74,6 +77,7 @@ const initialSlice = () => ({
   customers: seed.CUSTOMERS,
   brands: seed.BRANDS,
   appliances: seed.APPLIANCES,
+  applianceTelemetry: seed.APPLIANCE_TELEMETRY,
   technicians: seed.TECHNICIANS,
   inventoryItems: seed.INVENTORY_ITEMS,
   inventoryLocations: seed.INVENTORY_LOCATIONS,
@@ -86,6 +90,7 @@ const initialSlice = () => ({
   purchaseBills: seed.PURCHASE_BILLS,
   communicationLogs: seed.COMMUNICATION_LOGS,
   workflows: seed.WORKFLOWS,
+  payments: seed.PAYMENTS,
 });
 
 const STAGE_TO_STATUS: Record<StageName, JobCard["status"]> = {
@@ -269,6 +274,12 @@ export const useStore = create<DemoState>()(
 
       sendMaintenanceReminder: (applianceId) => {
         set((s) => ({ maintenanceRemindersSent: { ...s.maintenanceRemindersSent, [applianceId]: new Date().toISOString() } }));
+      },
+
+      recordPayment: (jobcardId, method, amount, installments) => {
+        const payment: Payment = { id: nextId("pay"), jobcardId, method, amount, installments, status: "paid", timestamp: new Date().toISOString() };
+        set((s) => ({ payments: [payment, ...s.payments] }));
+        return payment;
       },
 
       resetDemoData: () => set({ ...initialSlice(), maintenanceRemindersSent: {} }),

@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { useStore } from "../../lib/store";
 import { Card, CardHeader, Badge } from "../../components/ui";
 import { JobStatusBadge, JobTypeBadge } from "../../components/StatusBadge";
+import { WhatsappVerify } from "../../components/WhatsappVerify";
 import { formatDate, formatDateTime } from "../../lib/utils";
 
 export default function CustomerDetail() {
@@ -34,6 +35,9 @@ export default function CustomerDetail() {
             <p><span className="text-[var(--color-ink-muted)]">WhatsApp:</span> {customer.whatsapp}</p>
             <p><span className="text-[var(--color-ink-muted)]">Email:</span> {customer.email}</p>
             <p><span className="text-[var(--color-ink-muted)]">Address:</span> {customer.address}</p>
+            <div className="pt-2 border-t [border-color:var(--color-border)]">
+              <WhatsappVerify customerId={customer.id} verified={customer.whatsappVerified} />
+            </div>
           </div>
         </Card>
 

@@ -27,8 +27,8 @@
   --color-status-serious: #ec835a;
   --color-status-critical: #d03b3b;
 
-  --color-brand-1: #2a78d6;
-  --color-brand-2: #1c5cab;
+  --color-brand-1: #c2410c;
+  --color-brand-2: #9a3412;
 }
 
 :root[data-theme="dark"] {
@@ -50,6 +50,9 @@
   --color-series-6: #e66767;
   --color-series-7: #d55181;
   --color-series-8: #d95926;
+
+  --color-brand-1: #f0763a;
+  --color-brand-2: #e0621f;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -72,6 +75,9 @@
     --color-series-6: #e66767;
     --color-series-7: #d55181;
     --color-series-8: #d95926;
+
+    --color-brand-1: #f0763a;
+    --color-brand-2: #e0621f;
   }
 }
 

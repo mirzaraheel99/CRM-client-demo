@@ -67,6 +67,32 @@ export function inventoryAlerts(items: InventoryItem[], locations: InventoryLoca
     .slice(0, 8);
 }
 
+export function totalStockByItem(stock: InventoryStock[]) {
+  const map = new Map<string, number>();
+  for (const s of stock) map.set(s.itemId, (map.get(s.itemId) ?? 0) + s.qty);
+  return map;
+}
+
+export function stockByBranch(
+  items: InventoryItem[],
+  locations: InventoryLocation[],
+  stock: InventoryStock[],
+  branches: { id: string; name: string }[]
+) {
+  return branches.map((branch) => {
+    const branchLocIds = new Set(locations.filter((l) => l.branchId === branch.id).map((l) => l.id));
+    const totals = new Map<string, number>();
+    for (const s of stock) {
+      if (!branchLocIds.has(s.locationId)) continue;
+      totals.set(s.itemId, (totals.get(s.itemId) ?? 0) + s.qty);
+    }
+    const totalUnits = Array.from(totals.values()).reduce((a, b) => a + b, 0);
+    const totalValue = items.reduce((acc, item) => acc + (totals.get(item.id) ?? 0) * item.unitPrice, 0);
+    const lowStockCount = items.filter((item) => (totals.get(item.id) ?? 0) <= item.reorderLevel).length;
+    return { branch, totals, totalUnits, totalValue, lowStockCount };
+  });
+}
+
 export function avgTat(jobCards: JobCard[]) {
   const delivered = jobCards.filter((j) => j.status === "Delivered");
   if (!delivered.length) return 0;

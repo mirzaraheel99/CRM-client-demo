@@ -40,6 +40,7 @@ export interface Customer {
   address: string;
   branchId: string;
   createdAt: string;
+  whatsappVerified: boolean;
 }
 
 export interface Brand {

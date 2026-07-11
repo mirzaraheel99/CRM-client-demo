@@ -2,13 +2,15 @@ import { useMemo, useState } from "react";
 import { PackagePlus, PackageMinus, ArrowLeftRight, Undo2 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { Card, CardHeader, Tabs, Button, Input, Select, Field, Modal, Badge } from "../components/ui";
+import { HorizontalBarChart } from "../components/charts";
 import { formatCurrency, formatDateTime } from "../lib/utils";
+import { stockByBranch } from "../lib/selectors";
 import type { InventoryTransaction } from "../lib/types";
 
-const TABS = ["Item Master", "Stock Ledger", "Locations & Van Stock"];
+const TABS = ["Item Master", "Stock Ledger", "Locations & Van Stock", "Stock by Branch"];
 
 export default function Inventory() {
-  const { inventoryItems, inventoryLocations, inventoryStock, inventoryTransactions, addInventoryItem, addInventoryTransaction } = useStore();
+  const { branches, inventoryItems, inventoryLocations, inventoryStock, inventoryTransactions, addInventoryItem, addInventoryTransaction } = useStore();
   const [tab, setTab] = useState(TABS[0]);
   const [txnModal, setTxnModal] = useState<InventoryTransaction["type"] | null>(null);
   const [itemModal, setItemModal] = useState(false);
@@ -21,6 +23,12 @@ export default function Inventory() {
     for (const s of inventoryStock) map.set(s.itemId, (map.get(s.itemId) ?? 0) + s.qty);
     return map;
   }, [inventoryStock]);
+
+  const branchStock = useMemo(
+    () => stockByBranch(inventoryItems, inventoryLocations, inventoryStock, branches),
+    [inventoryItems, inventoryLocations, inventoryStock, branches]
+  );
+  const branchValueChart = branchStock.map((b) => ({ branch: b.branch.name, value: b.totalValue }));
 
   function submitTxn() {
     if (!txnForm.itemId || !txnForm.locationId || txnForm.qty <= 0) return;
@@ -150,6 +158,30 @@ export default function Inventory() {
               })}
             </div>
           )}
+
+          {tab === "Stock by Branch" && (
+            <div className="space-y-5">
+              <div>
+                <CardHeader title="Inventory value by branch" subtitle="Total stock value (unit price × qty on hand) across all locations in each branch" />
+                <HorizontalBarChart data={branchValueChart} dataKey="value" categoryKey="branch" color="var(--color-series-5)" height={Math.max(120, branchStock.length * 60)} />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {branchStock.map(({ branch, totalUnits, totalValue, lowStockCount }) => (
+                  <Card key={branch.id}>
+                    <CardHeader title={branch.name} />
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between"><span className="text-[var(--color-ink-muted)]">Units on hand</span><span className="font-medium tabular-nums">{totalUnits}</span></div>
+                      <div className="flex justify-between"><span className="text-[var(--color-ink-muted)]">Stock value</span><span className="font-medium tabular-nums">{formatCurrency(totalValue)}</span></div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[var(--color-ink-muted)]">Low-stock items</span>
+                        <Badge tone={lowStockCount > 0 ? "critical" : "good"}>{lowStockCount}</Badge>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </Card>
 
@@ -187,7 +219,7 @@ export default function Inventory() {
           <Field label="Name"><Input value={itemForm.name} onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })} /></Field>
           <Field label="Part No."><Input value={itemForm.partNo} onChange={(e) => setItemForm({ ...itemForm, partNo: e.target.value })} /></Field>
           <Field label="Brand"><Input value={itemForm.brand} onChange={(e) => setItemForm({ ...itemForm, brand: e.target.value })} /></Field>
-          <Field label="Unit price (AED)"><Input type="number" value={itemForm.unitPrice} onChange={(e) => setItemForm({ ...itemForm, unitPrice: Number(e.target.value) })} /></Field>
+          <Field label="Unit price (SAR)"><Input type="number" value={itemForm.unitPrice} onChange={(e) => setItemForm({ ...itemForm, unitPrice: Number(e.target.value) })} /></Field>
           <Field label="Reorder level"><Input type="number" value={itemForm.reorderLevel} onChange={(e) => setItemForm({ ...itemForm, reorderLevel: Number(e.target.value) })} /></Field>
           <Button className="w-full justify-center" onClick={submitItem}>Save Item</Button>
         </div>

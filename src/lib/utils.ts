@@ -1,6 +1,6 @@
 export function formatCurrency(n: number | null | undefined) {
   if (n == null) return "—";
-  return new Intl.NumberFormat("en-AE", { style: "currency", currency: "AED", maximumFractionDigits: 0 }).format(n);
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "SAR", maximumFractionDigits: 0 }).format(n);
 }
 
 export function formatDate(iso: string | null | undefined) {

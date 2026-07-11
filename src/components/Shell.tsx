@@ -51,7 +51,7 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
           {!sidebarCollapsed && (
             <div className="min-w-0">
-              <p className="text-sm font-semibold truncate">ServiceHub CRM</p>
+              <p className="text-sm font-semibold truncate">FixFlow</p>
               <p className="text-[11px] text-[var(--color-ink-muted)] truncate">Appliance Service Suite</p>
             </div>
           )}

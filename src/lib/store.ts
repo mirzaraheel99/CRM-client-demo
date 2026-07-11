@@ -39,7 +39,8 @@ interface DemoState {
   setLang: (l: "en" | "ar") => void;
   toggleSidebar: () => void;
 
-  addCustomer: (c: Omit<Customer, "id" | "createdAt">) => Customer;
+  addCustomer: (c: Omit<Customer, "id" | "createdAt" | "whatsappVerified">) => Customer;
+  verifyWhatsapp: (customerId: string) => void;
   addAppliance: (a: Omit<Appliance, "id">) => Appliance;
   addBrand: (b: Omit<Brand, "id">) => Brand;
   addTechnician: (t: Omit<Technician, "id">) => Technician;
@@ -115,9 +116,12 @@ export const useStore = create<DemoState>()(
       toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
 
       addCustomer: (c) => {
-        const customer: Customer = { ...c, id: nextId("cust"), createdAt: new Date().toISOString() };
+        const customer: Customer = { ...c, id: nextId("cust"), createdAt: new Date().toISOString(), whatsappVerified: false };
         set((s) => ({ customers: [customer, ...s.customers] }));
         return customer;
+      },
+      verifyWhatsapp: (customerId) => {
+        set((s) => ({ customers: s.customers.map((c) => (c.id === customerId ? { ...c, whatsappVerified: true } : c)) }));
       },
       addAppliance: (a) => {
         const appliance: Appliance = { ...a, id: nextId("app") };
@@ -233,8 +237,15 @@ export const useStore = create<DemoState>()(
       },
 
       sendCommunication: (jobcardId, channel, message) => {
-        const log: CommunicationLog = { id: nextId("comm"), jobcardId, channel, to: "+9715xxxxxxxx", message, status: "sent", timestamp: new Date().toISOString() };
+        const id = nextId("comm");
+        const log: CommunicationLog = { id, jobcardId, channel, to: "+9665xxxxxxxx", message, status: "sent", timestamp: new Date().toISOString() };
         set((s) => ({ communicationLogs: [log, ...s.communicationLogs] }));
+        // Simulate a delivery receipt arriving shortly after send, the way a real
+        // WhatsApp/SMS webhook callback would update status asynchronously.
+        const setStatus = (status: CommunicationLog["status"]) =>
+          set((s) => ({ communicationLogs: s.communicationLogs.map((c) => (c.id === id ? { ...c, status } : c)) }));
+        setTimeout(() => setStatus("delivered"), 2200);
+        if (channel === "whatsapp") setTimeout(() => setStatus("read"), 5500);
       },
 
       updateWorkflowStep: (workflowId, stepOrder, patch) => {

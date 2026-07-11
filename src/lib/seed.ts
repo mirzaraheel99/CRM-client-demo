@@ -42,18 +42,18 @@ const daysAgo = (n: number) => {
 const id = (prefix: string, n: number) => `${prefix}-${String(n).padStart(4, "0")}`;
 
 export const BRANCHES: Branch[] = [
-  { id: "br-1", name: "Downtown Service Center", city: "Dubai" },
-  { id: "br-2", name: "Al Quoz Branch", city: "Dubai" },
-  { id: "br-3", name: "Sharjah Branch", city: "Sharjah" },
+  { id: "br-1", name: "Riyadh Service Center", city: "Riyadh" },
+  { id: "br-2", name: "Jeddah Branch", city: "Jeddah" },
+  { id: "br-3", name: "Dammam Branch", city: "Dammam" },
 ];
 
 const firstNames = ["Ahmed", "Fatima", "Omar", "Sara", "Yusuf", "Layla", "Hamdan", "Mariam", "Khalid", "Noura", "Rashid", "Aisha", "Tariq", "Huda", "Salem", "Amina", "Faisal", "Reem", "Bilal", "Dana"];
-const lastNames = ["Al Farsi", "Hassan", "Al Mansoori", "Rahman", "Al Suwaidi", "Karim", "Al Nuaimi", "Siddiqui", "Al Marzooqi", "Iqbal"];
+const lastNames = ["Al-Ghamdi", "Al-Qahtani", "Al-Otaibi", "Al-Harbi", "Al-Zahrani", "Al-Shehri", "Al-Dosari", "Al-Mutairi", "Al-Amri", "Al-Anazi"];
 
 const CATEGORIES: ApplianceCategory[] = ["AC", "Refrigerator", "Washer", "Mobile", "TV", "Microwave"];
 
 export const BRANDS: Brand[] = [
-  { id: "brand-1", name: "Samsung", warrantyMonths: 12, rules: "Standard 12-month manufacturer warranty from purchase date; OEM claim required for parts over AED 200." },
+  { id: "brand-1", name: "Samsung", warrantyMonths: 12, rules: "Standard 12-month manufacturer warranty from purchase date; OEM claim required for parts over SAR 200." },
   { id: "brand-2", name: "LG", warrantyMonths: 24, rules: "24-month warranty on compressors/inverters, 12-month on general parts." },
   { id: "brand-3", name: "Daikin", warrantyMonths: 12, rules: "12-month warranty; requires original AC unit invoice and installation certificate." },
   { id: "brand-4", name: "Apple", warrantyMonths: 12, rules: "12-month limited warranty; IMEI must match Apple GSX record." },
@@ -66,12 +66,13 @@ export const CUSTOMERS: Customer[] = Array.from({ length: 60 }, (_, i) => {
   return {
     id: id("cust", i + 1),
     name,
-    phone: `+9715${int(0, 9)}${int(1000000, 9999999)}`,
-    whatsapp: `+9715${int(0, 9)}${int(1000000, 9999999)}`,
+    phone: `+9665${int(0, 9)}${int(1000000, 9999999)}`,
+    whatsapp: `+9665${int(0, 9)}${int(1000000, 9999999)}`,
     email: `${name.toLowerCase().replace(/\s+/g, ".")}@example.com`,
     address: `Building ${int(1, 40)}, Street ${int(1, 20)}, ${pick(BRANCHES).city}`,
     branchId: pick(BRANCHES).id,
     createdAt: daysAgo(int(10, 700)),
+    whatsappVerified: rand() > 0.35,
   };
 });
 
@@ -107,7 +108,7 @@ export const TECHNICIANS: Technician[] = [
 ].map((t, i) => ({
   id: id("tech", i + 1),
   name: t.name,
-  phone: `+9715${int(0, 9)}${int(1000000, 9999999)}`,
+  phone: `+9665${int(0, 9)}${int(1000000, 9999999)}`,
   skills: t.skills as ApplianceCategory[],
   zone: t.zone,
   branchId: pick(BRANCHES).id,
@@ -116,9 +117,9 @@ export const TECHNICIANS: Technician[] = [
 }));
 
 export const INVENTORY_LOCATIONS: InventoryLocation[] = [
-  { id: "loc-1", name: "Main Store - Downtown", type: "store", branchId: "br-1" },
-  { id: "loc-2", name: "Main Store - Al Quoz", type: "store", branchId: "br-2" },
-  { id: "loc-3", name: "Main Store - Sharjah", type: "store", branchId: "br-3" },
+  { id: "loc-1", name: "Main Store - Riyadh", type: "store", branchId: "br-1" },
+  { id: "loc-2", name: "Main Store - Jeddah", type: "store", branchId: "br-2" },
+  { id: "loc-3", name: "Main Store - Dammam", type: "store", branchId: "br-3" },
   ...TECHNICIANS.map((t) => ({ id: `van-${t.id}`, name: `${t.name.split(" ")[0]}'s Van`, type: "van" as const, branchId: t.branchId })),
 ];
 
@@ -280,7 +281,7 @@ for (let i = 0; i < 130; i++) {
       jobcardId: jobCardId,
       billNo: `INV-${int(100000, 999999)}`,
       billDate: appliance.purchaseDate,
-      vendorName: pick(["Sharaf DG", "Emax", "Jumbo Electronics", "Carrefour", "Lulu Hypermarket"]),
+      vendorName: pick(["eXtra Stores", "Jarir Bookstore", "Carrefour Saudi", "Al Yousifi Electronics", "Saco"]),
     });
   }
 
@@ -291,7 +292,7 @@ for (let i = 0; i < 130; i++) {
       id: id("comm", commId++),
       jobcardId: jobCardId,
       channel,
-      to: channel === "email" ? "customer@example.com" : "+9715xxxxxxxx",
+      to: channel === "email" ? "customer@example.com" : "+9665xxxxxxxx",
       message: pick([
         "Your item has been received and is being processed.",
         "Your job estimate is ready for approval.",

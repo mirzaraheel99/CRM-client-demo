@@ -1,4 +1,4 @@
-# ServiceHub CRM — Appliance Service Suite (Client Demo)
+# FixFlow — Appliance Service Suite (Client Demo)
 
 An interactive, fully-clickable demo of the CRM Service Module described in the
 functional & technical spec: appliance service and repair job cards, warranty

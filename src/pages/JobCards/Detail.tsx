@@ -1,10 +1,14 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, MessageCircle, Smartphone, Mail, CheckCircle2, XCircle, ImagePlus } from "lucide-react";
+import { ArrowLeft, MessageCircle, Smartphone, Mail, CheckCircle2, XCircle, ImagePlus, Printer } from "lucide-react";
 import { useStore } from "../../lib/store";
 import { Card, CardHeader, Tabs, Button, Select, Textarea, Badge, Avatar } from "../../components/ui";
 import { JobStatusBadge, JobTypeBadge } from "../../components/StatusBadge";
+import { PartsGrid } from "../../components/PartsGrid";
 import { formatCurrency, formatDateTime, relativeTime } from "../../lib/utils";
+import { totalStockByItem } from "../../lib/selectors";
+import { MESSAGE_TEMPLATES, renderTemplate } from "../../lib/templates";
+import { printEstimate } from "../../lib/print";
 import type { StageName, Channel } from "../../lib/types";
 
 const TAB_LIST = ["Timeline", "Details", "Parts", "Attachments", "Communication"];
@@ -15,31 +19,49 @@ const CHANNEL_ICON: Record<Channel, React.ReactNode> = {
   email: <Mail size={14} />,
 };
 
+const COMM_STATUS_TONE: Record<string, "neutral" | "good" | "critical"> = {
+  sent: "neutral",
+  delivered: "good",
+  read: "good",
+  failed: "critical",
+};
+
 export default function JobCardDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const {
     jobCards, customers, appliances, brands, technicians, workflows,
-    stageHistory, attachments, partsUsed, communicationLogs, inventoryItems, purchaseBills,
+    stageHistory, attachments, partsUsed, communicationLogs, inventoryItems, inventoryStock, purchaseBills,
     role, advanceStage, assignTechnician, setEstimate, approveCustomer, addPartUsed, addAttachment, sendCommunication,
   } = useStore();
 
   const [tab, setTab] = useState("Timeline");
   const [techSelect, setTechSelect] = useState("");
   const [channel, setChannel] = useState<Channel>("whatsapp");
+  const [templateId, setTemplateId] = useState("received");
   const [message, setMessage] = useState("");
   const [estimateInput, setEstimateInput] = useState("");
-  const [partSelect, setPartSelect] = useState("");
-  const [partQty, setPartQty] = useState(1);
 
   const job = jobCards.find((j) => j.id === id);
 
   const workflow = useMemo(() => workflows.find((w) => w.jobType === job?.jobType), [workflows, job]);
-  const jobHistory = useMemo(() => stageHistory.filter((h) => h.jobcardId === id).sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp)), [stageHistory, id]);
-  const jobAttachments = useMemo(() => attachments.filter((a) => a.jobcardId === id).sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp)), [attachments, id]);
+  const jobHistory = useMemo(() => stageHistory.filter((h) => h.jobcardId === id), [stageHistory, id]);
+  const jobAttachments = useMemo(() => attachments.filter((a) => a.jobcardId === id), [attachments, id]);
   const jobParts = useMemo(() => partsUsed.filter((p) => p.jobcardId === id), [partsUsed, id]);
-  const jobComms = useMemo(() => communicationLogs.filter((c) => c.jobcardId === id).sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp)), [communicationLogs, id]);
+  const jobComms = useMemo(() => communicationLogs.filter((c) => c.jobcardId === id), [communicationLogs, id]);
   const bill = useMemo(() => purchaseBills.find((b) => b.jobcardId === id), [purchaseBills, id]);
+  const stockByItem = useMemo(() => totalStockByItem(inventoryStock), [inventoryStock]);
+
+  useEffect(() => {
+    if (job) applyTemplate("received");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [job?.id]);
+
+  const timelineEntries = useMemo(() => {
+    const stageEntries = jobHistory.map((h) => ({ kind: "stage" as const, id: h.id, timestamp: h.timestamp, data: h }));
+    const commEntries = jobComms.map((c) => ({ kind: "comm" as const, id: c.id, timestamp: c.timestamp, data: c }));
+    return [...stageEntries, ...commEntries].sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp));
+  }, [jobHistory, jobComms]);
 
   if (!job) {
     return (
@@ -59,6 +81,23 @@ export default function JobCardDetail() {
   const nextStep = workflow && currentStepIdx >= 0 ? workflow.steps[currentStepIdx + 1] : undefined;
   const canApprove = ["supervisor", "manager", "admin"].includes(role);
 
+  const availableTemplates = MESSAGE_TEMPLATES.filter((t) => t.channels.includes(channel));
+  const selectedTemplate = availableTemplates.find((t) => t.id === templateId) ?? availableTemplates[0];
+
+  function applyTemplate(tid: string) {
+    const tpl = MESSAGE_TEMPLATES.find((t) => t.id === tid);
+    setTemplateId(tid);
+    if (!tpl || tpl.id === "custom") { setMessage(""); return; }
+    setMessage(
+      renderTemplate(tpl.body, {
+        customer: customer?.name.split(" ")[0] ?? "there",
+        appliance: appliance?.model ?? "item",
+        jobId: job!.id,
+        amount: formatCurrency(job!.estimateAmount),
+      })
+    );
+  }
+
   function handleAdvance() {
     if (!nextStep) return;
     advanceStage(job!.id, nextStep.stepName as StageName, `Advanced to ${nextStep.stepName}`, "You");
@@ -68,13 +107,6 @@ export default function JobCardDetail() {
     if (!message.trim()) return;
     sendCommunication(job!.id, channel, message.trim());
     setMessage("");
-  }
-
-  function handleAddPart() {
-    if (!partSelect) return;
-    addPartUsed(job!.id, partSelect, partQty);
-    setPartSelect("");
-    setPartQty(1);
   }
 
   const partsTotal = jobParts.reduce((acc, p) => acc + p.totalPrice, 0);
@@ -102,6 +134,11 @@ export default function JobCardDetail() {
             <p className="text-sm font-medium">{customer?.name}</p>
             <p className="text-xs text-[var(--color-ink-secondary)]">{customer?.phone}</p>
             <p className="text-xs text-[var(--color-ink-secondary)]">{customer?.address}</p>
+            <div className="mt-1.5">
+              <Badge tone={customer?.whatsappVerified ? "good" : "warning"}>
+                WhatsApp {customer?.whatsappVerified ? "Verified" : "Unverified"}
+              </Badge>
+            </div>
           </div>
           <div className="border-t pt-3 [border-color:var(--color-border)]">
             <p className="text-xs text-[var(--color-ink-muted)] mb-1">Appliance</p>
@@ -127,17 +164,50 @@ export default function JobCardDetail() {
           <div className="p-5">
             {tab === "Timeline" && (
               <ol className="relative border-l ml-2 [border-color:var(--color-border)]">
-                {jobHistory.map((h) => (
-                  <li key={h.id} className="mb-6 ml-4">
-                    <span className="absolute -left-1.5 h-3 w-3 rounded-full bg-[var(--color-brand-1)]" />
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-medium">{h.stageName}</p>
-                      <span className="text-xs text-[var(--color-ink-muted)]">{relativeTime(h.timestamp)}</span>
-                    </div>
-                    <p className="text-xs text-[var(--color-ink-secondary)]">{h.notes}</p>
-                    <p className="text-[11px] text-[var(--color-ink-muted)] mt-0.5">by {h.changedBy} · {formatDateTime(h.timestamp)}</p>
-                  </li>
-                ))}
+                {timelineEntries.map((entry) => {
+                  if (entry.kind === "stage") {
+                    const h = entry.data;
+                    const stagePhotos = jobAttachments.filter((a) => a.stageName === h.stageName);
+                    return (
+                      <li key={entry.id} className="mb-6 ml-4">
+                        <span className="absolute -left-1.5 h-3 w-3 rounded-full bg-[var(--color-brand-1)]" />
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-medium">{h.stageName}</p>
+                          <span className="text-xs text-[var(--color-ink-muted)]">{relativeTime(h.timestamp)}</span>
+                        </div>
+                        <p className="text-xs text-[var(--color-ink-secondary)]">{h.notes}</p>
+                        <p className="text-[11px] text-[var(--color-ink-muted)] mt-0.5">by {h.changedBy} · {formatDateTime(h.timestamp)}</p>
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          {stagePhotos.map((a) => (
+                            <div key={a.id} className="h-10 w-10 rounded-md bg-black/[0.05] dark:bg-white/[0.08] flex items-center justify-center" title={a.label}>
+                              <ImagePlus size={14} className="text-[var(--color-ink-muted)]" />
+                            </div>
+                          ))}
+                          <button
+                            onClick={() => addAttachment(job.id, h.stageName, `${h.stageName} photo`)}
+                            className="flex items-center gap-1 rounded-md border border-dashed px-2 py-1 text-[11px] text-[var(--color-ink-muted)] hover:text-[var(--color-brand-1)] hover:border-[var(--color-brand-1)] [border-color:var(--color-border)]"
+                          >
+                            <ImagePlus size={12} /> Add photo
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  }
+                  const c = entry.data;
+                  return (
+                    <li key={entry.id} className="mb-6 ml-4">
+                      <span className="absolute -left-1.5 h-3 w-3 rounded-full bg-[var(--color-surface-2)] border-2 [border-color:var(--color-brand-1)]" />
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[var(--color-brand-1)]">{CHANNEL_ICON[c.channel]}</span>
+                        <p className="text-sm font-medium">{c.channel.toUpperCase()} sent</p>
+                        <Badge tone={COMM_STATUS_TONE[c.status]}>{c.status}</Badge>
+                        <span className="text-xs text-[var(--color-ink-muted)]">{relativeTime(c.timestamp)}</span>
+                      </div>
+                      <p className="text-xs text-[var(--color-ink-secondary)]">{c.message}</p>
+                    </li>
+                  );
+                })}
+                {timelineEntries.length === 0 && <p className="text-sm text-[var(--color-ink-muted)]">No activity yet.</p>}
               </ol>
             )}
 
@@ -164,7 +234,7 @@ export default function JobCardDetail() {
                 {job.jobType === "non_warranty" && (
                   <div className="border-t pt-4 [border-color:var(--color-border)] flex items-end gap-2">
                     <div className="flex-1">
-                      <p className="text-xs text-[var(--color-ink-muted)] mb-1">Set / update estimate (AED)</p>
+                      <p className="text-xs text-[var(--color-ink-muted)] mb-1">Set / update estimate (SAR)</p>
                       <input
                         value={estimateInput}
                         onChange={(e) => setEstimateInput(e.target.value)}
@@ -186,27 +256,24 @@ export default function JobCardDetail() {
                     <Button variant="danger" onClick={() => approveCustomer(job.id, false)}><XCircle size={14} /> Decline</Button>
                   </div>
                 )}
+                <div className="border-t pt-4 [border-color:var(--color-border)]">
+                  <Button
+                    variant="secondary"
+                    onClick={() => printEstimate({ job, customer, appliance, brand, parts: jobParts, inventoryItems })}
+                  >
+                    <Printer size={14} /> Print Estimate
+                  </Button>
+                </div>
               </div>
             )}
 
             {tab === "Parts" && (
-              <div className="space-y-4">
-                <div className="flex gap-2 items-end flex-wrap">
-                  <div className="flex-1 min-w-[180px]">
-                    <Select value={partSelect} onChange={(e) => setPartSelect(e.target.value)}>
-                      <option value="">Select part…</option>
-                      {inventoryItems.map((i) => <option key={i.id} value={i.id}>{i.name} · {formatCurrency(i.unitPrice)}</option>)}
-                    </Select>
-                  </div>
-                  <input
-                    type="number"
-                    min={1}
-                    value={partQty}
-                    onChange={(e) => setPartQty(Number(e.target.value))}
-                    className="w-20 rounded-lg border bg-[var(--color-surface-2)] px-3 py-2 text-sm outline-none [border-color:var(--color-border)]"
-                  />
-                  <Button variant="secondary" onClick={handleAddPart}>Add Part</Button>
-                </div>
+              <div className="space-y-5">
+                <PartsGrid
+                  items={inventoryItems}
+                  stockByItem={stockByItem}
+                  onAdd={(selections) => selections.forEach((s) => addPartUsed(job.id, s.itemId, s.qty))}
+                />
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-xs text-[var(--color-ink-muted)] border-y [border-color:var(--color-border)]">
@@ -232,7 +299,7 @@ export default function JobCardDetail() {
                   </tbody>
                   {jobParts.length > 0 && (
                     <tfoot>
-                      <tr><td colSpan={3} className="py-2 text-right font-medium">Parts total</td><td className="py-2 font-semibold tabular-nums">{formatCurrency(partsTotal)}</td></tr>
+                      <tr><td colSpan={3} className="py-2 pr-4 text-right font-medium">Parts total</td><td className="py-2 font-semibold tabular-nums">{formatCurrency(partsTotal)}</td></tr>
                     </tfoot>
                   )}
                 </table>
@@ -261,14 +328,14 @@ export default function JobCardDetail() {
 
             {tab === "Communication" && (
               <div className="space-y-3">
-                {jobComms.map((c) => (
+                {jobComms.slice().sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp)).map((c) => (
                   <div key={c.id} className="flex items-start gap-2 text-sm border-b pb-3 last:border-0 [border-color:var(--color-border)]">
                     <span className="mt-0.5 text-[var(--color-brand-1)]">{CHANNEL_ICON[c.channel]}</span>
                     <div className="flex-1">
                       <p>{c.message}</p>
                       <p className="text-[11px] text-[var(--color-ink-muted)] mt-0.5">{c.channel.toUpperCase()} · {relativeTime(c.timestamp)}</p>
                     </div>
-                    <Badge tone={c.status === "failed" ? "critical" : "good"}>{c.status}</Badge>
+                    <Badge tone={COMM_STATUS_TONE[c.status]}>{c.status}</Badge>
                   </div>
                 ))}
                 {jobComms.length === 0 && <p className="text-sm text-[var(--color-ink-muted)] py-6 text-center">No messages sent yet.</p>}
@@ -319,10 +386,21 @@ export default function JobCardDetail() {
 
           <Card className="space-y-3">
             <CardHeader title="Send Message" />
-            <Select value={channel} onChange={(e) => setChannel(e.target.value as Channel)}>
+            <Select
+              value={channel}
+              onChange={(e) => {
+                const ch = e.target.value as Channel;
+                setChannel(ch);
+                const stillValid = MESSAGE_TEMPLATES.find((t) => t.id === templateId && t.channels.includes(ch));
+                applyTemplate(stillValid ? templateId : MESSAGE_TEMPLATES.find((t) => t.channels.includes(ch))!.id);
+              }}
+            >
               <option value="whatsapp">WhatsApp</option>
               <option value="sms">SMS</option>
               <option value="email">Email</option>
+            </Select>
+            <Select value={selectedTemplate?.id} onChange={(e) => applyTemplate(e.target.value)}>
+              {availableTemplates.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
             </Select>
             <Textarea rows={3} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Message to customer…" />
             <Button className="w-full justify-center" onClick={handleSend} disabled={!message.trim()}>Send</Button>

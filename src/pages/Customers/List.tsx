@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Search } from "lucide-react";
 import { useStore } from "../../lib/store";
-import { Card, Button, Input, Modal, Field } from "../../components/ui";
+import { Card, Button, Input, Modal, Field, Badge } from "../../components/ui";
 import { filterByBranch } from "../../lib/selectors";
 import { formatDate } from "../../lib/utils";
 
@@ -52,6 +52,7 @@ export default function CustomerList() {
             <tr className="text-left text-xs text-[var(--color-ink-muted)] border-b [border-color:var(--color-border)]">
               <th className="px-5 py-3 font-medium">Name</th>
               <th className="px-3 py-3 font-medium">Phone</th>
+              <th className="px-3 py-3 font-medium">WhatsApp</th>
               <th className="px-3 py-3 font-medium">Email</th>
               <th className="px-3 py-3 font-medium">Appliances</th>
               <th className="px-3 py-3 font-medium">Jobs</th>
@@ -65,6 +66,9 @@ export default function CustomerList() {
                   <Link to={`/customers/${c.id}`} className="font-medium text-[var(--color-brand-1)]">{c.name}</Link>
                 </td>
                 <td className="px-3 py-3 text-[var(--color-ink-secondary)]">{c.phone}</td>
+                <td className="px-3 py-3">
+                  <Badge tone={c.whatsappVerified ? "good" : "warning"}>{c.whatsappVerified ? "Verified" : "Unverified"}</Badge>
+                </td>
                 <td className="px-3 py-3 text-[var(--color-ink-secondary)]">{c.email}</td>
                 <td className="px-3 py-3 tabular-nums">{appliances.filter((a) => a.customerId === c.id).length}</td>
                 <td className="px-3 py-3 tabular-nums">{jobCards.filter((j) => j.customerId === c.id).length}</td>

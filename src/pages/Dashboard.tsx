@@ -1,0 +1,122 @@
+import { Link } from "react-router-dom";
+import { ClipboardList, Clock, ShieldCheck, PackageX, Users } from "lucide-react";
+import { useStore } from "../lib/store";
+import { Card, CardHeader, StatTile, Button } from "../components/ui";
+import { HorizontalBarChart, VerticalBarChart, DonutChart, TrendAreaChart } from "../components/charts";
+import { JobStatusBadge } from "../components/StatusBadge";
+import { filterByBranch, jobsByStatus, technicianWorkload, warrantyRatio, tatTrend, inventoryAlerts, avgTat } from "../lib/selectors";
+import { formatDate } from "../lib/utils";
+import { t } from "../lib/i18n";
+
+export default function Dashboard() {
+  const {
+    jobCards, technicians, customers, appliances, inventoryItems, inventoryLocations, inventoryStock,
+    selectedBranchId, lang,
+  } = useStore();
+
+  const scopedJobs = filterByBranch(jobCards, selectedBranchId);
+  const scopedTechs = filterByBranch(technicians, selectedBranchId);
+  const activeJobs = scopedJobs.filter((j) => j.status !== "Delivered");
+  const alerts = inventoryAlerts(inventoryItems, inventoryLocations, inventoryStock, selectedBranchId);
+  const custMap = new Map(customers.map((c) => [c.id, c]));
+  const appMap = new Map(appliances.map((a) => [a.id, a]));
+  const techMap = new Map(technicians.map((tc) => [tc.id, tc]));
+
+  const latest = [...scopedJobs].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)).slice(0, 8);
+  const warrantyPct = scopedJobs.length ? Math.round((scopedJobs.filter((j) => j.jobType === "warranty").length / scopedJobs.length) * 100) : 0;
+  const availableTechs = scopedTechs.filter((tc) => tc.status === "Available").length;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-xl font-semibold">{t(lang, "welcomeBack")}</h1>
+          <p className="text-sm text-[var(--color-ink-muted)] mt-0.5">{t(lang, "overviewToday")}</p>
+        </div>
+        <Link to="/jobcards/new">
+          <Button>+ {t(lang, "newJobCard")}</Button>
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+        <StatTile label="Active Jobs" value={String(activeJobs.length)} icon={<ClipboardList size={16} />} accent="var(--color-series-1)" />
+        <StatTile label="Avg. Turnaround Time" value={`${avgTat(scopedJobs)}h`} icon={<Clock size={16} />} accent="var(--color-series-3)" />
+        <StatTile label="Warranty Share" value={`${warrantyPct}%`} icon={<ShieldCheck size={16} />} accent="var(--color-series-2)" />
+        <StatTile label="Low Stock Alerts" value={String(alerts.length)} icon={<PackageX size={16} />} accent="var(--color-status-critical)" delta={alerts.length > 0 ? "Needs attention" : undefined} deltaTone="critical" />
+        <StatTile label="Technicians Available" value={`${availableTechs}/${scopedTechs.length}`} icon={<Users size={16} />} accent="var(--color-series-5)" />
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <Card className="xl:col-span-2">
+          <CardHeader title={t(lang, "jobsByStatus")} subtitle="Live count across the selected branch scope" />
+          <HorizontalBarChart data={jobsByStatus(scopedJobs)} dataKey="count" categoryKey="status" color="var(--color-series-1)" />
+        </Card>
+        <Card>
+          <CardHeader title={t(lang, "warrantyRatio")} />
+          <DonutChart data={warrantyRatio(scopedJobs)} centerValue={`${warrantyPct}%`} centerLabel="Warranty" />
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <Card className="xl:col-span-2">
+          <CardHeader title={t(lang, "tatTrend")} subtitle="Average turnaround hours per day, last 14 days" />
+          <TrendAreaChart data={tatTrend(scopedJobs)} dataKey="avgHours" categoryKey="day" color="var(--color-series-1)" />
+        </Card>
+        <Card>
+          <CardHeader title={t(lang, "technicianWorkload")} subtitle="Open jobs assigned" />
+          <VerticalBarChart data={technicianWorkload(scopedJobs, scopedTechs)} dataKey="jobs" categoryKey="name" color="var(--color-series-5)" height={240} />
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <Card className="xl:col-span-2 overflow-x-auto" padded={false}>
+          <div className="p-5 pb-0">
+            <CardHeader title={t(lang, "latestJobs")} action={<Link to="/jobcards" className="text-xs font-medium text-[var(--color-brand-1)]">View all →</Link>} />
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs text-[var(--color-ink-muted)] border-y [border-color:var(--color-border)]">
+                <th className="px-5 py-2 font-medium">Job ID</th>
+                <th className="px-3 py-2 font-medium">Customer</th>
+                <th className="px-3 py-2 font-medium">Appliance</th>
+                <th className="px-3 py-2 font-medium">Status</th>
+                <th className="px-3 py-2 font-medium">Technician</th>
+                <th className="px-5 py-2 font-medium">Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              {latest.map((j) => (
+                <tr key={j.id} className="border-b last:border-0 [border-color:var(--color-border)] hover:bg-black/[0.02] dark:hover:bg-white/[0.03]">
+                  <td className="px-5 py-2.5">
+                    <Link to={`/jobcards/${j.id}`} className="font-medium text-[var(--color-brand-1)]">{j.id}</Link>
+                  </td>
+                  <td className="px-3 py-2.5">{custMap.get(j.customerId)?.name ?? "—"}</td>
+                  <td className="px-3 py-2.5 text-[var(--color-ink-secondary)]">{appMap.get(j.applianceId)?.model ?? "—"}</td>
+                  <td className="px-3 py-2.5"><JobStatusBadge status={j.status} /></td>
+                  <td className="px-3 py-2.5 text-[var(--color-ink-secondary)]">{j.technicianId ? techMap.get(j.technicianId)?.name : "Unassigned"}</td>
+                  <td className="px-5 py-2.5 text-[var(--color-ink-muted)]">{formatDate(j.createdAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+
+        <Card>
+          <CardHeader title={t(lang, "inventoryAlerts")} subtitle="At or below reorder level" />
+          <div className="space-y-3">
+            {alerts.length === 0 && <p className="text-sm text-[var(--color-ink-muted)]">All stock levels healthy.</p>}
+            {alerts.map(({ item, total }) => (
+              <div key={item.id} className="flex items-center justify-between text-sm">
+                <div className="min-w-0">
+                  <p className="font-medium truncate">{item.name}</p>
+                  <p className="text-xs text-[var(--color-ink-muted)]">{item.partNo} · reorder at {item.reorderLevel}</p>
+                </div>
+                <span className="tabular-nums font-semibold text-[var(--color-status-critical)]">{total} left</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,161 @@
+import { NavLink, Link } from "react-router-dom";
+import {
+  LayoutDashboard, ClipboardList, Users, PackageSearch, Tag, Boxes,
+  UserCog, GitBranch, MessageSquare, BarChart3, Smartphone, Sun, Moon,
+  Languages, ChevronDown, Wrench, Menu, RotateCcw,
+} from "lucide-react";
+import { useStore } from "../lib/store";
+import { t } from "../lib/i18n";
+import { Avatar } from "./ui";
+import { cx } from "../lib/utils";
+import type { ReactNode } from "react";
+import type { Role } from "../lib/types";
+
+const NAV: { to: string; labelKey: Parameters<typeof t>[1]; icon: ReactNode; roles?: Role[] }[] = [
+  { to: "/", labelKey: "dashboard", icon: <LayoutDashboard size={18} /> },
+  { to: "/jobcards", labelKey: "jobCards", icon: <ClipboardList size={18} /> },
+  { to: "/customers", labelKey: "customers", icon: <Users size={18} /> },
+  { to: "/appliances", labelKey: "appliances", icon: <PackageSearch size={18} /> },
+  { to: "/brands", labelKey: "brands", icon: <Tag size={18} />, roles: ["admin", "manager"] },
+  { to: "/inventory", labelKey: "inventory", icon: <Boxes size={18} /> },
+  { to: "/technicians", labelKey: "technicians", icon: <UserCog size={18} />, roles: ["admin", "manager", "supervisor"] },
+  { to: "/workflow", labelKey: "workflow", icon: <GitBranch size={18} />, roles: ["admin", "manager"] },
+  { to: "/communications", labelKey: "communications", icon: <MessageSquare size={18} /> },
+  { to: "/reports", labelKey: "reports", icon: <BarChart3 size={18} />, roles: ["admin", "manager", "supervisor"] },
+  { to: "/mobile", labelKey: "mobileApps", icon: <Smartphone size={18} /> },
+];
+
+const ROLE_LABELS: Record<Role, string> = {
+  front_desk: "Front Desk",
+  technician: "Technician",
+  supervisor: "Supervisor",
+  manager: "Manager",
+  admin: "Admin",
+};
+
+export function Shell({ children }: { children: ReactNode }) {
+  const { role, setRole, selectedBranchId, setBranch, branches, theme, setTheme, lang, setLang, sidebarCollapsed, toggleSidebar, resetDemoData } = useStore();
+  const visibleNav = NAV.filter((n) => !n.roles || n.roles.includes(role));
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-[var(--color-surface-page)]">
+      <aside
+        className={cx(
+          "flex flex-col border-r [border-color:var(--color-border)] bg-[var(--color-surface-1)] transition-all shrink-0",
+          sidebarCollapsed ? "w-[64px]" : "w-[240px]"
+        )}
+      >
+        <div className="flex items-center gap-2 px-4 h-16 border-b [border-color:var(--color-border)] shrink-0">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-brand-1)] text-white shrink-0">
+            <Wrench size={16} />
+          </div>
+          {!sidebarCollapsed && (
+            <div className="min-w-0">
+              <p className="text-sm font-semibold truncate">ServiceHub CRM</p>
+              <p className="text-[11px] text-[var(--color-ink-muted)] truncate">Appliance Service Suite</p>
+            </div>
+          )}
+        </div>
+        <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
+          {visibleNav.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.to === "/"}
+              className={({ isActive }) =>
+                cx(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-[var(--color-brand-1)]/10 text-[var(--color-brand-1)]"
+                    : "text-[var(--color-ink-secondary)] hover:bg-black/5 dark:hover:bg-white/10"
+                )
+              }
+            >
+              {item.icon}
+              {!sidebarCollapsed && <span className="truncate">{t(lang, item.labelKey)}</span>}
+            </NavLink>
+          ))}
+        </nav>
+        <div className="border-t [border-color:var(--color-border)]">
+          <button
+            onClick={() => { if (confirm("Reset all demo data back to the original seed dataset?")) resetDemoData(); }}
+            title="Reset demo data"
+            className="flex w-full items-center gap-2 px-4 py-3 text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink-primary)]"
+          >
+            <RotateCcw size={16} />
+            {!sidebarCollapsed && "Reset demo data"}
+          </button>
+          <button
+            onClick={toggleSidebar}
+            className="flex w-full items-center gap-2 px-4 py-3 text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink-primary)] border-t [border-color:var(--color-border)]"
+          >
+            <Menu size={16} />
+            {!sidebarCollapsed && "Collapse"}
+          </button>
+        </div>
+      </aside>
+
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <header className="flex h-16 items-center gap-3 border-b bg-[var(--color-surface-1)] px-5 [border-color:var(--color-border)] shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-xs text-[var(--color-ink-muted)]">{t(lang, "branch")}</span>
+            <div className="relative">
+              <select
+                value={selectedBranchId}
+                onChange={(e) => setBranch(e.target.value)}
+                className="appearance-none rounded-lg border bg-[var(--color-surface-2)] py-1.5 pl-3 pr-7 text-sm font-medium outline-none [border-color:var(--color-border)]"
+              >
+                <option value="all">{t(lang, "allBranches")}</option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
+              <ChevronDown size={14} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-ink-muted)]" />
+            </div>
+          </div>
+
+          <div className="ml-auto flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-[var(--color-ink-muted)] hidden sm:inline">{t(lang, "role")}</span>
+              <div className="relative">
+                <select
+                  value={role}
+                  onChange={(e) => setRole(e.target.value as Role)}
+                  className="appearance-none rounded-lg border bg-[var(--color-surface-2)] py-1.5 pl-3 pr-7 text-sm font-medium outline-none [border-color:var(--color-border)]"
+                >
+                  {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
+                    <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                  ))}
+                </select>
+                <ChevronDown size={14} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-ink-muted)]" />
+              </div>
+            </div>
+
+            <button
+              onClick={() => setLang(lang === "en" ? "ar" : "en")}
+              title="Toggle language"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--color-ink-secondary)] hover:bg-black/5 dark:hover:bg-white/10"
+            >
+              <Languages size={17} />
+            </button>
+            <button
+              onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+              title="Toggle theme"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--color-ink-secondary)] hover:bg-black/5 dark:hover:bg-white/10"
+            >
+              {theme === "light" ? <Moon size={17} /> : <Sun size={17} />}
+            </button>
+            <Link to="/jobcards/new">
+              <span className="sr-only">{t(lang, "newJobCard")}</span>
+            </Link>
+            <div className="flex items-center gap-2 pl-2 ml-1 border-l [border-color:var(--color-border)]">
+              <Avatar name={ROLE_LABELS[role]} />
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+      </div>
+    </div>
+  );
+}

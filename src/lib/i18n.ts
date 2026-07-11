@@ -1,0 +1,63 @@
+export const translations = {
+  en: {
+    dashboard: "Dashboard",
+    jobCards: "Job Cards",
+    customers: "Customers",
+    appliances: "Appliances",
+    brands: "Brands",
+    inventory: "Inventory",
+    technicians: "Technicians",
+    workflow: "Workflow Designer",
+    communications: "Communications",
+    reports: "Reports",
+    mobileApps: "Mobile Apps",
+    settings: "Settings",
+    newJobCard: "New Job Card",
+    search: "Search…",
+    branch: "Branch",
+    allBranches: "All Branches",
+    role: "Role",
+    jobsByStatus: "Jobs by Status",
+    technicianWorkload: "Technician Workload",
+    warrantyRatio: "Warranty vs. Non-Warranty",
+    tatTrend: "Turnaround Time Trend",
+    inventoryAlerts: "Inventory Alerts",
+    latestJobs: "Latest Job Cards",
+    welcomeBack: "Welcome back",
+    overviewToday: "Here's what's happening across your service centers today.",
+  },
+  ar: {
+    dashboard: "لوحة التحكم",
+    jobCards: "بطاقات العمل",
+    customers: "العملاء",
+    appliances: "الأجهزة",
+    brands: "العلامات التجارية",
+    inventory: "المخزون",
+    technicians: "الفنيون",
+    workflow: "مصمم سير العمل",
+    communications: "الاتصالات",
+    reports: "التقارير",
+    mobileApps: "تطبيقات الجوال",
+    settings: "الإعدادات",
+    newJobCard: "بطاقة عمل جديدة",
+    search: "بحث…",
+    branch: "الفرع",
+    allBranches: "جميع الفروع",
+    role: "الدور",
+    jobsByStatus: "المهام حسب الحالة",
+    technicianWorkload: "عبء عمل الفنيين",
+    warrantyRatio: "الضمان مقابل بدون ضمان",
+    tatTrend: "اتجاه وقت الإنجاز",
+    inventoryAlerts: "تنبيهات المخزون",
+    latestJobs: "أحدث بطاقات العمل",
+    welcomeBack: "مرحبًا بعودتك",
+    overviewToday: "إليك ما يحدث في مراكز الخدمة اليوم.",
+  },
+} as const;
+
+export type Lang = keyof typeof translations;
+export type TranslationKey = keyof (typeof translations)["en"];
+
+export function t(lang: Lang, key: TranslationKey): string {
+  return translations[lang][key] ?? translations.en[key];
+}

@@ -4,6 +4,6 @@ import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: '/crm-client-demo/',
+  base: '/CRM-client-demo/',
   plugins: [react(), tailwindcss()],
 })

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { Check, Minus, Package, Plus, Search } from "lucide-react";
 import { Input, Button } from "./ui";
 import { formatCurrency } from "../lib/utils";
 import type { InventoryItem } from "../lib/types";
@@ -21,6 +21,7 @@ export function PartsGrid({
   }, [items, search]);
 
   function toggle(itemId: string) {
+    if ((stockByItem.get(itemId) ?? 0) <= 0) return;
     setSelected((s) => {
       const next = { ...s };
       if (itemId in next) delete next[itemId];
@@ -30,7 +31,8 @@ export function PartsGrid({
   }
 
   function setQty(itemId: string, qty: number) {
-    setSelected((s) => ({ ...s, [itemId]: Math.max(1, qty) }));
+    const available = stockByItem.get(itemId) ?? 0;
+    setSelected((s) => ({ ...s, [itemId]: Math.max(1, Math.min(available, qty)) }));
   }
 
   const selectedCount = Object.keys(selected).length;
@@ -50,59 +52,86 @@ export function PartsGrid({
         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-ink-muted)]" />
         <Input placeholder="Search parts by name, part no, brand…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8" />
       </div>
-      <div className="max-h-72 overflow-y-auto rounded-lg border [border-color:var(--color-border)]">
-        <table className="w-full text-sm">
-          <thead className="sticky top-0 bg-[var(--color-surface-2)]">
-            <tr className="text-left text-xs text-[var(--color-ink-muted)] border-b [border-color:var(--color-border)]">
-              <th className="py-2 pl-3 font-medium w-8"></th>
-              <th className="py-2 font-medium">Part</th>
-              <th className="py-2 font-medium">Brand</th>
-              <th className="py-2 font-medium">Unit Price</th>
-              <th className="py-2 font-medium">Stock</th>
-              <th className="py-2 pr-3 font-medium w-20">Qty</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((item) => {
-              const checked = item.id in selected;
-              const stock = stockByItem.get(item.id) ?? 0;
-              return (
-                <tr
-                  key={item.id}
-                  onClick={() => toggle(item.id)}
-                  className={`border-b last:border-0 cursor-pointer [border-color:var(--color-border)] ${checked ? "bg-[var(--color-brand-1)]/5" : "hover:bg-black/[0.02] dark:hover:bg-white/[0.03]"}`}
-                >
-                  <td className="py-2 pl-3">
-                    <input type="checkbox" checked={checked} onChange={() => toggle(item.id)} onClick={(e) => e.stopPropagation()} />
-                  </td>
-                  <td className="py-2">
-                    <p className="font-medium">{item.name}</p>
-                    <p className="text-xs text-[var(--color-ink-muted)]">{item.partNo}</p>
-                  </td>
-                  <td className="py-2 text-[var(--color-ink-secondary)]">{item.brand}</td>
-                  <td className="py-2 tabular-nums">{formatCurrency(item.unitPrice)}</td>
-                  <td className="py-2 tabular-nums">
-                    <span className={stock <= item.reorderLevel ? "text-[var(--color-status-critical)] font-medium" : ""}>{stock}</span>
-                  </td>
-                  <td className="py-2 pr-3">
+      <div className="max-h-[26rem] overflow-y-auto pr-1">
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+          {rows.map((item) => {
+            const checked = item.id in selected;
+            const stock = stockByItem.get(item.id) ?? 0;
+            const outOfStock = stock <= 0;
+            const lowStock = stock > 0 && stock <= item.reorderLevel;
+            const qty = selected[item.id] ?? 1;
+
+            return (
+              <div
+                key={item.id}
+                className={`overflow-hidden rounded-lg border transition-colors [border-color:var(--color-border)] ${checked ? "border-[var(--color-brand-1)] bg-[var(--color-brand-1)]/[0.05]" : "bg-[var(--color-surface-2)]"} ${outOfStock ? "opacity-55" : ""}`}
+              >
+                <label className={`flex min-h-24 gap-3 p-3 ${outOfStock ? "cursor-not-allowed" : "cursor-pointer"}`}>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={outOfStock}
+                    onChange={() => toggle(item.id)}
+                    aria-label={`Select ${item.name}`}
+                    className="sr-only"
+                  />
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-black/[0.04] text-[var(--color-ink-muted)] dark:bg-white/[0.06]">
+                    <Package size={18} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">{item.name}</span>
+                    <span className="block truncate text-[11px] text-[var(--color-ink-muted)]">{item.partNo} · {item.brand}</span>
+                    <span className="mt-2 block text-sm font-semibold tabular-nums">{formatCurrency(item.unitPrice)}</span>
+                  </span>
+                  <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${checked ? "border-[var(--color-brand-1)] bg-[var(--color-brand-1)] text-white" : "[border-color:var(--color-border)]"}`}>
+                    {checked && <Check size={13} strokeWidth={3} />}
+                  </span>
+                </label>
+
+                <div className="flex h-11 items-center justify-between border-t px-3 [border-color:var(--color-border)]">
+                  <span className={`text-[11px] font-medium ${outOfStock || lowStock ? "text-[var(--color-status-critical)]" : "text-[var(--color-ink-muted)]"}`}>
+                    {outOfStock ? "Out of stock" : lowStock ? `${stock} left · Low stock` : `${stock} in stock`}
+                  </span>
+                  <div className={`flex h-7 items-center overflow-hidden rounded-md border [border-color:var(--color-border)] ${checked ? "" : "opacity-35"}`}>
+                    <button
+                      type="button"
+                      title="Decrease quantity"
+                      aria-label={`Decrease ${item.name} quantity`}
+                      disabled={!checked || qty <= 1}
+                      onClick={() => setQty(item.id, qty - 1)}
+                      className="flex h-7 w-7 items-center justify-center disabled:cursor-not-allowed"
+                    >
+                      <Minus size={13} />
+                    </button>
                     <input
                       type="number"
                       min={1}
+                      max={stock}
                       disabled={!checked}
-                      value={selected[item.id] ?? 1}
-                      onClick={(e) => e.stopPropagation()}
+                      value={qty}
+                      aria-label={`${item.name} quantity`}
                       onChange={(e) => setQty(item.id, Number(e.target.value))}
-                      className="w-16 rounded border bg-[var(--color-surface-2)] px-1.5 py-1 text-sm outline-none disabled:opacity-40 [border-color:var(--color-border)]"
+                      className="h-7 w-8 border-x bg-transparent text-center text-xs tabular-nums outline-none disabled:cursor-not-allowed [border-color:var(--color-border)]"
                     />
-                  </td>
-                </tr>
-              );
-            })}
-            {rows.length === 0 && (
-              <tr><td colSpan={6} className="py-6 text-center text-[var(--color-ink-muted)]">No parts match your search.</td></tr>
-            )}
-          </tbody>
-        </table>
+                    <button
+                      type="button"
+                      title="Increase quantity"
+                      aria-label={`Increase ${item.name} quantity`}
+                      disabled={!checked || qty >= stock}
+                      onClick={() => setQty(item.id, qty + 1)}
+                      className="flex h-7 w-7 items-center justify-center disabled:cursor-not-allowed"
+                    >
+                      <Plus size={13} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {rows.length === 0 && (
+          <p className="py-8 text-center text-sm text-[var(--color-ink-muted)]">No parts match your search.</p>
+        )}
       </div>
       <div className="flex items-center justify-between">
         <p className="text-xs text-[var(--color-ink-muted)]">

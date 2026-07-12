@@ -1,24 +1,33 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useStore } from "./lib/store";
 import { Shell } from "./components/Shell";
-import Dashboard from "./pages/Dashboard";
-import PredictiveMaintenance from "./pages/PredictiveMaintenance";
-import JobCardList from "./pages/JobCards/List";
-import NewJobCard from "./pages/JobCards/New";
-import JobCardDetail from "./pages/JobCards/Detail";
-import CustomerList from "./pages/Customers/List";
-import CustomerDetail from "./pages/Customers/Detail";
-import ApplianceList from "./pages/Appliances/List";
-import ApplianceDetail from "./pages/Appliances/Detail";
-import Brands from "./pages/Brands";
-import Inventory from "./pages/Inventory";
-import Technicians from "./pages/Technicians";
-import Workflow from "./pages/Workflow";
-import Communications from "./pages/Communications";
-import Reports from "./pages/Reports";
-import MobilePreview from "./pages/Mobile/Preview";
-import TrackingPage from "./pages/Tracking";
+
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const PredictiveMaintenance = lazy(() => import("./pages/PredictiveMaintenance"));
+const JobCardList = lazy(() => import("./pages/JobCards/List"));
+const NewJobCard = lazy(() => import("./pages/JobCards/New"));
+const JobCardDetail = lazy(() => import("./pages/JobCards/Detail"));
+const CustomerList = lazy(() => import("./pages/Customers/List"));
+const CustomerDetail = lazy(() => import("./pages/Customers/Detail"));
+const ApplianceList = lazy(() => import("./pages/Appliances/List"));
+const ApplianceDetail = lazy(() => import("./pages/Appliances/Detail"));
+const Brands = lazy(() => import("./pages/Brands"));
+const Inventory = lazy(() => import("./pages/Inventory"));
+const Technicians = lazy(() => import("./pages/Technicians"));
+const Workflow = lazy(() => import("./pages/Workflow"));
+const Communications = lazy(() => import("./pages/Communications"));
+const Reports = lazy(() => import("./pages/Reports"));
+const MobilePreview = lazy(() => import("./pages/Mobile/Preview"));
+const TrackingPage = lazy(() => import("./pages/Tracking"));
+
+function PageLoading() {
+  return (
+    <div className="flex min-h-48 items-center justify-center" role="status" aria-label="Loading page">
+      <span className="h-7 w-7 animate-spin rounded-full border-2 border-[var(--color-border)] border-t-[var(--color-brand-1)]" />
+    </div>
+  );
+}
 
 function ShellRoutes() {
   return (
@@ -59,10 +68,12 @@ export default function App() {
 
   return (
     <BrowserRouter basename={import.meta.env.BASE_URL}>
-      <Routes>
-        <Route path="/track/:jobId" element={<TrackingPage />} />
-        <Route path="/*" element={<ShellRoutes />} />
-      </Routes>
+      <Suspense fallback={<PageLoading />}>
+        <Routes>
+          <Route path="/track/:jobId" element={<TrackingPage />} />
+          <Route path="/*" element={<ShellRoutes />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

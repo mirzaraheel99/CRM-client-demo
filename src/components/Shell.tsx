@@ -2,13 +2,13 @@ import { NavLink, Link } from "react-router-dom";
 import {
   LayoutDashboard, ClipboardList, Users, PackageSearch, Tag, Boxes,
   UserCog, GitBranch, MessageSquare, BarChart3, Smartphone, Sun, Moon,
-  Languages, ChevronDown, Wrench, Menu, RotateCcw, Radar,
+  Languages, ChevronDown, Wrench, Menu, RotateCcw, Radar, X,
 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { t } from "../lib/i18n";
 import { Avatar } from "./ui";
 import { cx } from "../lib/utils";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { Role } from "../lib/types";
 
 const NAV: { to: string; labelKey: Parameters<typeof t>[1]; icon: ReactNode; roles?: Role[] }[] = [
@@ -36,26 +36,43 @@ const ROLE_LABELS: Record<Role, string> = {
 
 export function Shell({ children }: { children: ReactNode }) {
   const { role, setRole, selectedBranchId, setBranch, branches, theme, setTheme, lang, setLang, sidebarCollapsed, toggleSidebar, resetDemoData } = useStore();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const visibleNav = NAV.filter((n) => !n.roles || n.roles.includes(role));
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[var(--color-surface-page)]">
+    <div className="flex h-dvh overflow-hidden bg-[var(--color-surface-page)]">
+      {mobileNavOpen && (
+        <button
+          type="button"
+          aria-label="Close navigation"
+          className="fixed inset-0 z-30 bg-black/45 md:hidden"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
       <aside
+        id="primary-navigation"
         className={cx(
-          "flex flex-col border-r [border-color:var(--color-border)] bg-[var(--color-surface-1)] transition-all shrink-0",
-          sidebarCollapsed ? "w-[64px]" : "w-[240px]"
+          "fixed inset-y-0 left-0 z-40 flex w-[260px] shrink-0 flex-col border-r bg-[var(--color-surface-1)] transition-transform [border-color:var(--color-border)] md:relative md:z-auto md:translate-x-0 md:transition-all",
+          mobileNavOpen ? "translate-x-0" : "-translate-x-full",
+          sidebarCollapsed ? "md:w-[64px]" : "md:w-[240px]"
         )}
       >
         <div className="flex items-center gap-2 px-4 h-16 border-b [border-color:var(--color-border)] shrink-0">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-brand-1)] text-white shrink-0">
             <Wrench size={16} />
           </div>
-          {!sidebarCollapsed && (
-            <div className="min-w-0">
-              <p className="text-sm font-semibold truncate">FixFlow</p>
-              <p className="text-[11px] text-[var(--color-ink-muted)] truncate">Appliance Service Suite</p>
-            </div>
-          )}
+          <div className={cx("min-w-0", sidebarCollapsed && "md:hidden")}>
+            <p className="text-sm font-semibold truncate">FixFlow</p>
+            <p className="text-[11px] text-[var(--color-ink-muted)] truncate">Appliance Service Suite</p>
+          </div>
+          <button
+            type="button"
+            aria-label="Close navigation"
+            className="ml-auto flex h-9 w-9 items-center justify-center rounded-lg text-[var(--color-ink-secondary)] hover:bg-black/5 md:hidden dark:hover:bg-white/10"
+            onClick={() => setMobileNavOpen(false)}
+          >
+            <X size={18} />
+          </button>
         </div>
         <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
           {visibleNav.map((item) => (
@@ -63,6 +80,7 @@ export function Shell({ children }: { children: ReactNode }) {
               key={item.to}
               to={item.to}
               end={item.to === "/"}
+              onClick={() => setMobileNavOpen(false)}
               className={({ isActive }) =>
                 cx(
                   "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
@@ -73,7 +91,7 @@ export function Shell({ children }: { children: ReactNode }) {
               }
             >
               {item.icon}
-              {!sidebarCollapsed && <span className="truncate">{t(lang, item.labelKey)}</span>}
+              <span className={cx("truncate", sidebarCollapsed && "md:hidden")}>{t(lang, item.labelKey)}</span>
             </NavLink>
           ))}
         </nav>
@@ -84,11 +102,11 @@ export function Shell({ children }: { children: ReactNode }) {
             className="flex w-full items-center gap-2 px-4 py-3 text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink-primary)]"
           >
             <RotateCcw size={16} />
-            {!sidebarCollapsed && "Reset demo data"}
+            <span className={cx(sidebarCollapsed && "md:hidden")}>Reset demo data</span>
           </button>
           <button
             onClick={toggleSidebar}
-            className="flex w-full items-center gap-2 px-4 py-3 text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink-primary)] border-t [border-color:var(--color-border)]"
+            className="hidden w-full items-center gap-2 border-t px-4 py-3 text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink-primary)] [border-color:var(--color-border)] md:flex"
           >
             <Menu size={16} />
             {!sidebarCollapsed && "Collapse"}
@@ -97,14 +115,30 @@ export function Shell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex h-16 items-center gap-3 border-b bg-[var(--color-surface-1)] px-5 [border-color:var(--color-border)] shrink-0">
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-xs text-[var(--color-ink-muted)]">{t(lang, "branch")}</span>
+        <header className="flex min-h-16 shrink-0 flex-wrap items-center gap-2 border-b bg-[var(--color-surface-1)] px-3 py-2 [border-color:var(--color-border)] md:gap-3 md:px-5">
+          <button
+            type="button"
+            aria-label="Open navigation"
+            aria-controls="primary-navigation"
+            aria-expanded={mobileNavOpen}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--color-ink-secondary)] hover:bg-black/5 md:hidden dark:hover:bg-white/10"
+            onClick={() => setMobileNavOpen(true)}
+          >
+            <Menu size={19} />
+          </button>
+          <div className="mr-auto min-w-0 md:hidden">
+            <p className="truncate text-sm font-semibold">FixFlow</p>
+            <p className="truncate text-[10px] text-[var(--color-ink-muted)]">Appliance Service Suite</p>
+          </div>
+
+          <div className="order-2 flex min-w-0 items-center gap-2 md:order-none md:shrink-0">
+            <span className="hidden text-xs text-[var(--color-ink-muted)] sm:inline">{t(lang, "branch")}</span>
             <div className="relative">
               <select
                 value={selectedBranchId}
                 onChange={(e) => setBranch(e.target.value)}
-                className="appearance-none rounded-lg border bg-[var(--color-surface-2)] py-1.5 pl-3 pr-7 text-sm font-medium outline-none [border-color:var(--color-border)]"
+                aria-label={t(lang, "branch")}
+                className="max-w-[154px] appearance-none truncate rounded-lg border bg-[var(--color-surface-2)] py-1.5 pl-3 pr-7 text-sm font-medium outline-none [border-color:var(--color-border)] sm:max-w-none"
               >
                 <option value="all">{t(lang, "allBranches")}</option>
                 {branches.map((b) => (
@@ -115,14 +149,15 @@ export function Shell({ children }: { children: ReactNode }) {
             </div>
           </div>
 
-          <div className="ml-auto flex items-center gap-2 shrink-0">
+          <div className="order-3 ml-auto flex shrink-0 items-center gap-1.5 md:order-none md:gap-2">
             <div className="flex items-center gap-2">
               <span className="text-xs text-[var(--color-ink-muted)] hidden sm:inline">{t(lang, "role")}</span>
               <div className="relative">
                 <select
                   value={role}
                   onChange={(e) => setRole(e.target.value as Role)}
-                  className="appearance-none rounded-lg border bg-[var(--color-surface-2)] py-1.5 pl-3 pr-7 text-sm font-medium outline-none [border-color:var(--color-border)]"
+                  aria-label={t(lang, "role")}
+                  className="max-w-[128px] appearance-none truncate rounded-lg border bg-[var(--color-surface-2)] py-1.5 pl-3 pr-7 text-sm font-medium outline-none [border-color:var(--color-border)] sm:max-w-none"
                 >
                   {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
                     <option key={r} value={r}>{ROLE_LABELS[r]}</option>
@@ -149,13 +184,13 @@ export function Shell({ children }: { children: ReactNode }) {
             <Link to="/jobcards/new">
               <span className="sr-only">{t(lang, "newJobCard")}</span>
             </Link>
-            <div className="flex items-center gap-2 pl-2 ml-1 border-l [border-color:var(--color-border)]">
+            <div className="hidden items-center gap-2 border-l pl-2 ml-1 [border-color:var(--color-border)] sm:flex">
               <Avatar name={ROLE_LABELS[role]} />
             </div>
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6">{children}</main>
       </div>
     </div>
   );

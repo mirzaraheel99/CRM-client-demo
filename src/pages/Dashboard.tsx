@@ -21,7 +21,7 @@ export default function Dashboard() {
 
   const scopedJobs = filterByBranch(jobCards, selectedBranchId);
   const scopedTechs = filterByBranch(technicians, selectedBranchId);
-  const scopedAppliances = appliancesByBranch(appliances, customers, selectedBranchId);
+  const scopedAppliances = appliancesByBranch(appliances, jobCards, selectedBranchId);
   const activeJobs = scopedJobs.filter((j) => j.status !== "Delivered");
   const alerts = inventoryAlerts(inventoryItems, inventoryLocations, inventoryStock, selectedBranchId);
   const maintenanceCandidates = predictiveMaintenanceCandidates(scopedAppliances, scopedJobs, brands);
@@ -200,7 +200,7 @@ export default function Dashboard() {
               {latest.map((j) => (
                 <tr key={j.id} className="border-b last:border-0 [border-color:var(--color-border)] transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.03]">
                   <td className="px-5 py-2.5">
-                    <Link to={`/jobcards/${j.id}`} className="font-medium text-[var(--color-brand-1)] hover:text-[var(--color-brand-2)] transition-colors">{j.id}</Link>
+                    <Link to={`/jobcards/${j.id}`} className="font-medium text-[var(--color-brand-1)] hover:text-[var(--color-brand-2)] transition-colors">{j.documentNo}</Link>
                   </td>
                   <td className="px-3 py-2.5">{custMap.get(j.customerId)?.name ?? "—"}</td>
                   <td className="px-3 py-2.5 text-[var(--color-ink-secondary)]">{appMap.get(j.applianceId)?.model ?? "—"}</td>

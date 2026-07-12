@@ -103,8 +103,9 @@ export default function Reports() {
 
   const scopedAppliances = useMemo(() => {
     if (selectedBranchId === "all") return appliances;
-    return appliances.filter((appliance) => customerMap.get(appliance.customerId)?.branchId === selectedBranchId);
-  }, [appliances, customerMap, selectedBranchId]);
+    const applianceIds = new Set(scopedJobs.map((job) => job.applianceId));
+    return appliances.filter((appliance) => applianceIds.has(appliance.id));
+  }, [appliances, scopedJobs, selectedBranchId]);
   const warrantyJobs = filteredJobs.filter((job) => job.jobType === "warranty");
   const warrantyByBrand = useMemo(() => {
     const claims = new Map<string, number>();
@@ -177,7 +178,7 @@ export default function Reports() {
     if (tab === "Technician Performance") downloadCsv("technician-performance.csv", techPerf.map((row) => ({ Technician: row.name, Jobs: row.jobs, Delivered: row.delivered, "Avg TAT (hrs)": row.avgHours, "SLA Met (%)": row.slaRate })));
     if (tab === "Inventory Consumption") downloadCsv("inventory-consumption.csv", consumption.map((row) => ({ Item: row.item, "Qty Used": row.qty, "Consumption Value": row.cost })));
     if (tab === "Warranty Claims") downloadCsv("warranty-claims.csv", warrantyByBrand.map((row) => ({ Brand: row.brand, Claims: row.claims, "Claim Rate (%)": row.claimRate })));
-    if (tab === "Revenue") downloadCsv("revenue-report.csv", revenueJobs.map((job) => ({ Job: job.id, Customer: customerMap.get(job.customerId)?.name ?? "", Amount: job.finalAmount ?? 0 })));
+    if (tab === "Revenue") downloadCsv("revenue-report.csv", revenueJobs.map((job) => ({ Job: job.documentNo, Invoice: job.invoiceNo, Customer: customerMap.get(job.customerId)?.name ?? "", Amount: job.finalAmount ?? 0 })));
   }
 
   return (

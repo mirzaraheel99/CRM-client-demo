@@ -3,6 +3,15 @@ export function formatCurrency(n: number | null | undefined) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "SAR", maximumFractionDigits: 0 }).format(n);
 }
 
+export function formatSequence(sequenceNo: number) {
+  return String(sequenceNo).padStart(2, "0");
+}
+
+export function fallbackDocumentNo(prefix: string, id: string) {
+  const suffix = id.replace(/^[^-]+-/, "").toUpperCase();
+  return `${prefix}-${suffix}`;
+}
+
 export function formatDate(iso: string | null | undefined) {
   if (!iso) return "—";
   return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(iso));

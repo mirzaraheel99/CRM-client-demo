@@ -33,6 +33,7 @@ export interface Branch {
 
 export interface Customer {
   id: string;
+  documentNo: string;
   name: string;
   phone: string;
   whatsapp: string;
@@ -54,7 +55,7 @@ export type ApplianceCategory = "AC" | "Refrigerator" | "Washer" | "Mobile" | "T
 
 export interface Appliance {
   id: string;
-  customerId: string;
+  documentNo: string;
   brandId: string;
   category: ApplianceCategory;
   model: string;
@@ -172,8 +173,21 @@ export interface CommunicationLog {
   timestamp: string;
 }
 
+export interface ServiceOrder {
+  id: string;
+  documentNo: string;
+  customerId: string;
+  branchId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface JobCard {
   id: string;
+  serviceOrderId: string;
+  sequenceNo: number;
+  documentNo: string;
+  invoiceNo: string;
   customerId: string;
   applianceId: string;
   technicianId: string | null;

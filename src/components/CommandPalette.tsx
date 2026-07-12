@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { create } from "zustand";
 import {
   Search, LayoutDashboard, ClipboardList, Users, PackageSearch, Tag, Boxes,
   UserCog, GitBranch, MessageSquare, BarChart3, Smartphone, Radar, ClipboardPlus,
@@ -8,16 +7,7 @@ import {
 import { useStore } from "../lib/store";
 import { canAccessPath } from "../lib/permissions";
 import { appliancesByBranch, filterByBranch } from "../lib/selectors";
-
-interface PaletteStore {
-  open: boolean;
-  setOpen: (open: boolean) => void;
-}
-
-export const useCommandPaletteStore = create<PaletteStore>((set) => ({
-  open: false,
-  setOpen: (open) => set({ open }),
-}));
+import { useCommandPaletteStore } from "../lib/commandPaletteStore";
 
 interface Command {
   id: string;
@@ -76,7 +66,7 @@ export function CommandPalette() {
   const appMap = useMemo(() => new Map(appliances.map((a) => [a.id, a])), [appliances]);
   const scopedJobs = useMemo(() => filterByBranch(jobCards, selectedBranchId), [jobCards, selectedBranchId]);
   const scopedCustomers = useMemo(() => filterByBranch(customers, selectedBranchId), [customers, selectedBranchId]);
-  const scopedAppliances = useMemo(() => appliancesByBranch(appliances, customers, selectedBranchId), [appliances, customers, selectedBranchId]);
+  const scopedAppliances = useMemo(() => appliancesByBranch(appliances, jobCards, selectedBranchId), [appliances, jobCards, selectedBranchId]);
 
   const commands: Command[] = useMemo(() => {
     const nav: Command[] = STATIC_DESTINATIONS.filter((destination) => canAccessPath(role, destination.to)).map((d) => ({
@@ -92,30 +82,30 @@ export function CommandPalette() {
       const app = appMap.get(j.applianceId)?.model ?? "";
       return {
         id: `job-${j.id}`,
-        label: `${j.id} — ${cust}`,
-        hint: `${app} · ${j.status}`,
+        label: `${j.documentNo} - ${cust}`,
+        hint: `${app} | ${j.status}`,
         icon: <ClipboardList size={15} />,
         action: () => navigate(`/jobcards/${j.id}`),
-        keywords: `${j.id} ${cust} ${app} ${j.status}`.toLowerCase(),
+        keywords: `${j.id} ${j.documentNo} ${j.invoiceNo} ${cust} ${app} ${j.status}`.toLowerCase(),
       };
     });
 
     const custs: Command[] = scopedCustomers.slice(0, 300).map((c) => ({
       id: `cust-${c.id}`,
-      label: c.name,
+      label: `${c.documentNo} - ${c.name}`,
       hint: c.phone,
       icon: <Users size={15} />,
       action: () => navigate(`/customers/${c.id}`),
-      keywords: `${c.name} ${c.phone}`.toLowerCase(),
+      keywords: `${c.documentNo} ${c.name} ${c.phone}`.toLowerCase(),
     }));
 
     const apps: Command[] = scopedAppliances.slice(0, 300).map((a) => ({
       id: `app-${a.id}`,
-      label: a.model,
+      label: `${a.documentNo} - ${a.model}`,
       hint: `Serial ${a.serialNo}`,
       icon: <PackageSearch size={15} />,
       action: () => navigate(`/appliances/${a.id}`),
-      keywords: `${a.model} ${a.serialNo}`.toLowerCase(),
+      keywords: `${a.documentNo} ${a.model} ${a.serialNo}`.toLowerCase(),
     }));
 
     return [...nav, ...jobs, ...custs, ...apps];

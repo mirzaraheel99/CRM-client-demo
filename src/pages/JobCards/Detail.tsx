@@ -6,13 +6,14 @@ import { Card, CardHeader, Tabs, Button, Select, Textarea, Input, Field, Badge, 
 import { JobStatusBadge, JobTypeBadge } from "../../components/StatusBadge";
 import { PartsGrid } from "../../components/PartsGrid";
 import { TrackingShare } from "../../components/TrackingShare";
-import { formatCurrency, formatDateTime, relativeTime } from "../../lib/utils";
+import { formatCurrency, formatDate, formatDateTime, formatSequence, relativeTime } from "../../lib/utils";
 import { inventoryStockByBranch, totalStockByItem } from "../../lib/selectors";
 import { MESSAGE_TEMPLATES, renderTemplate } from "../../lib/templates";
 import { printEstimate } from "../../lib/print";
 import { printTaxInvoice } from "../../lib/zatca";
 import { suggestDiagnosis, suggestFromTelemetry } from "../../lib/diagnosisAI";
 import { PaymentPanel } from "../../components/PaymentPanel";
+import { WhatsappVerify } from "../../components/WhatsappVerify";
 import { toast } from "../../lib/toast";
 import { Wifi } from "lucide-react";
 import { canPerform } from "../../lib/permissions";
@@ -34,11 +35,23 @@ const COMM_STATUS_TONE: Record<string, "neutral" | "good" | "critical"> = {
   failed: "critical",
 };
 
+function StagePhotoUpload({ label, onFile, compact = false }: { label: string; onFile: (file: File) => void; compact?: boolean }) {
+  return (
+    <label className={compact
+      ? "flex cursor-pointer items-center gap-1 rounded-md border border-dashed px-2 py-1 text-[11px] text-[var(--color-ink-muted)] hover:text-[var(--color-brand-1)] hover:border-[var(--color-brand-1)] [border-color:var(--color-border)]"
+      : "inline-flex cursor-pointer items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium text-[var(--color-ink-secondary)] hover:bg-black/[0.03] dark:hover:bg-white/[0.05] [border-color:var(--color-border)]"}
+    >
+      <ImagePlus size={compact ? 12 : 14} /> {label}
+      <input type="file" accept="image/*" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) onFile(file); event.target.value = ""; }} />
+    </label>
+  );
+}
+
 export default function JobCardDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const {
-    jobCards, customers, appliances, applianceTelemetry, brands, technicians, workflows,
+    jobCards, serviceOrders, customers, appliances, applianceTelemetry, brands, technicians, workflows,
     stageHistory, attachments, partsUsed, communicationLogs, inventoryItems, inventoryLocations, inventoryStock, purchaseBills, payments,
     role, selectedBranchId, advanceStage, assignTechnician, setDiagnosis, setEstimate, approveCustomer, setRepairNotes, setQaApproved,
     setFinalAmount, captureCustomerSignature, savePurchaseBill, addPartUsed, removePartUsed, addAttachment, sendCommunication,
@@ -57,6 +70,8 @@ export default function JobCardDetail() {
   const [billForm, setBillForm] = useState({ billNo: "", billDate: new Date().toISOString().slice(0, 10), vendorName: "" });
 
   const job = jobCards.find((candidate) => candidate.id === id && (selectedBranchId === "all" || candidate.branchId === selectedBranchId));
+  const serviceOrder = serviceOrders.find((candidate) => candidate.id === job?.serviceOrderId);
+  const siblingJobs = useMemo(() => jobCards.filter((candidate) => candidate.serviceOrderId === job?.serviceOrderId).sort((a, b) => a.sequenceNo - b.sequenceNo), [jobCards, job?.serviceOrderId]);
 
   const workflow = useMemo(() => workflows.find((w) => w.jobType === job?.jobType), [workflows, job]);
   const jobHistory = useMemo(() => stageHistory.filter((h) => h.jobcardId === id), [stageHistory, id]);
@@ -132,7 +147,7 @@ export default function JobCardDetail() {
       renderTemplate(tpl.body, {
         customer: customer?.name.split(" ")[0] ?? "there",
         appliance: appliance?.model ?? "item",
-        jobId: job!.id,
+        jobId: job!.documentNo,
         amount: formatCurrency(job!.estimateAmount),
       })
     );
@@ -153,6 +168,17 @@ export default function JobCardDetail() {
     if (action.ok) onSuccess?.();
   }
 
+  function uploadPhoto(stageName: StageName, file: File) {
+    if (file.size > 1_500_000) {
+      toast("Choose an image smaller than 1.5 MB for this browser demo.", "error");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => showResult(addAttachment(job!.id, stageName, file.name, String(reader.result)));
+    reader.onerror = () => toast("The selected image could not be read.", "error");
+    reader.readAsDataURL(file);
+  }
+
   const partsTotal = jobParts.reduce((acc, p) => acc + p.totalPrice, 0);
 
   return (
@@ -163,30 +189,41 @@ export default function JobCardDetail() {
 
       <div className="flex items-center justify-between flex-wrap gap-3 animate-rise-in">
         <div className="flex items-center gap-3 flex-wrap">
-          <h1 className="text-xl font-semibold tracking-tight">{job.id}</h1>
+          <h1 className="text-xl font-semibold tracking-tight">{job.documentNo}</h1>
           <JobStatusBadge status={job.status} />
           <JobTypeBadge jobType={job.jobType} />
           {job.oemClaimNo && <Badge tone="brand">OEM {job.oemClaimNo}</Badge>}
         </div>
       </div>
 
+      <Card padded={false}>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-3 [border-color:var(--color-border)]">
+          <div><p className="text-xs text-[var(--color-ink-muted)]">Parent service order</p><p className="font-semibold">{serviceOrder?.documentNo ?? job.serviceOrderId}</p></div>
+          <div className="text-right"><p className="text-xs text-[var(--color-ink-muted)]">Customer</p><p className="text-sm font-medium">{customer?.documentNo} | {siblingJobs.length} {siblingJobs.length === 1 ? "product" : "products"}</p></div>
+        </div>
+        <div className="flex gap-2 overflow-x-auto px-5 py-3">
+          {siblingJobs.map((line) => {
+            const lineProduct = appliances.find((candidate) => candidate.id === line.applianceId);
+            return <Link key={line.id} to={`/jobcards/${line.id}`} className={`min-w-48 rounded-md border px-3 py-2 text-sm [border-color:var(--color-border)] ${line.id === job.id ? "bg-[var(--color-brand-soft)] ring-1 ring-[var(--color-brand-1)]" : "hover:bg-black/[0.03] dark:hover:bg-white/[0.05]"}`}><div className="flex items-center justify-between gap-2"><span className="font-semibold">Sequence {formatSequence(line.sequenceNo)}</span><JobStatusBadge status={line.status} /></div><p className="mt-1 truncate text-xs text-[var(--color-ink-secondary)]">{lineProduct?.model}</p><p className="text-[11px] text-[var(--color-ink-muted)]">{line.documentNo}</p></Link>;
+          })}
+        </div>
+      </Card>
+
       <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr_280px] gap-5 items-start animate-rise-in" style={{ animationDelay: "40ms" }}>
         {/* Left panel */}
         <Card className="space-y-4">
           <div>
             <p className="text-xs text-[var(--color-ink-muted)] mb-1">Customer</p>
-            <p className="text-sm font-medium">{customer?.name}</p>
+            <p className="text-sm font-medium">{customer ? <Link to={`/customers/${customer.id}`} className="text-[var(--color-brand-1)] hover:underline">{customer.name}</Link> : "-"}</p>
+            <p className="text-xs text-[var(--color-ink-muted)]">{customer?.documentNo}</p>
             <p className="text-xs text-[var(--color-ink-secondary)]">{customer?.phone}</p>
             <p className="text-xs text-[var(--color-ink-secondary)]">{customer?.address}</p>
-            <div className="mt-1.5">
-              <Badge tone={customer?.whatsappVerified ? "good" : "warning"}>
-                WhatsApp {customer?.whatsappVerified ? "Verified" : "Unverified"}
-              </Badge>
-            </div>
+            {customer && <div className="mt-2"><WhatsappVerify customerId={customer.id} verified={customer.whatsappVerified} /></div>}
           </div>
           <div className="border-t pt-3 [border-color:var(--color-border)]">
-            <p className="text-xs text-[var(--color-ink-muted)] mb-1">Appliance</p>
+            <p className="text-xs text-[var(--color-ink-muted)] mb-1">Product sequence {formatSequence(job.sequenceNo)}</p>
             <p className="text-sm font-medium">{appliance?.model}</p>
+            <p className="text-xs text-[var(--color-ink-muted)]">{appliance?.documentNo} | Purchased {formatDate(appliance?.purchaseDate)}</p>
             <p className="text-xs text-[var(--color-ink-secondary)]">{brand?.name} · {appliance?.category}</p>
             <p className="text-xs text-[var(--color-ink-secondary)]">Serial {appliance?.serialNo}</p>
             {appliance?.imeiNo && <p className="text-xs text-[var(--color-ink-secondary)]">IMEI {appliance.imeiNo}</p>}
@@ -241,17 +278,12 @@ export default function JobCardDetail() {
                         <p className="text-xs text-[var(--color-ink-secondary)]">{h.notes}</p>
                         <p className="text-[11px] text-[var(--color-ink-muted)] mt-0.5">by {h.changedBy} · {formatDateTime(h.timestamp)}</p>
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
-                          {stagePhotos.map((a) => (
-                            <div key={a.id} className="h-10 w-10 rounded-md bg-black/[0.05] dark:bg-white/[0.08] flex items-center justify-center" title={a.label}>
-                              <ImagePlus size={14} className="text-[var(--color-ink-muted)]" />
+                          {stagePhotos.map((attachment) => (
+                            <div key={attachment.id} className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-md bg-black/[0.05] dark:bg-white/[0.08]" title={attachment.label}>
+                              {attachment.fileUrl !== "#" ? <img src={attachment.fileUrl} alt={attachment.label} className="h-full w-full object-cover" /> : <ImagePlus size={14} className="text-[var(--color-ink-muted)]" />}
                             </div>
                           ))}
-                          <button
-                            onClick={() => showResult(addAttachment(job.id, h.stageName, `${h.stageName} photo`))}
-                            className="flex items-center gap-1 rounded-md border border-dashed px-2 py-1 text-[11px] text-[var(--color-ink-muted)] hover:text-[var(--color-brand-1)] hover:border-[var(--color-brand-1)] [border-color:var(--color-border)]"
-                          >
-                            <ImagePlus size={12} /> Add photo
-                          </button>
+                          <StagePhotoUpload compact label="Add photo" onFile={(file) => uploadPhoto(h.stageName, file)} />
                         </div>
                       </li>
                     );
@@ -433,14 +465,12 @@ export default function JobCardDetail() {
 
             {tab === "Attachments" && (
               <div className="space-y-3">
-                <Button variant="secondary" onClick={() => showResult(addAttachment(job.id, job.currentStage, `${job.currentStage} photo`))}>
-                  <ImagePlus size={14} /> Upload photo (simulated)
-                </Button>
+                <StagePhotoUpload label={`Upload to ${job.currentStage}`} onFile={(file) => uploadPhoto(job.currentStage, file)} />
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {jobAttachments.map((a) => (
                     <div key={a.id} className="rounded-lg border [border-color:var(--color-border)] p-3">
-                      <div className="h-20 rounded-md bg-black/[0.04] dark:bg-white/[0.06] flex items-center justify-center mb-2">
-                        <ImagePlus size={20} className="text-[var(--color-ink-muted)]" />
+                      <div className="mb-2 flex h-20 items-center justify-center overflow-hidden rounded-md bg-black/[0.04] dark:bg-white/[0.06]">
+                        {a.fileUrl !== "#" ? <img src={a.fileUrl} alt={a.label} className="h-full w-full object-cover" /> : <ImagePlus size={20} className="text-[var(--color-ink-muted)]" />}
                       </div>
                       <p className="text-xs font-medium truncate">{a.label}</p>
                       <p className="text-[11px] text-[var(--color-ink-muted)]">{a.stageName} · {relativeTime(a.timestamp)}</p>
@@ -473,7 +503,7 @@ export default function JobCardDetail() {
         <div className="space-y-4">
           <Card interactive className="space-y-3">
             <CardHeader title="Customer Tracking" subtitle="Self-service link — no login required" />
-            <TrackingShare jobId={job.id} />
+            <TrackingShare jobId={serviceOrder?.id ?? job.id} />
           </Card>
 
           {job.currentStage !== "Delivered" && (

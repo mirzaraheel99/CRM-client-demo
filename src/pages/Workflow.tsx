@@ -1,9 +1,19 @@
 import { useState } from "react";
-import { ArrowRight, MessageCircle, Smartphone, Mail, ShieldCheck } from "lucide-react";
+import { ArrowRight, CheckCircle2, MessageCircle, Smartphone, Mail, ShieldCheck } from "lucide-react";
 import { useStore } from "../lib/store";
 import { Card, CardHeader, Button, Badge } from "../components/ui";
 import { toast } from "../lib/toast";
 import { cx } from "../lib/utils";
+import { canAccessPath, canPerform } from "../lib/permissions";
+import type { Role } from "../lib/types";
+
+const ROLES: { id: Role; label: string }[] = [
+  { id: "front_desk", label: "Front Desk" },
+  { id: "technician", label: "Technician" },
+  { id: "supervisor", label: "Supervisor" },
+  { id: "manager", label: "Manager" },
+  { id: "admin", label: "Admin" },
+];
 
 export default function Workflow() {
   const { workflows, updateWorkflowStep } = useStore();
@@ -106,6 +116,21 @@ export default function Workflow() {
           <Button variant="secondary" className="w-full justify-center" disabled>Save &amp; Assign to Job Type (auto-saved)</Button>
         </Card>
       )}
+
+      <Card padded={false}>
+        <div className="px-5 pt-5"><CardHeader title="User-wise screen and action access" subtitle="The selected role controls navigation, direct routes, and job-stage actions." /></div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[820px] text-sm">
+            <thead><tr className="border-y text-left text-xs text-[var(--color-ink-muted)] [border-color:var(--color-border)]"><th className="px-5 py-2 font-medium">Role</th><th className="px-3 py-2 font-medium">Create customer</th><th className="px-3 py-2 font-medium">Create service order</th><th className="px-3 py-2 font-medium">Diagnosis / repair</th><th className="px-3 py-2 font-medium">Inventory</th><th className="px-3 py-2 font-medium">QA / assignment</th><th className="px-3 py-2 font-medium">Reports</th><th className="px-5 py-2 font-medium">Workflow setup</th></tr></thead>
+            <tbody>
+              {ROLES.map((role) => {
+                const cells = [canPerform(role.id, "create_customer"), canPerform(role.id, "create_job"), canPerform(role.id, "set_diagnosis") && canPerform(role.id, "set_repair_notes"), canPerform(role.id, "manage_inventory"), canPerform(role.id, "approve_qa") && canPerform(role.id, "assign_technician"), canAccessPath(role.id, "/reports"), canPerform(role.id, "edit_workflow")];
+                return <tr key={role.id} className="border-b last:border-0 [border-color:var(--color-border)]"><td className="px-5 py-3 font-medium">{role.label}</td>{cells.map((allowed, index) => <td key={index} className="px-3 py-3">{allowed ? <CheckCircle2 size={16} className="text-[var(--color-status-good)]" aria-label="Allowed" /> : <span className="text-[var(--color-ink-muted)]" aria-label="Not allowed">-</span>}</td>)}</tr>;
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
     </div>
   );
 }

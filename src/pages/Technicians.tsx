@@ -4,6 +4,7 @@ import { Card, Button, Input, Select, Field, Modal, Badge, Avatar, Tabs } from "
 import { toast } from "../lib/toast";
 import type { ApplianceCategory } from "../lib/types";
 import { filterByBranch } from "../lib/selectors";
+import { fallbackDocumentNo } from "../lib/utils";
 
 const CATEGORIES: ApplianceCategory[] = ["AC", "Refrigerator", "Washer", "Mobile", "TV", "Microwave"];
 const TABS = ["Technician List", "Allocation Calendar"];
@@ -60,6 +61,7 @@ export default function Technicians() {
                       <Avatar name={t.name} color={t.avatarColor} />
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate">{t.name}</p>
+                        <p className="text-[11px] text-[var(--color-ink-muted)]">{fallbackDocumentNo("TECH", t.id)}</p>
                         <p className="text-xs text-[var(--color-ink-muted)]">{t.zone}</p>
                       </div>
                       <Badge tone={t.status === "Available" ? "good" : t.status === "On Job" ? "warning" : "neutral"} >{t.status}</Badge>
@@ -90,7 +92,7 @@ export default function Technicians() {
                 <tbody>
                   {scopedTechnicians.map((t) => (
                     <tr key={t.id} className="border-t [border-color:var(--color-border)]">
-                      <td className="py-2 pr-3 font-medium sticky left-0 bg-[var(--color-surface-1)] whitespace-nowrap">{t.name}</td>
+                      <td className="py-2 pr-3 font-medium sticky left-0 bg-[var(--color-surface-1)] whitespace-nowrap">{t.name}<p className="font-normal text-[10px] text-[var(--color-ink-muted)]">{fallbackDocumentNo("TECH", t.id)}</p></td>
                       {days.map((d) => {
                         const dayJobs = scopedJobs.filter(
                           (j) => j.technicianId === t.id && j.scheduledAt && new Date(j.scheduledAt).toDateString() === d.toDateString()
@@ -99,8 +101,8 @@ export default function Technicians() {
                           <td key={d.toISOString()} className="py-2 px-2 align-top">
                             <div className="space-y-1">
                               {dayJobs.slice(0, 2).map((j) => (
-                                <div key={j.id} className="rounded bg-[var(--color-brand-1)]/10 text-[var(--color-brand-2)] px-1.5 py-1 truncate" title={j.id}>
-                                  {custMap.get(j.customerId)?.name.split(" ")[0]}
+                                <div key={j.id} className="rounded bg-[var(--color-brand-1)]/10 text-[var(--color-brand-2)] px-1.5 py-1 truncate" title={j.documentNo}>
+                                  {j.documentNo.split("-").slice(-1)[0]} | {custMap.get(j.customerId)?.name.split(" ")[0]}
                                 </div>
                               ))}
                             </div>

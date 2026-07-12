@@ -6,10 +6,10 @@ export function filterByBranch<T extends { branchId: string }>(items: T[], branc
   return items.filter((i) => i.branchId === branchId);
 }
 
-export function appliancesByBranch(appliances: Appliance[], customers: Customer[], branchId: string | "all") {
+export function appliancesByBranch(appliances: Appliance[], jobs: JobCard[], branchId: string | "all") {
   if (branchId === "all") return appliances;
-  const customerIds = new Set(customers.filter((customer) => customer.branchId === branchId).map((customer) => customer.id));
-  return appliances.filter((appliance) => customerIds.has(appliance.customerId));
+  const applianceIds = new Set(jobs.filter((job) => job.branchId === branchId).map((job) => job.applianceId));
+  return appliances.filter((appliance) => applianceIds.has(appliance.id));
 }
 
 export function communicationsByBranch(communications: CommunicationLog[], jobs: JobCard[], customers: Customer[], branchId: string | "all") {

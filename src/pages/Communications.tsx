@@ -23,6 +23,7 @@ export default function Communications() {
   const [page, setPage] = useState(1);
 
   const custMap = useMemo(() => new Map(customers.map((c) => [c.id, c])), [customers]);
+  const jobMap = useMemo(() => new Map(jobCards.map((job) => [job.id, job])), [jobCards]);
   const scopedLogs = useMemo(() => communicationsByBranch(communicationLogs, jobCards, customers, selectedBranchId), [communicationLogs, jobCards, customers, selectedBranchId]);
 
   const rows = useMemo(() => {
@@ -31,10 +32,10 @@ export default function Communications() {
     if (status !== "all") list = list.filter((c) => c.status === status);
     if (search.trim()) {
       const q = search.toLowerCase();
-      list = list.filter((c) => c.message.toLowerCase().includes(q) || (c.jobcardId ?? "").toLowerCase().includes(q));
+      list = list.filter((c) => c.message.toLowerCase().includes(q) || (c.jobcardId ?? "").toLowerCase().includes(q) || (c.jobcardId ? jobMap.get(c.jobcardId)?.documentNo.toLowerCase().includes(q) : false));
     }
     return [...list].sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp));
-  }, [scopedLogs, channel, status, search]);
+  }, [scopedLogs, channel, status, search, jobMap]);
 
   const currentPage = Math.min(page, Math.max(1, Math.ceil(rows.length / PAGE_SIZE)));
   const pagedRows = rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -91,10 +92,11 @@ export default function Communications() {
             const customer = custMap.get(message.customerId);
             return (
               <div key={message.id} className="p-4">
+                <p className="mb-1 text-[10px] font-medium text-[var(--color-ink-muted)]">{message.id.toUpperCase()}</p>
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-2">
                     {CHANNEL_ICON[message.channel]}
-                    {message.jobcardId ? <Link to={`/jobcards/${message.jobcardId}`} className="truncate text-sm font-semibold text-[var(--color-brand-1)]">{message.jobcardId}</Link> : <span className="truncate text-sm font-semibold">Maintenance</span>}
+                    {message.jobcardId ? <Link to={`/jobcards/${message.jobcardId}`} className="truncate text-sm font-semibold text-[var(--color-brand-1)]">{jobMap.get(message.jobcardId)?.documentNo ?? message.jobcardId}</Link> : <span className="truncate text-sm font-semibold">Maintenance</span>}
                   </div>
                   <Badge tone={message.status === "failed" ? "critical" : message.status === "read" ? "good" : "neutral"}>{message.status}</Badge>
                 </div>
@@ -106,10 +108,11 @@ export default function Communications() {
           })}
         </div>
         <div className="hidden overflow-x-auto sm:block">
-          <table className="w-full text-sm min-w-[720px]">
+          <table className="w-full text-sm min-w-[840px]">
             <thead>
               <tr className="text-left text-xs text-[var(--color-ink-muted)] border-b [border-color:var(--color-border)]">
-                <th className="px-5 py-3 font-medium">Channel</th>
+                <th className="px-5 py-3 font-medium">Message No.</th>
+                <th className="px-3 py-3 font-medium">Channel</th>
                 <th className="px-3 py-3 font-medium">Job</th>
                 <th className="px-3 py-3 font-medium">Customer</th>
                 <th className="px-3 py-3 font-medium">Message</th>
@@ -122,8 +125,9 @@ export default function Communications() {
                 const cust = custMap.get(c.customerId);
                 return (
                   <tr key={c.id} className="border-b last:border-0 [border-color:var(--color-border)] transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.03]">
-                    <td className="px-5 py-2.5">{CHANNEL_ICON[c.channel]}</td>
-                    <td className="px-3 py-2.5">{c.jobcardId ? <Link to={`/jobcards/${c.jobcardId}`} className="font-medium text-[var(--color-brand-1)]">{c.jobcardId}</Link> : <span className="text-[var(--color-ink-secondary)]">Maintenance</span>}</td>
+                    <td className="px-5 py-2.5 text-xs text-[var(--color-ink-muted)]">{c.id.toUpperCase()}</td>
+                    <td className="px-3 py-2.5">{CHANNEL_ICON[c.channel]}</td>
+                    <td className="px-3 py-2.5">{c.jobcardId ? <Link to={`/jobcards/${c.jobcardId}`} className="font-medium text-[var(--color-brand-1)]">{jobMap.get(c.jobcardId)?.documentNo ?? c.jobcardId}</Link> : <span className="text-[var(--color-ink-secondary)]">Maintenance</span>}</td>
                     <td className="px-3 py-2.5 text-[var(--color-ink-secondary)]">{cust?.name ?? "—"}</td>
                     <td className="px-3 py-2.5 text-[var(--color-ink-secondary)] max-w-xs truncate">{c.message}</td>
                     <td className="px-3 py-2.5"><Badge tone={c.status === "failed" ? "critical" : c.status === "read" ? "good" : "neutral"}>{c.status}</Badge></td>

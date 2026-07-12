@@ -1,111 +1,69 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { Radar, CheckCircle2, Sparkles } from "lucide-react";
+import { CheckCircle2, Radar, Sparkles } from "lucide-react";
 import { useStore } from "../lib/store";
-import { Card, CardHeader, Badge, Button, StatTile } from "../components/ui";
+import { Badge, Button, Card, CardHeader, StatTile } from "../components/ui";
 import { appliancesByBranch, filterByBranch, predictiveMaintenanceCandidates } from "../lib/selectors";
 import { relativeTime } from "../lib/utils";
 import { toast } from "../lib/toast";
 
 export default function PredictiveMaintenance() {
   const { appliances, jobCards, brands, customers, selectedBranchId, maintenanceRemindersSent, sendMaintenanceReminder } = useStore();
-
-  const scopedAppliances = useMemo(() => appliancesByBranch(appliances, customers, selectedBranchId), [appliances, customers, selectedBranchId]);
+  const scopedAppliances = useMemo(() => appliancesByBranch(appliances, jobCards, selectedBranchId), [appliances, jobCards, selectedBranchId]);
   const scopedJobs = useMemo(() => filterByBranch(jobCards, selectedBranchId), [jobCards, selectedBranchId]);
   const candidates = useMemo(() => predictiveMaintenanceCandidates(scopedAppliances, scopedJobs, brands), [scopedAppliances, scopedJobs, brands]);
-  const custMap = useMemo(() => new Map(customers.map((c) => [c.id, c])), [customers]);
-  const brandMap = useMemo(() => new Map(brands.map((b) => [b.id, b])), [brands]);
+  const customerMap = useMemo(() => new Map(customers.map((customer) => [customer.id, customer])), [customers]);
+  const brandMap = useMemo(() => new Map(brands.map((brand) => [brand.id, brand])), [brands]);
+  const latestJobByAppliance = useMemo(() => {
+    const map = new Map<string, (typeof jobCards)[number]>();
+    for (const job of jobCards) {
+      const current = map.get(job.applianceId);
+      if (!current || new Date(job.createdAt) > new Date(current.createdAt)) map.set(job.applianceId, job);
+    }
+    return map;
+  }, [jobCards]);
 
-  const remindersSentCount = candidates.filter((c) => maintenanceRemindersSent[c.appliance.id]).length;
-  // Candidates are already filtered to the plausible cohort window, so their
-  // match strength is displayed on a 50-100% scale rather than 0-100%.
+  const remindersSentCount = candidates.filter((candidate) => maintenanceRemindersSent[candidate.appliance.id]).length;
   const matchStrength = (score: number) => Math.round(50 + score * 50);
 
   return (
     <div className="space-y-6">
       <div className="animate-rise-in">
-        <div className="flex items-center gap-2">
-          <Sparkles size={18} className="text-[var(--color-brand-1)]" />
-          <h1 className="text-xl font-semibold tracking-tight">Predictive Maintenance</h1>
-        </div>
-        <p className="text-sm text-[var(--color-ink-muted)] mt-0.5 max-w-2xl">
-          Proactive service opportunities — flagged from real repair-history patterns across similar appliances,
-          not waiting for a breakdown call. No IoT hardware required: FixFlow learns the typical age-at-first-repair
-          for each brand and category, then surfaces appliances approaching that window.
-        </p>
+        <div className="flex items-center gap-2"><Sparkles size={18} className="text-[var(--color-brand-1)]" /><h1 className="text-xl font-semibold tracking-tight">Predictive Maintenance</h1></div>
+        <p className="mt-0.5 max-w-2xl text-sm text-[var(--color-ink-muted)]">Proactive service opportunities flagged from repair-history patterns across similar products. The reminder uses the customer from the product's latest service-order sequence.</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl">
-        <StatTile label="Flagged appliances" value={String(candidates.length)} icon={<Radar size={16} />} accent="var(--color-brand-1)" />
+      <div className="grid max-w-2xl grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatTile label="Flagged products" value={String(candidates.length)} icon={<Radar size={16} />} accent="var(--color-brand-1)" />
         <StatTile label="Reminders sent" value={String(remindersSentCount)} icon={<CheckCircle2 size={16} />} accent="var(--color-status-good)" />
-        <StatTile
-          label="Avg. match strength"
-          value={candidates.length ? `${Math.round(candidates.reduce((a, c) => a + matchStrength(c.urgencyScore), 0) / candidates.length)}%` : "—"}
-          icon={<Sparkles size={16} />}
-          accent="var(--color-series-5)"
-        />
+        <StatTile label="Avg. match strength" value={candidates.length ? `${Math.round(candidates.reduce((sum, candidate) => sum + matchStrength(candidate.urgencyScore), 0) / candidates.length)}%` : "-"} icon={<Sparkles size={16} />} accent="var(--color-series-5)" />
       </div>
 
       <Card padded={false} className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[820px]">
-          <thead>
-            <tr className="text-left text-xs text-[var(--color-ink-muted)] border-b [border-color:var(--color-border)]">
-              <th className="px-5 py-3 font-medium">Appliance</th>
-              <th className="px-3 py-3 font-medium">Customer</th>
-              <th className="px-3 py-3 font-medium">Current age</th>
-              <th className="px-3 py-3 font-medium">Cohort avg. age at first repair</th>
-              <th className="px-3 py-3 font-medium">Confidence</th>
-              <th className="px-5 py-3 font-medium">Action</th>
-            </tr>
-          </thead>
+        <table className="w-full min-w-[860px] text-sm">
+          <thead><tr className="border-b text-left text-xs text-[var(--color-ink-muted)] [border-color:var(--color-border)]"><th className="px-5 py-3 font-medium">Product</th><th className="px-3 py-3 font-medium">Latest service customer</th><th className="px-3 py-3 font-medium">Current age</th><th className="px-3 py-3 font-medium">Cohort avg. age at first repair</th><th className="px-3 py-3 font-medium">Confidence</th><th className="px-5 py-3 font-medium">Action</th></tr></thead>
           <tbody>
             {candidates.map(({ appliance, ageMonths, cohortAvgMonths, cohortSize, urgencyScore }) => {
               const sent = maintenanceRemindersSent[appliance.id];
+              const latestJob = latestJobByAppliance.get(appliance.id);
+              const customer = latestJob ? customerMap.get(latestJob.customerId) : undefined;
               return (
-                <tr key={appliance.id} className="border-b last:border-0 [border-color:var(--color-border)] transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.03]">
-                  <td className="px-5 py-3">
-                    <Link to={`/appliances/${appliance.id}`} className="font-medium text-[var(--color-brand-1)]">{appliance.model}</Link>
-                    <p className="text-xs text-[var(--color-ink-muted)]">{brandMap.get(appliance.brandId)?.name} · {appliance.category}</p>
-                  </td>
-                  <td className="px-3 py-3 text-[var(--color-ink-secondary)]">{custMap.get(appliance.customerId)?.name ?? "—"}</td>
+                <tr key={appliance.id} className="border-b last:border-0 hover:bg-black/[0.02] dark:hover:bg-white/[0.03] [border-color:var(--color-border)]">
+                  <td className="px-5 py-3"><Link to={`/appliances/${appliance.id}`} className="font-medium text-[var(--color-brand-1)]">{appliance.model}</Link><p className="text-xs text-[var(--color-ink-muted)]">{appliance.documentNo} | {brandMap.get(appliance.brandId)?.name} | {appliance.category}</p></td>
+                  <td className="px-3 py-3 text-[var(--color-ink-secondary)]">{customer?.name ?? "No recent customer"}{customer && <p className="text-xs text-[var(--color-ink-muted)]">{customer.documentNo}</p>}</td>
                   <td className="px-3 py-3 tabular-nums">{ageMonths} mo</td>
                   <td className="px-3 py-3 tabular-nums text-[var(--color-ink-secondary)]">{cohortAvgMonths} mo <span className="text-[var(--color-ink-muted)]">(n={cohortSize})</span></td>
-                  <td className="px-3 py-3">
-                    <Badge tone={urgencyScore > 0.66 ? "serious" : "warning"}>{matchStrength(urgencyScore)}%</Badge>
-                  </td>
-                  <td className="px-5 py-3">
-                    {sent ? (
-                      <span className="text-xs text-[var(--color-status-good)] flex items-center gap-1"><CheckCircle2 size={13} /> Reminded {relativeTime(sent)}</span>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <Button size="sm" variant="secondary" onClick={() => { const result = sendMaintenanceReminder(appliance.id); toast(result.message, result.ok ? "success" : "error"); }}>Send Reminder</Button>
-                        <Link to={`/jobcards/new?customerId=${appliance.customerId}&applianceId=${appliance.id}`}>
-                          <Button size="sm">Create Job Card</Button>
-                        </Link>
-                      </div>
-                    )}
-                  </td>
+                  <td className="px-3 py-3"><Badge tone={urgencyScore > 0.66 ? "serious" : "warning"}>{matchStrength(urgencyScore)}%</Badge></td>
+                  <td className="px-5 py-3">{sent ? <span className="flex items-center gap-1 text-xs text-[var(--color-status-good)]"><CheckCircle2 size={13} /> Reminded {relativeTime(sent)}</span> : <div className="flex items-center gap-2"><Button size="sm" variant="secondary" disabled={!customer} onClick={() => { const result = sendMaintenanceReminder(appliance.id); toast(result.message, result.ok ? "success" : "error"); }}>Send Reminder</Button>{customer && <Link to={`/jobcards/new?customerId=${customer.id}&applianceId=${appliance.id}`}><Button size="sm">Create Service Order</Button></Link>}</div>}</td>
                 </tr>
               );
             })}
-            {candidates.length === 0 && (
-              <tr><td colSpan={6} className="px-5 py-10 text-center text-[var(--color-ink-muted)]">No predictive maintenance opportunities flagged right now.</td></tr>
-            )}
+            {candidates.length === 0 && <tr><td colSpan={6} className="px-5 py-10 text-center text-[var(--color-ink-muted)]">No predictive maintenance opportunities flagged right now.</td></tr>}
           </tbody>
         </table>
       </Card>
 
-      <Card className="max-w-2xl">
-        <CardHeader title="How this works" />
-        <p className="text-sm text-[var(--color-ink-secondary)]">
-          For every brand + appliance category with at least 3 completed repairs, FixFlow calculates the average
-          appliance age at first service. Appliances of the same brand/category that haven't had a job card yet,
-          and are now within ~22% of that average age, are flagged here — the same "similar units failed around
-          this age" signal that IoT telemetry programs (LG ThinQ Care, Samsung SmartThings) use, derived entirely
-          from job-card history already in the system. Wiring in real appliance telemetry later would sharpen this
-          further without changing the workflow.
-        </p>
-      </Card>
+      <Card className="max-w-2xl"><CardHeader title="How this works" /><p className="text-sm text-[var(--color-ink-secondary)]">For every brand and product category with enough completed repairs, FixFlow estimates the typical age at first service. Products approaching that window are flagged, while customer outreach is always routed through the most recent service relationship rather than permanent product ownership.</p></Card>
     </div>
   );
 }

@@ -1,12 +1,13 @@
+import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { CheckCircle2, XCircle, Wrench, ImagePlus, MessageCircle, Smartphone, Mail } from "lucide-react";
+import { CheckCircle2, ImagePlus, Mail, MessageCircle, Smartphone, Wrench, XCircle } from "lucide-react";
 import { useStore } from "../lib/store";
-import { Card, Badge, Button, WorkflowStepper } from "../components/ui";
+import { Badge, Button, Card, WorkflowStepper } from "../components/ui";
 import { JobStatusBadge } from "../components/StatusBadge";
 import { PaymentPanel } from "../components/PaymentPanel";
 import { Toaster } from "../components/Toaster";
 import { toast } from "../lib/toast";
-import { formatCurrency, formatDate } from "../lib/utils";
+import { formatCurrency, formatDate, formatSequence } from "../lib/utils";
 import type { Channel } from "../lib/types";
 
 const CHANNEL_ICON: Record<Channel, React.ReactNode> = {
@@ -17,144 +18,77 @@ const CHANNEL_ICON: Record<Channel, React.ReactNode> = {
 
 export default function TrackingPage() {
   const { jobId } = useParams();
-  const {
-    jobCards, customers, appliances, brands, technicians, workflows,
-    stageHistory, attachments, communicationLogs, approveCustomer, payments,
-  } = useStore();
+  const { jobCards, serviceOrders, customers, appliances, brands, technicians, workflows, stageHistory, attachments, communicationLogs, approveCustomer, payments } = useStore();
+  const directJob = jobCards.find((job) => job.id === jobId);
+  const serviceOrder = serviceOrders.find((order) => order.id === jobId) ?? serviceOrders.find((order) => order.id === directJob?.serviceOrderId);
+  const orderJobs = jobCards.filter((job) => job.serviceOrderId === serviceOrder?.id).sort((a, b) => a.sequenceNo - b.sequenceNo);
+  const [selectedLineId, setSelectedLineId] = useState("");
 
-  const job = jobCards.find((j) => j.id === jobId);
-
-  if (!job) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[var(--color-surface-page)] text-[var(--color-ink-primary)] p-6">
-        <div className="text-center">
-          <p className="text-lg font-semibold">Tracking link not found</p>
-          <p className="text-sm text-[var(--color-ink-muted)] mt-1">Double-check the link your service center sent you.</p>
-        </div>
-      </div>
-    );
+  const job = orderJobs.find((line) => line.id === selectedLineId) ?? directJob ?? orderJobs[0];
+  if (!job || !serviceOrder) {
+    return <div className="flex min-h-screen items-center justify-center bg-[var(--color-surface-page)] p-6 text-[var(--color-ink-primary)]"><div className="text-center"><p className="text-lg font-semibold">Tracking link not found</p><p className="mt-1 text-sm text-[var(--color-ink-muted)]">Double-check the link your service center sent you.</p></div></div>;
   }
 
-  const customer = customers.find((c) => c.id === job.customerId);
-  const appliance = appliances.find((a) => a.id === job.applianceId);
-  const brand = brands.find((b) => b.id === appliance?.brandId);
-  const technician = technicians.find((t) => t.id === job.technicianId);
-  const workflow = workflows.find((w) => w.jobType === job.jobType);
-  const history = stageHistory.filter((h) => h.jobcardId === job.id).sort((a, b) => +new Date(a.timestamp) - +new Date(b.timestamp));
-  const photos = attachments.filter((a) => a.jobcardId === job.id);
-  const comms = communicationLogs.filter((c) => c.jobcardId === job.id).sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp));
-  const jobPayments = payments.filter((p) => p.jobcardId === job.id);
-
-  const stepIdx = workflow?.steps.findIndex((s) => s.stepName === job.currentStage) ?? -1;
+  const customer = customers.find((candidate) => candidate.id === serviceOrder.customerId);
+  const appliance = appliances.find((candidate) => candidate.id === job.applianceId);
+  const brand = brands.find((candidate) => candidate.id === appliance?.brandId);
+  const technician = technicians.find((candidate) => candidate.id === job.technicianId);
+  const workflow = workflows.find((candidate) => candidate.jobType === job.jobType);
+  const history = stageHistory.filter((entry) => entry.jobcardId === job.id).sort((a, b) => +new Date(a.timestamp) - +new Date(b.timestamp));
+  const photos = attachments.filter((attachment) => attachment.jobcardId === job.id);
+  const comms = communicationLogs.filter((communication) => communication.jobcardId === job.id).sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp));
+  const jobPayments = payments.filter((payment) => payment.jobcardId === job.id);
+  const stepIdx = workflow?.steps.findIndex((step) => step.stepName === job.currentStage) ?? -1;
   const needsApproval = job.currentStage === "Customer Approval" && job.customerApproved !== true;
   const canPay = job.jobType === "non_warranty" && (job.status === "Ready" || job.status === "Delivered") && job.finalAmount != null;
 
   return (
     <div className="min-h-screen bg-[var(--color-surface-page)] text-[var(--color-ink-primary)]">
-      <header className="flex items-center gap-2 px-6 h-16 border-b [border-color:var(--color-border)] bg-[var(--color-surface-1)]">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-brand-1)] text-white">
-          <Wrench size={16} />
-        </div>
-        <div>
-          <p className="text-sm font-semibold">FixFlow</p>
-          <p className="text-[11px] text-[var(--color-ink-muted)]">Customer tracking — no login required</p>
-        </div>
-      </header>
+      <header className="flex h-16 items-center gap-2 border-b bg-[var(--color-surface-1)] px-6 [border-color:var(--color-border)]"><div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-brand-1)] text-white"><Wrench size={16} /></div><div><p className="text-sm font-semibold">FixFlow</p><p className="text-[11px] text-[var(--color-ink-muted)]">Customer tracking | no login required</p></div></header>
 
-      <main className="max-w-2xl mx-auto p-5 sm:p-8 space-y-5">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div>
-            <h1 className="text-xl font-semibold">{job.id}</h1>
-            <p className="text-sm text-[var(--color-ink-muted)]">Hi {customer?.name.split(" ")[0]}, here's the latest on your {appliance?.category.toLowerCase()}.</p>
-          </div>
-          <JobStatusBadge status={job.status} />
+      <main className="mx-auto max-w-3xl space-y-5 p-5 sm:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div><p className="text-xs font-medium text-[var(--color-ink-muted)]">Service order</p><h1 className="text-xl font-semibold">{serviceOrder.documentNo}</h1><p className="text-sm text-[var(--color-ink-muted)]">Hi {customer?.name.split(" ")[0]}, track all {orderJobs.length} {orderJobs.length === 1 ? "product" : "products"} received under this order.</p></div>
+          <div className="text-right"><p className="text-xs text-[var(--color-ink-muted)]">Customer No.</p><p className="text-sm font-medium">{customer?.documentNo}</p></div>
         </div>
 
-        {workflow && (
+        {orderJobs.length > 1 && (
           <Card>
-            <WorkflowStepper steps={workflow.steps} currentIdx={stepIdx} orientation="horizontal" />
-          </Card>
-        )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Card>
-            <p className="text-xs text-[var(--color-ink-muted)] mb-1">Appliance</p>
-            <p className="text-sm font-medium">{appliance?.model}</p>
-            <p className="text-xs text-[var(--color-ink-secondary)]">{brand?.name} · Serial {appliance?.serialNo}</p>
-            <div className="mt-2"><Badge tone={appliance?.warrantyStatus === "In Warranty" ? "good" : "neutral"}>{appliance?.warrantyStatus}</Badge></div>
-          </Card>
-          <Card>
-            <p className="text-xs text-[var(--color-ink-muted)] mb-1">Technician</p>
-            <p className="text-sm font-medium">{technician?.name ?? "Being assigned"}</p>
-            {job.estimateAmount != null && (
-              <>
-                <p className="text-xs text-[var(--color-ink-muted)] mt-2">Estimate</p>
-                <p className="text-sm font-semibold tabular-nums">{formatCurrency(job.estimateAmount)}</p>
-              </>
-            )}
-          </Card>
-        </div>
-
-        {needsApproval && (
-          <Card className="border-2 [border-color:var(--color-brand-1)]">
-            <p className="text-sm font-medium mb-1">{job.customerApproved === false ? "You declined this estimate" : "Your approval is needed to proceed"}</p>
-            <p className="text-xs text-[var(--color-ink-secondary)] mb-3">
-              Estimated cost: <span className="font-semibold">{formatCurrency(job.estimateAmount)}</span> for parts + labor.
-            </p>
-            <div className="flex gap-2">
-              <Button onClick={() => { const result = approveCustomer(job.id, true, "customer"); toast(result.message, result.ok ? "success" : "error"); }}><CheckCircle2 size={14} /> Approve</Button>
-              {job.customerApproved == null && <Button variant="danger" onClick={() => { const result = approveCustomer(job.id, false, "customer"); toast(result.message, result.ok ? "info" : "error"); }}><XCircle size={14} /> Decline</Button>}
+            <p className="mb-3 text-sm font-semibold">Product sequences</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {orderJobs.map((line) => {
+                const product = appliances.find((candidate) => candidate.id === line.applianceId);
+                return <button key={line.id} type="button" onClick={() => setSelectedLineId(line.id)} className={`rounded-md border p-3 text-left [border-color:var(--color-border)] ${line.id === job.id ? "ring-2 ring-[var(--color-brand-1)] bg-black/[0.02] dark:bg-white/[0.04]" : "hover:bg-black/[0.02] dark:hover:bg-white/[0.03]"}`}><div className="flex items-center justify-between gap-2"><span className="text-sm font-semibold">Sequence {formatSequence(line.sequenceNo)}</span><JobStatusBadge status={line.status} /></div><p className="mt-1 truncate text-xs text-[var(--color-ink-secondary)]">{product?.model}</p><p className="text-[11px] text-[var(--color-ink-muted)]">{line.documentNo} | {formatDate(line.createdAt)}</p></button>;
+              })}
             </div>
           </Card>
         )}
-        {job.currentStage === "Customer Approval" && job.customerApproved === true && (
-          <Card>
-            <Badge tone={job.customerApproved ? "good" : "critical"}>{job.customerApproved ? "You approved this estimate" : "You declined this estimate"}</Badge>
-          </Card>
-        )}
 
+        <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs text-[var(--color-ink-muted)]">Selected product line</p><h2 className="text-lg font-semibold">{job.documentNo}</h2><p className="text-xs text-[var(--color-ink-muted)]">Invoice No. {job.invoiceNo}</p></div><JobStatusBadge status={job.status} /></div>
+
+        {workflow && <Card><WorkflowStepper steps={workflow.steps} currentIdx={stepIdx} orientation="horizontal" /></Card>}
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Card><p className="mb-1 text-xs text-[var(--color-ink-muted)]">Product</p><p className="text-sm font-medium">{appliance?.model}</p><p className="text-xs text-[var(--color-ink-secondary)]">{appliance?.documentNo} | {brand?.name} | Serial {appliance?.serialNo}</p><p className="mt-1 text-xs text-[var(--color-ink-muted)]">Purchased {formatDate(appliance?.purchaseDate)}</p><div className="mt-2"><Badge tone={appliance?.warrantyStatus === "In Warranty" ? "good" : "neutral"}>{appliance?.warrantyStatus}</Badge></div></Card>
+          <Card><p className="mb-1 text-xs text-[var(--color-ink-muted)]">Technician</p><p className="text-sm font-medium">{technician?.name ?? "Being assigned"}</p>{job.estimateAmount != null && <><p className="mt-2 text-xs text-[var(--color-ink-muted)]">Estimate</p><p className="text-sm font-semibold tabular-nums">{formatCurrency(job.estimateAmount)}</p></>}</Card>
+        </div>
+
+        {needsApproval && <Card className="border-2 [border-color:var(--color-brand-1)]"><p className="mb-1 text-sm font-medium">{job.customerApproved === false ? "You declined this estimate" : "Your approval is needed to proceed"}</p><p className="mb-3 text-xs text-[var(--color-ink-secondary)]">Estimated cost: <span className="font-semibold">{formatCurrency(job.estimateAmount)}</span> for this product sequence.</p><div className="flex gap-2"><Button onClick={() => { const result = approveCustomer(job.id, true, "customer"); toast(result.message, result.ok ? "success" : "error"); }}><CheckCircle2 size={14} /> Approve</Button>{job.customerApproved == null && <Button variant="danger" onClick={() => { const result = approveCustomer(job.id, false, "customer"); toast(result.message, result.ok ? "info" : "error"); }}><XCircle size={14} /> Decline</Button>}</div></Card>}
+        {job.currentStage === "Customer Approval" && job.customerApproved === true && <Card><Badge tone="good">You approved this product estimate</Badge></Card>}
         {canPay && <PaymentPanel jobcardId={job.id} amount={job.finalAmount} payments={jobPayments} source="customer" />}
 
         <Card>
-          <p className="text-sm font-semibold mb-3">Progress timeline</p>
-          <ol className="relative border-l ml-2 [border-color:var(--color-border)]">
-            {history.map((h) => {
-              const stagePhotos = photos.filter((p) => p.stageName === h.stageName);
-              return (
-                <li key={h.id} className="mb-5 ml-4">
-                  <span className="absolute -left-1.5 h-3 w-3 rounded-full bg-[var(--color-brand-1)]" />
-                  <p className="text-sm font-medium">{h.stageName}</p>
-                  <p className="text-xs text-[var(--color-ink-muted)]">{formatDate(h.timestamp)}</p>
-                  {stagePhotos.length > 0 && (
-                    <div className="flex gap-1.5 mt-1.5">
-                      {stagePhotos.map((p) => (
-                        <div key={p.id} className="h-9 w-9 rounded-md bg-black/[0.05] dark:bg-white/[0.08] flex items-center justify-center" title={p.label}>
-                          <ImagePlus size={13} className="text-[var(--color-ink-muted)]" />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </li>
-              );
+          <p className="mb-3 text-sm font-semibold">Progress timeline</p>
+          <ol className="relative ml-2 border-l [border-color:var(--color-border)]">
+            {history.map((entry) => {
+              const stagePhotos = photos.filter((photo) => photo.stageName === entry.stageName);
+              return <li key={entry.id} className="mb-5 ml-4"><span className="absolute -left-1.5 h-3 w-3 rounded-full bg-[var(--color-brand-1)]" /><p className="text-sm font-medium">{entry.stageName}</p><p className="text-xs text-[var(--color-ink-muted)]">{formatDate(entry.timestamp)}</p>{stagePhotos.length > 0 && <div className="mt-1.5 flex gap-1.5">{stagePhotos.map((photo) => <div key={photo.id} className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-md bg-black/[0.05] dark:bg-white/[0.08]" title={photo.label}>{photo.fileUrl !== "#" ? <img src={photo.fileUrl} alt={photo.label} className="h-full w-full object-cover" /> : <ImagePlus size={13} className="text-[var(--color-ink-muted)]" />}</div>)}</div>}</li>;
             })}
           </ol>
         </Card>
 
-        {comms.length > 0 && (
-          <Card>
-            <p className="text-sm font-semibold mb-3">Messages sent to you</p>
-            <div className="space-y-2.5">
-              {comms.slice(0, 5).map((c) => (
-                <div key={c.id} className="flex items-start gap-2 text-sm">
-                  <span className="mt-0.5 text-[var(--color-brand-1)]">{CHANNEL_ICON[c.channel]}</span>
-                  <div className="flex-1"><p>{c.message}</p><p className="text-[11px] text-[var(--color-ink-muted)]">{formatDate(c.timestamp)}</p></div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        )}
-
-        <p className="text-center text-[11px] text-[var(--color-ink-muted)] pb-6">Powered by FixFlow</p>
+        {comms.length > 0 && <Card><p className="mb-3 text-sm font-semibold">Messages sent to you</p><div className="space-y-2.5">{comms.slice(0, 5).map((communication) => <div key={communication.id} className="flex items-start gap-2 text-sm"><span className="mt-0.5 text-[var(--color-brand-1)]">{CHANNEL_ICON[communication.channel]}</span><div className="flex-1"><p>{communication.message}</p><p className="text-[11px] text-[var(--color-ink-muted)]">{formatDate(communication.timestamp)} | {communication.status}</p></div></div>)}</div></Card>}
+        <p className="pb-6 text-center text-[11px] text-[var(--color-ink-muted)]">Powered by FixFlow</p>
       </main>
       <Toaster />
     </div>

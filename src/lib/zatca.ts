@@ -51,7 +51,7 @@ export async function printTaxInvoice({
   const subtotal = totalWithVat / (1 + VAT_RATE);
   const vatTotal = totalWithVat - subtotal;
   const timestamp = new Date().toISOString();
-  const invoiceNo = `INV-${job.id.replace(/^job-/, "")}`;
+  const invoiceNo = job.invoiceNo;
 
   const qrBase64 = buildZatcaQrBase64(timestamp, totalWithVat.toFixed(2), vatTotal.toFixed(2));
   const qrDataUrl = await QRCode.toDataURL(qrBase64, { margin: 1, width: 140 });
@@ -107,14 +107,16 @@ export async function printTaxInvoice({
     <div class="box">
       <h3>Bill To</h3>
       <p>${customer?.name ?? "—"}</p>
+      <p class="muted">${customer?.documentNo ?? ""}</p>
       <p class="muted">${customer?.phone ?? ""}</p>
       <p class="muted">${customer?.address ?? ""}</p>
     </div>
     <div class="box">
       <h3>Appliance / Job</h3>
+      <p class="muted">${appliance?.documentNo ?? ""} | Sequence ${String(job.sequenceNo).padStart(2, "0")}</p>
       <p>${appliance?.model ?? "—"}</p>
       <p class="muted">${brand?.name ?? ""} · Serial ${appliance?.serialNo ?? "—"}</p>
-      <p class="muted">${job.id} · ${job.jobType === "warranty" ? "Warranty" : "Non-warranty"}</p>
+      <p class="muted">${job.documentNo} | ${job.jobType === "warranty" ? "Warranty" : "Non-warranty"}</p>
     </div>
   </div>
   <table>

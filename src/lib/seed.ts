@@ -19,6 +19,7 @@ import type {
   ApplianceCategory,
   StageName,
   Payment,
+  ServiceOrder,
 } from "./types";
 
 // Deterministic PRNG so the demo dataset is stable across reloads.
@@ -76,6 +77,7 @@ export const CUSTOMERS: Customer[] = Array.from({ length: 60 }, (_, i) => {
   const branch = pick(BRANCHES);
   return {
     id: id("cust", i + 1),
+    documentNo: `CUST-${String(i + 1).padStart(5, "0")}`,
     name,
     phone: `+9665${int(0, 9)}${int(1000000, 9999999)}`,
     whatsapp: `+9665${int(0, 9)}${int(1000000, 9999999)}`,
@@ -100,7 +102,7 @@ export const APPLIANCES: Appliance[] = Array.from({ length: 90 }, (_, i) => {
   const isSmartConnected = category !== "Mobile" && SMART_CAPABLE_BRANDS.has(brand.name) && monthsSince < 30 && rand() > 0.45;
   return {
     id: id("app", i + 1),
-    customerId: pick(CUSTOMERS).id,
+    documentNo: `AST-${String(i + 1).padStart(5, "0")}`,
     brandId: brand.id,
     category,
     model: `${brand.name} ${category} ${pick(modelSuffixes)}-${int(100, 999)}`,
@@ -253,6 +255,7 @@ const problems = [
   "Spinning issue during cycle", "Drainage blocked", "Compressor cycling on/off frequently", "Cracked display", "No cold air output",
 ];
 
+export const SERVICE_ORDERS: ServiceOrder[] = [];
 export const JOB_CARDS: JobCard[] = [];
 export const STAGE_HISTORY: JobCardStageHistory[] = [];
 export const ATTACHMENTS: JobCardAttachment[] = [];
@@ -260,11 +263,25 @@ export const PARTS_USED: JobCardPartUsed[] = [];
 export const PURCHASE_BILLS: PurchaseBill[] = [];
 export const COMMUNICATION_LOGS: CommunicationLog[] = [];
 
-let stageHistId = 1, attId = 1, partId = 1, billId = 1, commId = 1, jobTxnId = 5000;
+let stageHistId = 1, attId = 1, partId = 1, billId = 1, commId = 1, jobTxnId = 5000, serviceOrderId = 1;
+let activeOrder: ServiceOrder | null = null;
+let activeOrderCustomer: Customer | null = null;
+let activeOrderRemaining = 0;
+let activeOrderSequence = 0;
+let activeOrderApplianceIds = new Set<string>();
 
 for (let i = 0; i < 130; i++) {
-  const appliance = pick(APPLIANCES);
-  const customer = CUSTOMERS.find((candidate) => candidate.id === appliance.customerId)!;
+  if (!activeOrderCustomer || activeOrderRemaining === 0) {
+    activeOrderCustomer = pick(CUSTOMERS);
+    activeOrderRemaining = rand() < 0.42 ? int(2, 3) : 1;
+    activeOrderSequence = 0;
+    activeOrderApplianceIds = new Set<string>();
+    activeOrder = null;
+  }
+  const appliance = pick(APPLIANCES.filter((candidate) => !activeOrderApplianceIds.has(candidate.id)));
+  activeOrderApplianceIds.add(appliance.id);
+  const customer = activeOrderCustomer;
+  activeOrderSequence += 1;
   const jobType = appliance.warrantyStatus === "In Warranty" && rand() > 0.3 ? "warranty" : "non_warranty";
   const stages = jobType === "warranty" ? STAGES_WARRANTY : STAGES_NONWARRANTY;
   // progress index: weighted so most jobs are in-flight, some done, a few just received
@@ -274,6 +291,18 @@ for (let i = 0; i < 130; i++) {
   // ensure enough elapsed time exists for the full stage progression to play out without clamping
   const minDaysNeeded = Math.ceil((progressIdx * 20) / 24) + 1;
   const createdAt = daysAgo(int(Math.min(minDaysNeeded, 20), Math.max(minDaysNeeded, 20)));
+  if (!activeOrder) {
+    activeOrder = {
+      id: id("order", serviceOrderId),
+      documentNo: `SO-${new Date().getFullYear()}-${String(serviceOrderId).padStart(5, "0")}`,
+      customerId: customer.id,
+      branchId: customer.branchId,
+      createdAt,
+      updatedAt: createdAt,
+    };
+    serviceOrderId += 1;
+    SERVICE_ORDERS.push(activeOrder);
+  }
   const eligibleTechnicians = TECHNICIANS.filter((candidate) => candidate.branchId === customer.branchId && candidate.skills.includes(appliance.category));
   const technician = eligibleTechnicians.length && (progressIdx > 0 || rand() > 0.35) ? pick(eligibleTechnicians) : null;
   const jobCardId = id("job", i + 1);
@@ -319,7 +348,11 @@ for (let i = 0; i < 130; i++) {
   const readyIndex = stages.indexOf("Ready for Handover");
   const job: JobCard = {
     id: jobCardId,
-    customerId: appliance.customerId,
+    serviceOrderId: activeOrder.id,
+    sequenceNo: activeOrderSequence,
+    documentNo: `${activeOrder.documentNo}-${String(activeOrderSequence).padStart(2, "0")}`,
+    invoiceNo: `INV-${activeOrder.documentNo}-${String(activeOrderSequence).padStart(2, "0")}`,
+    customerId: customer.id,
     applianceId: appliance.id,
     technicianId: technician?.id ?? null,
     branchId: customer.branchId,
@@ -340,6 +373,9 @@ for (let i = 0; i < 130; i++) {
     oemClaimNo: jobType === "warranty" && progressIdx >= 1 && rand() > 0.5 ? `OEM-${int(100000, 999999)}` : undefined,
   };
   JOB_CARDS.push(job);
+  activeOrder.createdAt = new Date(activeOrder.createdAt) < new Date(job.createdAt) ? activeOrder.createdAt : job.createdAt;
+  activeOrder.updatedAt = new Date(activeOrder.updatedAt) > new Date(job.updatedAt) ? activeOrder.updatedAt : job.updatedAt;
+  activeOrderRemaining -= 1;
 
   if (repairIndex >= 0 && progressIdx >= repairIndex) {
     const numParts = int(1, 3);
@@ -409,18 +445,18 @@ for (let i = 0; i < 130; i++) {
     });
   };
 
-  addMessage("Received", "whatsapp", `Hi ${customer.name.split(" ")[0]}, we received your ${appliance.model} (${jobCardId}).`);
-  addMessage("Received", "sms", `FixFlow received ${jobCardId}. We will share a diagnosis shortly.`);
+  addMessage("Received", "whatsapp", `Hi ${customer.name.split(" ")[0]}, we received your ${appliance.model} (${job.documentNo}).`);
+  addMessage("Received", "sms", `FixFlow received ${job.documentNo}. We will share a diagnosis shortly.`);
   if (jobType === "non_warranty" && approvalIndex >= 0 && progressIdx >= approvalIndex) {
-    addMessage("Customer Approval", "whatsapp", `Estimate ready for ${jobCardId}: SAR ${estimateAmount?.toLocaleString()} for parts and labor.`);
-    addMessage("Customer Approval", "email", `Your FixFlow estimate for ${jobCardId} is ready for approval.`);
+    addMessage("Customer Approval", "whatsapp", `Estimate ready for ${job.documentNo}: SAR ${estimateAmount?.toLocaleString()} for parts and labor.`);
+    addMessage("Customer Approval", "email", `Your FixFlow estimate for ${job.documentNo} is ready for approval.`);
   }
   if (readyIndex >= 0 && progressIdx >= readyIndex) {
     addMessage("Ready for Handover", "whatsapp", `Your ${appliance.model} is repaired and ready for pickup.`);
-    addMessage("Ready for Handover", "sms", `${jobCardId} is ready for handover.`);
+    addMessage("Ready for Handover", "sms", `${job.documentNo} is ready for handover.`);
   }
   if (isDelivered) {
-    addMessage("Delivered", "whatsapp", `Your ${appliance.model} (${jobCardId}) has been delivered. Thank you.`);
+    addMessage("Delivered", "whatsapp", `Your ${appliance.model} (${job.documentNo}) has been delivered. Thank you.`);
   }
 }
 

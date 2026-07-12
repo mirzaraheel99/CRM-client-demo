@@ -19,9 +19,10 @@ export function printEstimate({
     .join("");
   const partsTotal = parts.reduce((acc, p) => acc + p.totalPrice, 0);
   const laborEstimate = Math.max(0, (job.estimateAmount ?? 0) - partsTotal);
+  const estimateNo = `EST-${job.documentNo}`;
 
   const html = `<!doctype html>
-<html><head><meta charset="utf-8" /><title>Estimate — ${job.id}</title>
+<html><head><meta charset="utf-8" /><title>Estimate - ${estimateNo}</title>
 <style>
   body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #0b0b0b; padding: 40px; max-width: 720px; margin: 0 auto; }
   .header { display: flex; justify-content: space-between; align-items: start; border-bottom: 2px solid #c2410c; padding-bottom: 16px; margin-bottom: 24px; }
@@ -43,12 +44,13 @@ export function printEstimate({
 </head><body>
   <div class="header">
     <div><div class="brand">FixFlow</div><div class="brand-sub">Appliance Service Estimate</div></div>
-    <div style="text-align:right"><h1>${job.id}</h1><p class="muted">${formatDate(job.createdAt)}</p></div>
+    <div style="text-align:right"><h1>${estimateNo}</h1><p class="muted">${job.documentNo} | ${formatDate(job.createdAt)}</p></div>
   </div>
   <div class="grid">
     <div class="box">
       <h3>Customer</h3>
       <p>${customer?.name ?? "—"}</p>
+      <p class="muted">${customer?.documentNo ?? ""}</p>
       <p class="muted">${customer?.phone ?? ""}</p>
       <p class="muted">${customer?.address ?? ""}</p>
     </div>
@@ -56,6 +58,7 @@ export function printEstimate({
       <h3>Appliance</h3>
       <p>${appliance?.model ?? "—"}</p>
       <p class="muted">${brand?.name ?? ""} · Serial ${appliance?.serialNo ?? "—"}</p>
+      <p class="muted">${appliance?.documentNo ?? ""} | Sequence ${String(job.sequenceNo).padStart(2, "0")}</p>
       <p class="muted">${job.jobType === "warranty" ? "Warranty job" : "Non-warranty job"}</p>
     </div>
   </div>

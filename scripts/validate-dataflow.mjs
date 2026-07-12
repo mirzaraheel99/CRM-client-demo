@@ -11,7 +11,7 @@ const seed = await import(`data:text/javascript;base64,${Buffer.from(compiled).t
 const {
   APPLIANCES, BRANCHES, COMMUNICATION_LOGS, CUSTOMERS, INVENTORY_LOCATIONS,
   INVENTORY_STOCK, INVENTORY_TRANSACTIONS, JOB_CARDS, PARTS_USED, PAYMENTS,
-  PURCHASE_BILLS, STAGE_HISTORY, TECHNICIANS, WORKFLOWS,
+  PURCHASE_BILLS, SERVICE_ORDERS, STAGE_HISTORY, TECHNICIANS, WORKFLOWS,
 } = seed;
 
 const failures = [];
@@ -29,6 +29,7 @@ function assertUnique(rows, label) {
 
 const customerById = new Map(CUSTOMERS.map((customer) => [customer.id, customer]));
 const applianceById = new Map(APPLIANCES.map((appliance) => [appliance.id, appliance]));
+const serviceOrderById = new Map(SERVICE_ORDERS.map((order) => [order.id, order]));
 const branchById = new Map(BRANCHES.map((branch) => [branch.id, branch]));
 const technicianById = new Map(TECHNICIANS.map((technician) => [technician.id, technician]));
 const locationById = new Map(INVENTORY_LOCATIONS.map((location) => [location.id, location]));
@@ -41,7 +42,7 @@ const statusByStage = {
 
 for (const [rows, label] of [
   [CUSTOMERS, "Customers"], [APPLIANCES, "Appliances"], [TECHNICIANS, "Technicians"],
-  [JOB_CARDS, "Job cards"], [STAGE_HISTORY, "Stage history"], [PARTS_USED, "Parts used"],
+  [SERVICE_ORDERS, "Service orders"], [JOB_CARDS, "Job cards"], [STAGE_HISTORY, "Stage history"], [PARTS_USED, "Parts used"],
   [INVENTORY_TRANSACTIONS, "Inventory transactions"], [COMMUNICATION_LOGS, "Communications"],
   [PAYMENTS, "Payments"],
 ]) assertUnique(rows, label);
@@ -52,13 +53,27 @@ for (const customer of CUSTOMERS) {
   assert(Boolean(branch && customer.address.includes(branch.city)), `${customer.id} address does not match ${branch?.city ?? "its branch"}.`);
 }
 
-for (const appliance of APPLIANCES) {
-  assert(customerById.has(appliance.customerId), `${appliance.id} references a missing customer.`);
+assert(new Set(CUSTOMERS.map((customer) => customer.documentNo)).size === CUSTOMERS.length, "Customer document numbers are not unique.");
+assert(new Set(APPLIANCES.map((appliance) => appliance.documentNo)).size === APPLIANCES.length, "Product document numbers are not unique.");
+assert(new Set(SERVICE_ORDERS.map((order) => order.documentNo)).size === SERVICE_ORDERS.length, "Service order document numbers are not unique.");
+assert(new Set(JOB_CARDS.map((job) => job.documentNo)).size === JOB_CARDS.length, "Job line document numbers are not unique.");
+assert(new Set(JOB_CARDS.map((job) => job.invoiceNo)).size === JOB_CARDS.length, "Invoice numbers are not unique.");
+
+for (const order of SERVICE_ORDERS) {
+  const customer = customerById.get(order.customerId);
+  const lines = JOB_CARDS.filter((job) => job.serviceOrderId === order.id).sort((a, b) => a.sequenceNo - b.sequenceNo);
+  assert(Boolean(customer), `${order.id} references a missing customer.`);
+  assert(customer?.branchId === order.branchId, `${order.id} branch differs from its customer branch.`);
+  assert(lines.length > 0, `${order.id} has no product sequences.`);
+  assert(lines.every((line, index) => line.sequenceNo === index + 1), `${order.id} sequence numbers are not contiguous.`);
+  assert(new Set(lines.map((line) => line.applianceId)).size === lines.length, `${order.id} repeats a product within the same order.`);
+  assert(lines.every((line) => line.customerId === order.customerId && line.branchId === order.branchId), `${order.id} line ownership or branch is inconsistent.`);
 }
 
 for (const job of JOB_CARDS) {
   const customer = customerById.get(job.customerId);
   const appliance = applianceById.get(job.applianceId);
+  const serviceOrder = serviceOrderById.get(job.serviceOrderId);
   const workflow = workflowByType.get(job.jobType);
   const stages = workflow?.steps.map((step) => step.stepName) ?? [];
   const stageIndex = stages.indexOf(job.currentStage);
@@ -67,7 +82,10 @@ for (const job of JOB_CARDS) {
 
   assert(Boolean(customer), `${job.id} references a missing customer.`);
   assert(Boolean(appliance), `${job.id} references a missing appliance.`);
-  assert(appliance?.customerId === job.customerId, `${job.id} appliance belongs to another customer.`);
+  assert(Boolean(serviceOrder), `${job.id} references a missing service order.`);
+  assert(serviceOrder?.customerId === job.customerId, `${job.id} customer differs from its service order.`);
+  assert(job.documentNo === `${serviceOrder?.documentNo}-${String(job.sequenceNo).padStart(2, "0")}`, `${job.id} document number does not match its order sequence.`);
+  assert(job.invoiceNo === `INV-${job.documentNo}`, `${job.id} invoice number does not match its job line.`);
   assert(customer?.branchId === job.branchId, `${job.id} branch differs from its customer branch.`);
   assert(stageIndex >= 0, `${job.id} current stage is outside its workflow.`);
   assert(job.status === statusByStage[job.currentStage], `${job.id} status disagrees with its current stage.`);
@@ -149,4 +167,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log(`Data-flow validation passed: ${checks} checks across ${JOB_CARDS.length} jobs, ${PARTS_USED.length} part issues, and ${COMMUNICATION_LOGS.length} messages.`);
+console.log(`Data-flow validation passed: ${checks} checks across ${SERVICE_ORDERS.length} service orders, ${JOB_CARDS.length} job lines, ${PARTS_USED.length} part issues, and ${COMMUNICATION_LOGS.length} messages.`);

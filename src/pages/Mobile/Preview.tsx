@@ -55,6 +55,7 @@ export default function MobilePreview() {
                   <p className="text-sm font-medium">{custMap.get(j.customerId)?.name}</p>
                   <JobStatusBadge status={j.status} />
                 </div>
+                <p className="mt-0.5 text-[10px] font-medium text-[var(--color-brand-1)]">{j.documentNo}</p>
                 <p className="text-xs text-[var(--color-ink-muted)] mt-0.5">{appMap.get(j.applianceId)?.model}</p>
               </div>
             ))}
@@ -69,6 +70,7 @@ export default function MobilePreview() {
                 <p className="text-sm font-semibold">{custMap.get(sample[0]?.customerId)?.name}</p>
                 <JobStatusBadge status={sample[0]?.status ?? "Received"} />
               </div>
+              <p className="text-[10px] font-medium text-[var(--color-brand-1)]">{sample[0]?.documentNo}</p>
               <div className="flex items-center gap-1.5 text-xs text-[var(--color-ink-muted)]">
                 <MapPin size={12} /> {custMap.get(sample[0]?.customerId)?.address}
               </div>

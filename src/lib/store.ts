@@ -8,11 +8,17 @@ import type {
   ActionResult, Customer, Appliance, ApplianceTelemetry, Brand, Technician, InventoryItem, InventoryLocation,
   InventoryStock, InventoryTransaction, JobCard, JobCardStageHistory,
   JobCardAttachment, JobCardPartUsed, PurchaseBill, CommunicationLog,
-  WorkflowDefinition, Role, StageName, Branch, Payment, PaymentMethod, Channel,
+  WorkflowDefinition, Role, StageName, Branch, Payment, PaymentMethod, Channel, ServiceOrder,
 } from "./types";
 
 type JobResult = ActionResult & { job?: JobCard };
+type ServiceOrderResult = ActionResult & { serviceOrder?: ServiceOrder; jobs?: JobCard[] };
 type PaymentResult = ActionResult & { payment?: Payment };
+type ServiceOrderLineInput = {
+  applianceId: string;
+  jobType: JobCard["jobType"];
+  problemDescription: string;
+};
 
 interface DemoState {
   branches: Branch[];
@@ -25,6 +31,7 @@ interface DemoState {
   inventoryLocations: InventoryLocation[];
   inventoryStock: InventoryStock[];
   inventoryTransactions: InventoryTransaction[];
+  serviceOrders: ServiceOrder[];
   jobCards: JobCard[];
   stageHistory: JobCardStageHistory[];
   attachments: JobCardAttachment[];
@@ -47,14 +54,19 @@ interface DemoState {
   setLang: (lang: "en" | "ar") => void;
   toggleSidebar: () => void;
 
-  addCustomer: (customer: Omit<Customer, "id" | "createdAt" | "whatsappVerified">) => Customer;
+  addCustomer: (customer: Omit<Customer, "id" | "documentNo" | "createdAt" | "whatsappVerified">) => Customer;
   verifyWhatsapp: (customerId: string) => void;
-  addAppliance: (appliance: Omit<Appliance, "id">) => Appliance;
+  addAppliance: (appliance: Omit<Appliance, "id" | "documentNo">) => Appliance;
   addBrand: (brand: Omit<Brand, "id">) => Brand;
   addTechnician: (technician: Omit<Technician, "id">) => Technician;
   addInventoryItem: (item: Omit<InventoryItem, "id">) => InventoryItem;
   addInventoryTransaction: (transaction: Omit<InventoryTransaction, "id" | "timestamp">) => ActionResult;
 
+  createServiceOrder: (input: {
+    customerId: string;
+    branchId: string;
+    lines: ServiceOrderLineInput[];
+  }) => ServiceOrderResult;
   createJobCard: (input: {
     customerId: string;
     applianceId: string;
@@ -74,7 +86,7 @@ interface DemoState {
   savePurchaseBill: (jobcardId: string, bill: Omit<PurchaseBill, "id" | "jobcardId">) => ActionResult;
   addPartUsed: (jobcardId: string, itemId: string, qty: number) => ActionResult;
   removePartUsed: (partUsedId: string) => ActionResult;
-  addAttachment: (jobcardId: string, stageName: StageName, label: string) => ActionResult;
+  addAttachment: (jobcardId: string, stageName: StageName, label: string, fileUrl?: string) => ActionResult;
   sendCommunication: (jobcardId: string, channel: CommunicationLog["channel"], message: string) => ActionResult;
   updateWorkflowStep: (workflowId: string, stepOrder: number, patch: Partial<WorkflowDefinition["steps"][number]>) => ActionResult;
   addWorkflowStep: (workflowId: string, step: WorkflowDefinition["steps"][number]) => ActionResult;
@@ -103,6 +115,7 @@ const initialSlice = () => ({
   inventoryLocations: clone(seed.INVENTORY_LOCATIONS),
   inventoryStock: clone(seed.INVENTORY_STOCK),
   inventoryTransactions: clone(seed.INVENTORY_TRANSACTIONS),
+  serviceOrders: clone(seed.SERVICE_ORDERS),
   jobCards: clone(seed.JOB_CARDS),
   stageHistory: clone(seed.STAGE_HISTORY),
   attachments: clone(seed.ATTACHMENTS),
@@ -160,7 +173,7 @@ function buildTriggeredLogs(state: DemoState, job: JobCard, stageName: StageName
     message: renderTemplate(template.body, {
       customer: customer.name.split(" ")[0],
       appliance: appliance.model,
-      jobId: job.id,
+      jobId: job.documentNo,
       amount: job.estimateAmount == null ? "pending" : `SAR ${job.estimateAmount.toLocaleString()}`,
     }),
     status: "sent",
@@ -210,7 +223,15 @@ export const useStore = create<DemoState>()(
       toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
 
       addCustomer: (input) => {
-        const customer: Customer = { ...input, id: nextId("cust"), createdAt: new Date().toISOString(), whatsappVerified: false };
+        const existing = get().customers.find((customer) => customer.phone.replace(/\D/g, "") === input.phone.replace(/\D/g, ""));
+        if (existing) return existing;
+        const customer: Customer = {
+          ...input,
+          id: nextId("cust"),
+          documentNo: `CUST-${String(get().customers.length + 1).padStart(5, "0")}`,
+          createdAt: new Date().toISOString(),
+          whatsappVerified: false,
+        };
         set((state) => ({ customers: [customer, ...state.customers] }));
         return customer;
       },
@@ -218,7 +239,7 @@ export const useStore = create<DemoState>()(
         set((state) => ({ customers: state.customers.map((customer) => customer.id === customerId ? { ...customer, whatsappVerified: true } : customer) }));
       },
       addAppliance: (input) => {
-        const appliance: Appliance = { ...input, id: nextId("app") };
+        const appliance: Appliance = { ...input, id: nextId("app"), documentNo: `AST-${String(get().appliances.length + 1).padStart(5, "0")}` };
         set((state) => ({ appliances: [appliance, ...state.appliances] }));
         return appliance;
       },
@@ -267,47 +288,67 @@ export const useStore = create<DemoState>()(
         return result(true, "Inventory transaction recorded.");
       },
 
-      createJobCard: ({ customerId, applianceId, jobType, problemDescription, branchId }) => {
+      createServiceOrder: ({ customerId, branchId, lines }) => {
         const state = get();
-        if (!canPerform(state.role, "create_job")) return { ...result(false, "Your role cannot create job cards.") };
+        if (!canPerform(state.role, "create_job")) return { ...result(false, "Your role cannot create service orders.") };
         const customer = state.customers.find((candidate) => candidate.id === customerId);
-        const appliance = state.appliances.find((candidate) => candidate.id === applianceId);
-        if (!customer || !appliance) return { ...result(false, "Choose a valid customer and appliance.") };
-        if (appliance.customerId !== customer.id) return { ...result(false, "The selected appliance does not belong to this customer.") };
+        if (!customer) return { ...result(false, "Choose a valid customer.") };
         if (branchId !== customer.branchId) return { ...result(false, "Receiving branch must match the customer branch. Transfer the customer before opening this job.") };
-        if (problemDescription.trim().length < 4) return { ...result(false, "Describe the reported problem before creating the job.") };
+        if (!lines.length) return { ...result(false, "Add at least one product to the service order.") };
+        if (new Set(lines.map((line) => line.applianceId)).size !== lines.length) return { ...result(false, "Each product can appear only once in the same service order.") };
+        for (const line of lines) {
+          if (!state.appliances.some((candidate) => candidate.id === line.applianceId)) return { ...result(false, "Choose a valid product for every sequence.") };
+          if (line.problemDescription.trim().length < 4) return { ...result(false, "Describe the reported problem for every product.") };
+        }
 
         const now = new Date().toISOString();
-        const job: JobCard = {
-          id: nextId("job"),
-          customerId,
-          applianceId,
-          technicianId: null,
-          branchId,
-          jobType,
-          status: "Received",
-          currentStage: "Received",
-          problemDescription: problemDescription.trim(),
-          estimateAmount: null,
-          finalAmount: null,
-          createdAt: now,
-          updatedAt: now,
-          scheduledAt: null,
-          customerApproved: null,
-          diagnosisNotes: null,
-          repairNotes: null,
-          qaApproved: false,
-          customerSignature: null,
-        };
-        const history: JobCardStageHistory = { id: nextId("hist"), jobcardId: job.id, stageName: "Received", changedBy: "Front Desk", timestamp: now, notes: "Item received at counter." };
-        const logs = buildTriggeredLogs(state, job, "Received", now);
+        const orderIndex = state.serviceOrders.length + 1;
+        const documentNo = `SO-${new Date(now).getFullYear()}-${String(orderIndex).padStart(5, "0")}`;
+        const serviceOrder: ServiceOrder = { id: nextId("order"), documentNo, customerId, branchId, createdAt: now, updatedAt: now };
+        const jobs = lines.map<JobCard>((line, index) => {
+          const sequenceNo = index + 1;
+          const lineDocumentNo = `${documentNo}-${String(sequenceNo).padStart(2, "0")}`;
+          return {
+            id: nextId("job"),
+            serviceOrderId: serviceOrder.id,
+            sequenceNo,
+            documentNo: lineDocumentNo,
+            invoiceNo: `INV-${lineDocumentNo}`,
+            customerId,
+            applianceId: line.applianceId,
+            technicianId: null,
+            branchId,
+            jobType: line.jobType,
+            status: "Received",
+            currentStage: "Received",
+            problemDescription: line.problemDescription.trim(),
+            estimateAmount: null,
+            finalAmount: null,
+            createdAt: new Date(new Date(now).getTime() + index).toISOString(),
+            updatedAt: new Date(new Date(now).getTime() + index).toISOString(),
+            scheduledAt: null,
+            customerApproved: null,
+            diagnosisNotes: null,
+            repairNotes: null,
+            qaApproved: false,
+            customerSignature: null,
+          };
+        });
+        const history = jobs.map<JobCardStageHistory>((job) => ({ id: nextId("hist"), jobcardId: job.id, stageName: "Received", changedBy: "Front Desk", timestamp: job.createdAt, notes: `Product sequence ${String(job.sequenceNo).padStart(2, "0")} received at counter.` }));
+        const logs = jobs.flatMap((job) => buildTriggeredLogs(state, job, "Received", job.createdAt));
         set((current) => ({
-          jobCards: [job, ...current.jobCards],
-          stageHistory: [history, ...current.stageHistory],
+          serviceOrders: [serviceOrder, ...current.serviceOrders],
+          jobCards: [...jobs, ...current.jobCards],
+          stageHistory: [...history, ...current.stageHistory],
           communicationLogs: [...logs, ...current.communicationLogs],
         }));
         scheduleCommunicationReceipts(logs);
-        return { ...result(true, `Job card ${job.id} created.`), job };
+        return { ...result(true, `Service order ${documentNo} created with ${jobs.length} product ${jobs.length === 1 ? "sequence" : "sequences"}.`), serviceOrder, jobs };
+      },
+
+      createJobCard: ({ customerId, applianceId, jobType, problemDescription, branchId }) => {
+        const created = get().createServiceOrder({ customerId, branchId, lines: [{ applianceId, jobType, problemDescription }] });
+        return { ok: created.ok, message: created.message, job: created.jobs?.[0] };
       },
 
       advanceStage: (jobcardId, targetStage, notes, changedBy) => {
@@ -403,7 +444,7 @@ export const useStore = create<DemoState>()(
         const logs: CommunicationLog[] = template && customer && appliance ? [{
           id: nextId("comm"), jobcardId: job.id, customerId: customer.id, applianceId: appliance.id, stageName: job.currentStage,
           channel: "whatsapp", to: customer.whatsapp,
-          message: renderTemplate(template.body, { customer: customer.name.split(" ")[0], appliance: appliance.model, jobId: job.id, amount: `SAR ${job.estimateAmount?.toLocaleString()}` }),
+          message: renderTemplate(template.body, { customer: customer.name.split(" ")[0], appliance: appliance.model, jobId: job.documentNo, amount: `SAR ${job.estimateAmount?.toLocaleString()}` }),
           status: "sent", timestamp: now,
         }] : [];
         set({
@@ -501,7 +542,7 @@ export const useStore = create<DemoState>()(
           inventoryStock: state.inventoryStock.map((entry) => entry.itemId === itemId && entry.locationId === source.locationId ? { ...entry, qty: entry.qty - qty } : entry),
           jobCards: state.jobCards.map((candidate) => candidate.id === jobcardId ? { ...candidate, updatedAt: now } : candidate),
         });
-        return result(true, `${qty} ${item.name} issued to ${job.id}.`);
+        return result(true, `${qty} ${item.name} issued to ${job.documentNo}.`);
       },
       removePartUsed: (partUsedId) => {
         const state = get();
@@ -523,10 +564,10 @@ export const useStore = create<DemoState>()(
         });
         return result(true, "Part returned to inventory.");
       },
-      addAttachment: (jobcardId, stageName, label) => {
+      addAttachment: (jobcardId, stageName, label, fileUrl) => {
         const state = get();
         if (!state.jobCards.some((job) => job.id === jobcardId)) return result(false, "Job card not found.");
-        const attachment: JobCardAttachment = { id: nextId("att"), jobcardId, stageName, fileUrl: "#", label, uploadedBy: "You", timestamp: new Date().toISOString() };
+        const attachment: JobCardAttachment = { id: nextId("att"), jobcardId, stageName, fileUrl: fileUrl ?? "#", label, uploadedBy: "You", timestamp: new Date().toISOString() };
         set({ attachments: [attachment, ...state.attachments] });
         return result(true, "Attachment added.");
       },
@@ -560,9 +601,10 @@ export const useStore = create<DemoState>()(
       sendMaintenanceReminder: (applianceId) => {
         const state = get();
         const appliance = state.appliances.find((candidate) => candidate.id === applianceId);
-        const customer = state.customers.find((candidate) => candidate.id === appliance?.customerId);
+        const latestJob = state.jobCards.filter((job) => job.applianceId === applianceId).sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))[0];
+        const customer = state.customers.find((candidate) => candidate.id === latestJob?.customerId);
         const template = MESSAGE_TEMPLATES.find((candidate) => candidate.id === "maintenance_reminder");
-        if (!appliance || !customer || !template) return result(false, "Appliance or customer was not found.");
+        if (!appliance || !customer || !template) return result(false, "No recent service customer was found for this product.");
         if (state.maintenanceRemindersSent[applianceId]) return result(false, "A maintenance reminder was already sent for this appliance.");
         const now = new Date().toISOString();
         const log: CommunicationLog = {
@@ -606,12 +648,12 @@ export const useStore = create<DemoState>()(
         });
       },
     }),
-    { name: "crm-demo-store-v2", version: 2 }
+    { name: "crm-demo-store-v3", version: 3 }
   )
 );
 
 if (typeof window !== "undefined") {
   window.addEventListener("storage", (event) => {
-    if (event.key === "crm-demo-store-v2") void useStore.persist.rehydrate();
+    if (event.key === "crm-demo-store-v3") void useStore.persist.rehydrate();
   });
 }

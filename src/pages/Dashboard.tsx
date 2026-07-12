@@ -1,14 +1,15 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ClipboardList, Clock, ShieldCheck, PackageX, Users, Sparkles, ArrowRight, PackageCheck } from "lucide-react";
+import { ClipboardList, Clock, ShieldCheck, PackageX, Users, Sparkles, ArrowRight, PackageCheck, AlertTriangle } from "lucide-react";
 import { useStore } from "../lib/store";
-import { Card, CardHeader, StatTile, Button, EmptyState } from "../components/ui";
+import { Card, CardHeader, StatTile, Button, EmptyState, LiveIndicator } from "../components/ui";
 import { HorizontalBarChart, VerticalBarChart, DonutChart, ComboChart, Sparkline } from "../components/charts";
 import { JobStatusBadge } from "../components/StatusBadge";
 import {
   filterByBranch, jobsByStatus, technicianWorkload, warrantyRatio, inventoryAlerts, avgTat,
-  predictiveMaintenanceCandidates, jobVolumeAndTat, activeJobsTrend, warrantyShareTrend,
+  predictiveMaintenanceCandidates, jobVolumeAndTat, activeJobsTrend, warrantyShareTrend, weekComparison, unassignedActiveJobs,
 } from "../lib/selectors";
-import { formatDate } from "../lib/utils";
+import { formatDate, cx } from "../lib/utils";
 import { t } from "../lib/i18n";
 
 export default function Dashboard() {
@@ -22,6 +23,7 @@ export default function Dashboard() {
   const activeJobs = scopedJobs.filter((j) => j.status !== "Delivered");
   const alerts = inventoryAlerts(inventoryItems, inventoryLocations, inventoryStock, selectedBranchId);
   const maintenanceCandidates = predictiveMaintenanceCandidates(appliances, jobCards, brands);
+  const riskyJobs = unassignedActiveJobs(scopedJobs);
   const custMap = new Map(customers.map((c) => [c.id, c]));
   const appMap = new Map(appliances.map((a) => [a.id, a]));
   const techMap = new Map(technicians.map((tc) => [tc.id, tc]));
@@ -30,14 +32,37 @@ export default function Dashboard() {
   const warrantyPct = scopedJobs.length ? Math.round((scopedJobs.filter((j) => j.jobType === "warranty").length / scopedJobs.length) * 100) : 0;
   const availableTechs = scopedTechs.filter((tc) => tc.status === "Available").length;
 
+  const [rangeDays, setRangeDays] = useState(14);
   const sparkData = (arr: number[]) => arr.map((v, i) => ({ i, v }));
-  const volumeTrend = jobVolumeAndTat(scopedJobs);
+  const volumeTrend = jobVolumeAndTat(scopedJobs, rangeDays);
+  const wow = weekComparison(scopedJobs);
+
+  function pctDelta(now: number, prev: number) {
+    if (prev === 0) return now === 0 ? null : { text: "New this week", tone: "neutral" as const };
+    const pct = Math.round(((now - prev) / prev) * 100);
+    if (pct === 0) return { text: "Flat vs last wk", tone: "neutral" as const };
+    return { text: `${pct > 0 ? "+" : ""}${pct}% vs last wk`, tone: "neutral" as const };
+  }
+  const activeDelta = pctDelta(wow.activeJobsNow, wow.activeJobsWeekAgo);
+  const tatDeltaPts = wow.avgTatLastWeek === 0 ? null : wow.avgTatThisWeek - wow.avgTatLastWeek;
+  const tatDelta = tatDeltaPts == null ? null : {
+    text: `${tatDeltaPts > 0 ? "+" : ""}${tatDeltaPts}h vs last wk`,
+    tone: tatDeltaPts <= 0 ? ("good" as const) : ("critical" as const),
+  };
+  const warrantyDeltaPts = wow.warrantyPctThisWeek - wow.warrantyPctLastWeek;
+  const warrantyDelta = wow.warrantyPctLastWeek === 0 && wow.warrantyPctThisWeek === 0 ? null : {
+    text: `${warrantyDeltaPts > 0 ? "+" : ""}${warrantyDeltaPts}pts vs last wk`,
+    tone: "neutral" as const,
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between flex-wrap gap-3 animate-rise-in">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">{t(lang, "welcomeBack")}</h1>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h1 className="text-xl font-semibold tracking-tight">{t(lang, "welcomeBack")}</h1>
+            <LiveIndicator />
+          </div>
           <p className="text-sm text-[var(--color-ink-muted)] mt-0.5">{t(lang, "overviewToday")}</p>
         </div>
         <Link to="/jobcards/new">
@@ -45,36 +70,59 @@ export default function Dashboard() {
         </Link>
       </div>
 
-      {maintenanceCandidates.length > 0 && (
-        <Link to="/predictive-maintenance" className="block animate-rise-in" style={{ animationDelay: "40ms" }}>
-          <Card interactive className="!bg-[var(--color-brand-1)]/[0.05] hover:!bg-[var(--color-brand-1)]/[0.08]">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div className="flex items-center gap-2.5">
-                <Sparkles size={18} className="text-[var(--color-brand-1)] shrink-0" />
-                <p className="text-sm">
-                  <span className="font-semibold">{maintenanceCandidates.length} predictive maintenance opportunities</span>
-                  <span className="text-[var(--color-ink-muted)]"> flagged from repair-history patterns — no breakdown call needed.</span>
-                </p>
-              </div>
-              <span className="text-xs font-medium text-[var(--color-brand-1)] flex items-center gap-1 shrink-0">View <ArrowRight size={13} /></span>
-            </div>
-          </Card>
-        </Link>
+      {(maintenanceCandidates.length > 0 || riskyJobs.length > 0) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {maintenanceCandidates.length > 0 && (
+            <Link to="/predictive-maintenance" className="block animate-rise-in" style={{ animationDelay: "40ms" }}>
+              <Card interactive className="h-full !bg-[var(--color-brand-1)]/[0.05] hover:!bg-[var(--color-brand-1)]/[0.08]">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <Sparkles size={18} className="text-[var(--color-brand-1)] shrink-0" />
+                    <p className="text-sm">
+                      <span className="font-semibold">{maintenanceCandidates.length} predictive maintenance opportunities</span>
+                      <span className="text-[var(--color-ink-muted)]"> flagged from repair-history patterns.</span>
+                    </p>
+                  </div>
+                  <span className="text-xs font-medium text-[var(--color-brand-1)] flex items-center gap-1 shrink-0">View <ArrowRight size={13} /></span>
+                </div>
+              </Card>
+            </Link>
+          )}
+          {riskyJobs.length > 0 && (
+            <Link to="/jobcards" className="block animate-rise-in" style={{ animationDelay: "80ms" }}>
+              <Card interactive className="h-full !bg-[var(--color-status-serious)]/[0.06] hover:!bg-[var(--color-status-serious)]/[0.1]">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <AlertTriangle size={18} className="text-[var(--color-status-serious)] shrink-0" />
+                    <p className="text-sm">
+                      <span className="font-semibold">{riskyJobs.length} active job{riskyJobs.length > 1 ? "s" : ""} unassigned</span>
+                      <span className="text-[var(--color-ink-muted)]"> waiting on a technician to be assigned.</span>
+                    </p>
+                  </div>
+                  <span className="text-xs font-medium text-[var(--color-status-serious)] flex items-center gap-1 shrink-0">Review <ArrowRight size={13} /></span>
+                </div>
+              </Card>
+            </Link>
+          )}
+        </div>
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
         {[
           <StatTile
             key="active" label="Active Jobs" value={String(activeJobs.length)} icon={<ClipboardList size={16} />} accent="var(--color-series-1)"
-            sparkline={<Sparkline data={sparkData(activeJobsTrend(scopedJobs))} dataKey="v" color="var(--color-series-1)" />}
+            delta={activeDelta?.text} deltaTone={activeDelta?.tone}
+            sparkline={<Sparkline data={sparkData(activeJobsTrend(scopedJobs, rangeDays))} dataKey="v" color="var(--color-series-1)" />}
           />,
           <StatTile
             key="tat" label="Avg. Turnaround Time" value={`${avgTat(scopedJobs)}h`} icon={<Clock size={16} />} accent="var(--color-series-3)"
+            delta={tatDelta?.text} deltaTone={tatDelta?.tone}
             sparkline={<Sparkline data={volumeTrend} dataKey="avgHours" color="var(--color-series-3)" />}
           />,
           <StatTile
             key="warranty" label="Warranty Share" value={`${warrantyPct}%`} icon={<ShieldCheck size={16} />} accent="var(--color-series-2)"
-            sparkline={<Sparkline data={sparkData(warrantyShareTrend(scopedJobs))} dataKey="v" color="var(--color-series-2)" />}
+            delta={warrantyDelta?.text} deltaTone={warrantyDelta?.tone}
+            sparkline={<Sparkline data={sparkData(warrantyShareTrend(scopedJobs, rangeDays))} dataKey="v" color="var(--color-series-2)" />}
           />,
           <StatTile key="stock" label="Low Stock Alerts" value={String(alerts.length)} icon={<PackageX size={16} />} accent="var(--color-status-critical)" delta={alerts.length > 0 ? "Needs attention" : undefined} deltaTone="critical" />,
           <StatTile key="techs" label="Technicians Available" value={`${availableTechs}/${scopedTechs.length}`} icon={<Users size={16} />} accent="var(--color-series-5)" />,
@@ -98,7 +146,26 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <Card className="xl:col-span-2" interactive>
-          <CardHeader title={t(lang, "tatTrend")} subtitle="Daily job volume (bars) vs. average turnaround hours (line), last 14 days" />
+          <CardHeader
+            title={t(lang, "tatTrend")}
+            subtitle={`Daily job volume (bars) vs. average turnaround hours (line), last ${rangeDays} days`}
+            action={
+              <div className="flex rounded-lg border p-0.5 [border-color:var(--color-border)]">
+                {[7, 14, 30].map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => setRangeDays(d)}
+                    className={cx(
+                      "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                      rangeDays === d ? "bg-[var(--color-brand-1)] text-white" : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink-primary)]"
+                    )}
+                  >
+                    {d}D
+                  </button>
+                ))}
+              </div>
+            }
+          />
           <ComboChart
             data={volumeTrend} categoryKey="day" barKey="jobs" lineKey="avgHours"
             barColor="var(--color-series-1)" lineColor="var(--color-series-3)"

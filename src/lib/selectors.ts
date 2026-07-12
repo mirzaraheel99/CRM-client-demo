@@ -99,6 +99,47 @@ export function warrantyShareTrend(jobCards: JobCard[], days = 14) {
   return points;
 }
 
+export function weekComparison(jobCards: JobCard[]) {
+  const now = new Date();
+  const weekAgo = new Date(now);
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  const twoWeeksAgo = new Date(now);
+  twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+
+  const thisWeekJobs = jobCards.filter((j) => new Date(j.createdAt) > weekAgo);
+  const lastWeekJobs = jobCards.filter((j) => new Date(j.createdAt) > twoWeeksAgo && new Date(j.createdAt) <= weekAgo);
+
+  function avgTatOf(jobs: JobCard[]) {
+    if (!jobs.length) return 0;
+    return Math.round(jobs.reduce((acc, j) => acc + tatHours(j.createdAt, j.status === "Delivered" ? j.updatedAt : undefined), 0) / jobs.length);
+  }
+  function warrantyPctOf(jobs: JobCard[]) {
+    if (!jobs.length) return 0;
+    return Math.round((jobs.filter((j) => j.jobType === "warranty").length / jobs.length) * 100);
+  }
+  function activeAsOf(cutoff: Date) {
+    return jobCards.filter((j) => {
+      const created = new Date(j.createdAt);
+      if (created > cutoff) return false;
+      if (j.status !== "Delivered") return true;
+      return new Date(j.updatedAt) > cutoff;
+    }).length;
+  }
+
+  return {
+    activeJobsNow: activeAsOf(now),
+    activeJobsWeekAgo: activeAsOf(weekAgo),
+    avgTatThisWeek: avgTatOf(thisWeekJobs),
+    avgTatLastWeek: avgTatOf(lastWeekJobs),
+    warrantyPctThisWeek: warrantyPctOf(thisWeekJobs),
+    warrantyPctLastWeek: warrantyPctOf(lastWeekJobs),
+  };
+}
+
+export function unassignedActiveJobs(jobCards: JobCard[]) {
+  return jobCards.filter((j) => j.status !== "Delivered" && !j.technicianId);
+}
+
 export function inventoryAlerts(items: InventoryItem[], locations: InventoryLocation[], stock: InventoryStock[], branchId: string | "all") {
   const relevantLocIds = new Set(filterByBranch(locations, branchId).map((l) => l.id));
   const totals = new Map<string, number>();

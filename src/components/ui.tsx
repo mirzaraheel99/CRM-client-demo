@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Check, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { cx } from "../lib/utils";
 import { useCountUp } from "../lib/useCountUp";
@@ -88,10 +88,14 @@ export function Button({
 export function StatTile({
   label, value, delta, deltaTone = "good", icon, accent, sparkline,
 }: {
-  label: string; value: string; delta?: string; deltaTone?: "good" | "critical"; icon?: ReactNode; accent?: string;
+  label: string; value: string; delta?: string; deltaTone?: "good" | "critical" | "neutral"; icon?: ReactNode; accent?: string;
   sparkline?: ReactNode;
 }) {
   const animatedValue = useCountUp(value);
+  const deltaColor =
+    deltaTone === "good" ? "text-[var(--color-status-good)]" :
+    deltaTone === "critical" ? "text-[var(--color-status-critical)]" :
+    "text-[var(--color-ink-muted)]";
   return (
     <Card interactive className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
@@ -107,11 +111,7 @@ export function StatTile({
       </div>
       <div className="flex items-end justify-between">
         <span className="text-2xl font-semibold tracking-tight tabular-nums text-[var(--color-ink-primary)]">{animatedValue}</span>
-        {delta && (
-          <span className={cx("text-xs font-medium tabular-nums", deltaTone === "good" ? "text-[var(--color-status-good)]" : "text-[var(--color-status-critical)]")}>
-            {delta}
-          </span>
-        )}
+        {delta && <span className={cx("text-xs font-medium tabular-nums", deltaColor)}>{delta}</span>}
       </div>
       {sparkline && <div className="-mx-1 -mb-1">{sparkline}</div>}
     </Card>
@@ -362,5 +362,32 @@ export function PageSkeleton() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export function LiveIndicator() {
+  const [since, setSince] = useState(() => Date.now());
+  const [, forceTick] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => forceTick((n) => n + 1), 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const secs = Math.max(0, Math.round((Date.now() - since) / 1000));
+  const label = secs < 10 ? "Updated just now" : secs < 60 ? `Updated ${secs}s ago` : `Updated ${Math.round(secs / 60)}m ago`;
+
+  return (
+    <button
+      onClick={() => setSince(Date.now())}
+      title="Refresh"
+      className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink-primary)] hover:border-[var(--color-brand-1)]/40 transition-colors [border-color:var(--color-border)]"
+    >
+      <span className="relative flex h-1.5 w-1.5">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--color-status-good)] opacity-75" />
+        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[var(--color-status-good)]" />
+      </span>
+      {label}
+    </button>
   );
 }

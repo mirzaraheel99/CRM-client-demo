@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Check, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { cx } from "../lib/utils";
 import { useCountUp } from "../lib/useCountUp";
 
@@ -11,9 +11,9 @@ export function Card({
   return (
     <div
       className={cx(
-        "rounded-xl border bg-[var(--color-surface-1)] shadow-[var(--shadow-xs)] transition-[box-shadow,transform] duration-200 [border-color:var(--color-border)]",
-        padded && "p-5",
-        interactive && "hover:shadow-[var(--shadow-md)] hover:-translate-y-0.5",
+        "rounded-lg border bg-[var(--color-surface-1)] shadow-[var(--shadow-xs)] transition-[border-color,box-shadow] duration-200 [border-color:var(--color-border)]",
+        padded && "p-4",
+        interactive && "hover:border-[var(--color-baseline)] hover:shadow-[var(--shadow-sm)]",
         className
       )}
     >
@@ -97,23 +97,26 @@ export function StatTile({
     deltaTone === "critical" ? "text-[var(--color-status-critical)]" :
     "text-[var(--color-ink-muted)]";
   return (
-    <Card interactive className="flex flex-col gap-3">
+    <Card interactive className="flex h-full min-h-[142px] flex-col gap-3">
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-[var(--color-ink-muted)]">{label}</span>
         {icon && (
           <span
             className="flex h-8 w-8 items-center justify-center rounded-lg"
-            style={{ background: `${accent ?? "var(--color-brand-1)"}1a`, color: accent ?? "var(--color-brand-1)" }}
+            style={{
+              background: `color-mix(in srgb, ${accent ?? "var(--color-brand-1)"} 10%, transparent)`,
+              color: accent ?? "var(--color-brand-1)",
+            }}
           >
             {icon}
           </span>
         )}
       </div>
-      <div className="flex items-end justify-between">
+      <div className="flex flex-wrap items-end justify-between gap-x-2 gap-y-0.5">
         <span className="text-2xl font-semibold tracking-tight tabular-nums text-[var(--color-ink-primary)]">{animatedValue}</span>
-        {delta && <span className={cx("text-xs font-medium tabular-nums", deltaColor)}>{delta}</span>}
+        {delta && <span className={cx("ml-auto max-w-full text-right text-[11px] font-medium leading-4 tabular-nums", deltaColor)}>{delta}</span>}
       </div>
-      {sparkline && <div className="-mx-1 -mb-1">{sparkline}</div>}
+      <div className="-mx-1 -mb-1 mt-auto h-9">{sparkline}</div>
     </Card>
   );
 }
@@ -326,6 +329,50 @@ export function SortableTh({
         )}
       </button>
     </th>
+  );
+}
+
+export function Pagination({
+  page, pageSize, total, onPageChange,
+}: {
+  page: number; pageSize: number; total: number; onPageChange: (page: number) => void;
+}) {
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const safePage = Math.min(page, pageCount);
+  const start = total === 0 ? 0 : (safePage - 1) * pageSize + 1;
+  const end = Math.min(total, safePage * pageSize);
+
+  return (
+    <div className="flex min-h-12 flex-wrap items-center justify-between gap-3 border-t px-4 py-2.5 [border-color:var(--color-border)]">
+      <p className="text-xs tabular-nums text-[var(--color-ink-muted)]">
+        {start}-{end} of {total}
+      </p>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          title="Previous page"
+          aria-label="Previous page"
+          disabled={safePage <= 1}
+          onClick={() => onPageChange(safePage - 1)}
+          className="flex h-8 w-8 items-center justify-center rounded-md border text-[var(--color-ink-secondary)] transition-colors hover:bg-black/[0.03] disabled:cursor-not-allowed disabled:opacity-35 [border-color:var(--color-border)] dark:hover:bg-white/[0.06]"
+        >
+          <ChevronLeft size={15} />
+        </button>
+        <span className="min-w-20 text-center text-xs font-medium tabular-nums text-[var(--color-ink-secondary)]">
+          Page {safePage} of {pageCount}
+        </span>
+        <button
+          type="button"
+          title="Next page"
+          aria-label="Next page"
+          disabled={safePage >= pageCount}
+          onClick={() => onPageChange(safePage + 1)}
+          className="flex h-8 w-8 items-center justify-center rounded-md border text-[var(--color-ink-secondary)] transition-colors hover:bg-black/[0.03] disabled:cursor-not-allowed disabled:opacity-35 [border-color:var(--color-border)] dark:hover:bg-white/[0.06]"
+        >
+          <ChevronRight size={15} />
+        </button>
+      </div>
+    </div>
   );
 }
 

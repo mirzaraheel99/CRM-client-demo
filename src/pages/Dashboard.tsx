@@ -56,7 +56,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="flex items-start justify-between flex-wrap gap-3 animate-rise-in">
         <div>
           <div className="flex items-center gap-2.5 flex-wrap">
@@ -74,7 +74,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {maintenanceCandidates.length > 0 && (
             <Link to="/predictive-maintenance" className="block animate-rise-in" style={{ animationDelay: "40ms" }}>
-              <Card interactive className="h-full !bg-[var(--color-brand-1)]/[0.05] hover:!bg-[var(--color-brand-1)]/[0.08]">
+              <Card interactive className="h-full !p-3.5 !bg-[var(--color-brand-1)]/[0.05] hover:!bg-[var(--color-brand-1)]/[0.08]">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2.5">
                     <Sparkles size={18} className="text-[var(--color-brand-1)] shrink-0" />
@@ -90,7 +90,7 @@ export default function Dashboard() {
           )}
           {riskyJobs.length > 0 && (
             <Link to="/jobcards" className="block animate-rise-in" style={{ animationDelay: "80ms" }}>
-              <Card interactive className="h-full !bg-[var(--color-status-serious)]/[0.06] hover:!bg-[var(--color-status-serious)]/[0.1]">
+              <Card interactive className="h-full !p-3.5 !bg-[var(--color-status-serious)]/[0.06] hover:!bg-[var(--color-status-serious)]/[0.1]">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2.5">
                     <AlertTriangle size={18} className="text-[var(--color-status-serious)] shrink-0" />
@@ -107,7 +107,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
         {[
           <StatTile
             key="active" label="Active Jobs" value={String(activeJobs.length)} icon={<ClipboardList size={16} />} accent="var(--color-series-1)"
@@ -127,7 +127,7 @@ export default function Dashboard() {
           <StatTile key="stock" label="Low Stock Alerts" value={String(alerts.length)} icon={<PackageX size={16} />} accent="var(--color-status-critical)" delta={alerts.length > 0 ? "Needs attention" : undefined} deltaTone="critical" />,
           <StatTile key="techs" label="Technicians Available" value={`${availableTechs}/${scopedTechs.length}`} icon={<Users size={16} />} accent="var(--color-series-5)" />,
         ].map((tile, i) => (
-          <div key={tile.key} className="animate-rise-in" style={{ animationDelay: `${i * 40}ms` }}>
+          <div key={tile.key} className={cx("animate-rise-in", i === 4 && "col-span-2 xl:col-span-1")} style={{ animationDelay: `${i * 40}ms` }}>
             {tile}
           </div>
         ))}

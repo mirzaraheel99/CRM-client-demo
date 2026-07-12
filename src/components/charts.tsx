@@ -187,6 +187,49 @@ export function TrendAreaChart({
   );
 }
 
+export function DualLineChart({
+  data, categoryKey, primaryKey, secondaryKey, primaryName = primaryKey, secondaryName = secondaryKey,
+  primaryColor = SERIES[0], secondaryColor = SERIES[1], height = 260,
+}: {
+  data: Record<string, any>[]; categoryKey: string; primaryKey: string; secondaryKey: string;
+  primaryName?: string; secondaryName?: string; primaryColor?: string; secondaryColor?: string; height?: number;
+}) {
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const items = [
+    { name: primaryName, color: primaryColor },
+    { name: secondaryName, color: secondaryColor },
+  ];
+
+  function toggle(name: string) {
+    setHidden((current) => {
+      const next = new Set(current);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }
+
+  return (
+    <div>
+      <ResponsiveContainer width="100%" height={height}>
+        <ComposedChart data={data} margin={{ left: -8, right: 12, top: 12, bottom: 4 }}>
+          <CartesianGrid vertical={false} stroke={gridColor} />
+          <XAxis dataKey={categoryKey} tick={tickStyle} axisLine={{ stroke: gridColor }} tickLine={false} />
+          <YAxis tick={tickStyle} axisLine={false} tickLine={false} allowDecimals={false} tickFormatter={formatCompact} />
+          <Tooltip content={<ChartTooltip />} />
+          {!hidden.has(primaryName) && (
+            <Line type="monotone" dataKey={primaryKey} name={primaryName} stroke={primaryColor} strokeWidth={2.5} dot={{ r: 3, fill: primaryColor, strokeWidth: 0 }} activeDot={{ r: 5 }} />
+          )}
+          {!hidden.has(secondaryName) && (
+            <Line type="monotone" dataKey={secondaryKey} name={secondaryName} stroke={secondaryColor} strokeWidth={2.5} strokeDasharray="6 3" dot={{ r: 3, fill: secondaryColor, strokeWidth: 0 }} activeDot={{ r: 5 }} />
+          )}
+        </ComposedChart>
+      </ResponsiveContainer>
+      <ToggleLegend items={items} hidden={hidden} onToggle={toggle} />
+    </div>
+  );
+}
+
 export function ComboChart({
   data, categoryKey, barKey, lineKey, barColor = SERIES[0], lineColor = SERIES[5], height = 260, referenceValue, referenceLabel,
 }: {

@@ -8,13 +8,14 @@ import { filterByBranch } from "../../lib/selectors";
 import { formatDate } from "../../lib/utils";
 import { useSort } from "../../lib/useSort";
 import type { JobStatus, JobType, JobCard } from "../../lib/types";
+import { canPerform } from "../../lib/permissions";
 
 const STATUSES: JobStatus[] = ["Received", "In Diagnosis", "Waiting Approval", "In Repair", "QA", "Ready", "Delivered"];
 const PAGE_SIZE = 15;
 type SortKey = "id" | "customer" | "appliance" | "status" | "technician" | "created";
 
 export default function JobCardList() {
-  const { jobCards, customers, appliances, brands, technicians, selectedBranchId } = useStore();
+  const { jobCards, customers, appliances, brands, technicians, selectedBranchId, role } = useStore();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<JobStatus | "all">("all");
   const [jobType, setJobType] = useState<JobType | "all">("all");
@@ -25,6 +26,7 @@ export default function JobCardList() {
   const appMap = useMemo(() => new Map(appliances.map((a) => [a.id, a])), [appliances]);
   const brandMap = useMemo(() => new Map(brands.map((b) => [b.id, b])), [brands]);
   const techMap = useMemo(() => new Map(technicians.map((t) => [t.id, t])), [technicians]);
+  const scopedTechnicians = useMemo(() => filterByBranch(technicians, selectedBranchId), [technicians, selectedBranchId]);
 
   const filtered = useMemo(() => {
     let list = filterByBranch(jobCards, selectedBranchId);
@@ -66,7 +68,7 @@ export default function JobCardList() {
           <h1 className="text-xl font-semibold tracking-tight">Job Cards</h1>
           <p className="text-sm text-[var(--color-ink-muted)] mt-0.5">{rows.length} job cards match your filters</p>
         </div>
-        <Link to="/jobcards/new"><Button>+ New Job Card</Button></Link>
+        {canPerform(role, "create_job") && <Link to="/jobcards/new"><Button>+ New Job Card</Button></Link>}
       </div>
 
       <Card className="flex flex-wrap gap-3 items-end" padded>
@@ -92,7 +94,7 @@ export default function JobCardList() {
         <div className="w-44">
           <Select value={techId} onChange={(e) => { setTechId(e.target.value); setPage(1); }}>
             <option value="all">All technicians</option>
-            {technicians.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            {scopedTechnicians.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
           </Select>
         </div>
       </Card>

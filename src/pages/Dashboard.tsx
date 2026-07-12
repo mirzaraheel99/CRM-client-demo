@@ -6,23 +6,25 @@ import { Card, CardHeader, StatTile, Button, EmptyState, LiveIndicator } from ".
 import { HorizontalBarChart, VerticalBarChart, DonutChart, ComboChart, Sparkline } from "../components/charts";
 import { JobStatusBadge } from "../components/StatusBadge";
 import {
-  filterByBranch, jobsByStatus, technicianWorkload, warrantyRatio, inventoryAlerts, avgTat,
+  appliancesByBranch, filterByBranch, jobsByStatus, technicianWorkload, warrantyRatio, inventoryAlerts, avgTat,
   predictiveMaintenanceCandidates, jobVolumeAndTat, activeJobsTrend, warrantyShareTrend, weekComparison, unassignedActiveJobs,
 } from "../lib/selectors";
 import { formatDate, cx } from "../lib/utils";
 import { t } from "../lib/i18n";
+import { canPerform } from "../lib/permissions";
 
 export default function Dashboard() {
   const {
     jobCards, technicians, customers, appliances, brands, inventoryItems, inventoryLocations, inventoryStock,
-    selectedBranchId, lang,
+    selectedBranchId, lang, role,
   } = useStore();
 
   const scopedJobs = filterByBranch(jobCards, selectedBranchId);
   const scopedTechs = filterByBranch(technicians, selectedBranchId);
+  const scopedAppliances = appliancesByBranch(appliances, customers, selectedBranchId);
   const activeJobs = scopedJobs.filter((j) => j.status !== "Delivered");
   const alerts = inventoryAlerts(inventoryItems, inventoryLocations, inventoryStock, selectedBranchId);
-  const maintenanceCandidates = predictiveMaintenanceCandidates(appliances, jobCards, brands);
+  const maintenanceCandidates = predictiveMaintenanceCandidates(scopedAppliances, scopedJobs, brands);
   const riskyJobs = unassignedActiveJobs(scopedJobs);
   const custMap = new Map(customers.map((c) => [c.id, c]));
   const appMap = new Map(appliances.map((a) => [a.id, a]));
@@ -65,9 +67,9 @@ export default function Dashboard() {
           </div>
           <p className="text-sm text-[var(--color-ink-muted)] mt-0.5">{t(lang, "overviewToday")}</p>
         </div>
-        <Link to="/jobcards/new">
+        {canPerform(role, "create_job") && <Link to="/jobcards/new">
           <Button>+ {t(lang, "newJobCard")}</Button>
-        </Link>
+        </Link>}
       </div>
 
       {(maintenanceCandidates.length > 0 || riskyJobs.length > 0) && (

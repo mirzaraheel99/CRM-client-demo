@@ -1,4 +1,4 @@
-import { NavLink, Link } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, ClipboardList, Users, PackageSearch, Tag, Boxes,
   UserCog, GitBranch, MessageSquare, BarChart3, Smartphone, Sun, Moon,
@@ -11,6 +11,7 @@ import { Toaster } from "./Toaster";
 import { CommandPalette, useCommandPaletteStore } from "./CommandPalette";
 import { toast } from "../lib/toast";
 import { cx } from "../lib/utils";
+import { canAccessPath } from "../lib/permissions";
 import { useState, type ReactNode } from "react";
 import type { Role } from "../lib/types";
 
@@ -38,9 +39,16 @@ const ROLE_LABELS: Record<Role, string> = {
 };
 
 export function Shell({ children }: { children: ReactNode }) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { role, setRole, selectedBranchId, setBranch, branches, theme, setTheme, lang, setLang, sidebarCollapsed, toggleSidebar, resetDemoData } = useStore();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const visibleNav = NAV.filter((n) => !n.roles || n.roles.includes(role));
+  const visibleNav = NAV.filter((item) => canAccessPath(role, item.to));
+
+  function changeRole(nextRole: Role) {
+    setRole(nextRole);
+    if (!canAccessPath(nextRole, location.pathname)) navigate("/", { replace: true });
+  }
 
   return (
     <div className="flex h-dvh overflow-hidden bg-[var(--color-surface-page)]">
@@ -100,7 +108,13 @@ export function Shell({ children }: { children: ReactNode }) {
         </nav>
         <div className="border-t [border-color:var(--color-border)]">
           <button
-            onClick={() => { if (confirm("Reset all demo data back to the original seed dataset?")) { resetDemoData(); toast("Demo data reset."); } }}
+            onClick={() => {
+              if (confirm("Reset all demo data back to the original seed dataset?")) {
+                resetDemoData();
+                navigate("/", { replace: true });
+                toast("Demo data reset.");
+              }
+            }}
             title="Reset demo data"
             className="flex w-full items-center gap-2 px-4 py-3 text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink-primary)]"
           >
@@ -176,7 +190,7 @@ export function Shell({ children }: { children: ReactNode }) {
               <div className="relative">
                 <select
                   value={role}
-                  onChange={(e) => setRole(e.target.value as Role)}
+                  onChange={(e) => changeRole(e.target.value as Role)}
                   aria-label={t(lang, "role")}
                   className="max-w-[128px] appearance-none truncate rounded-lg border bg-[var(--color-surface-2)] py-1.5 pl-3 pr-7 text-sm font-medium outline-none [border-color:var(--color-border)] sm:max-w-none"
                 >
@@ -202,9 +216,6 @@ export function Shell({ children }: { children: ReactNode }) {
             >
               {theme === "light" ? <Moon size={17} /> : <Sun size={17} />}
             </button>
-            <Link to="/jobcards/new">
-              <span className="sr-only">{t(lang, "newJobCard")}</span>
-            </Link>
             <div className="hidden items-center gap-2 border-l pl-2 ml-1 [border-color:var(--color-border)] sm:flex">
               <Avatar name={ROLE_LABELS[role]} />
             </div>

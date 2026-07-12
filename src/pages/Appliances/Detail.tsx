@@ -8,8 +8,11 @@ import { formatDate, relativeTime } from "../../lib/utils";
 export default function ApplianceDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { appliances, applianceTelemetry, customers, brands, jobCards } = useStore();
-  const appliance = appliances.find((a) => a.id === id);
+  const { appliances, applianceTelemetry, customers, brands, jobCards, selectedBranchId } = useStore();
+  const appliance = appliances.find((candidate) => {
+    const owner = customers.find((customer) => customer.id === candidate.customerId);
+    return candidate.id === id && owner && (selectedBranchId === "all" || owner.branchId === selectedBranchId);
+  });
   if (!appliance) return <p className="text-sm text-[var(--color-ink-muted)]">Appliance not found.</p>;
 
   const customer = customers.find((c) => c.id === appliance.customerId);

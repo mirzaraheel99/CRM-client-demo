@@ -36,6 +36,30 @@ export const MESSAGE_TEMPLATES: MessageTemplate[] = [
     body: "Reminder: your {{appliance}} ({{jobId}}) is ready for pickup. Please collect at your convenience.",
   },
   {
+    id: "approval_received",
+    label: "Approval Received",
+    channels: ["whatsapp", "sms"],
+    body: "Thanks {{customer}}. Your approval for {{jobId}} has been recorded and repair can begin.",
+  },
+  {
+    id: "approval_declined",
+    label: "Approval Declined",
+    channels: ["whatsapp", "sms"],
+    body: "Your decline for {{jobId}} has been recorded. Our service team will contact you about next steps.",
+  },
+  {
+    id: "delivered",
+    label: "Item Delivered",
+    channels: ["whatsapp", "sms"],
+    body: "Your {{appliance}} ({{jobId}}) has been delivered. Thank you for choosing FixFlow.",
+  },
+  {
+    id: "maintenance_reminder",
+    label: "Maintenance Reminder",
+    channels: ["whatsapp"],
+    body: "Hi {{customer}}, your {{appliance}} is approaching its recommended service window. Reply to schedule preventive maintenance.",
+  },
+  {
     id: "warranty_report",
     label: "Warranty Report (Email)",
     channels: ["email"],

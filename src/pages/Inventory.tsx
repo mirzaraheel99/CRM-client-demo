@@ -4,8 +4,9 @@ import { useStore } from "../lib/store";
 import { Card, CardHeader, Tabs, Button, Input, Select, Field, Modal, Badge, SortableTh } from "../components/ui";
 import { HorizontalBarChart } from "../components/charts";
 import { formatCurrency, formatDateTime } from "../lib/utils";
-import { stockByBranch, smartReorderSuggestions } from "../lib/selectors";
+import { inventoryLocationsByBranch, inventoryStockByBranch, inventoryTransactionsByBranch, stockByBranch, smartReorderSuggestions } from "../lib/selectors";
 import { toast } from "../lib/toast";
+import { canPerform } from "../lib/permissions";
 import { useSort } from "../lib/useSort";
 import type { InventoryTransaction, InventoryItem } from "../lib/types";
 
@@ -13,7 +14,7 @@ const TABS = ["Item Master", "Stock Ledger", "Locations & Van Stock", "Stock by 
 type ItemSortKey = "name" | "partNo" | "brand" | "unitPrice" | "reorderLevel" | "totalStock";
 
 export default function Inventory() {
-  const { branches, inventoryItems, inventoryLocations, inventoryStock, inventoryTransactions, addInventoryItem, addInventoryTransaction } = useStore();
+  const { branches, inventoryItems, inventoryLocations, inventoryStock, inventoryTransactions, selectedBranchId, role, addInventoryItem, addInventoryTransaction } = useStore();
   const [tab, setTab] = useState(TABS[0]);
   const [txnModal, setTxnModal] = useState<InventoryTransaction["type"] | null>(null);
   const [itemModal, setItemModal] = useState(false);
@@ -21,12 +22,16 @@ export default function Inventory() {
 
   const [txnForm, setTxnForm] = useState({ itemId: "", locationId: "", destLocationId: "", qty: 1 });
   const [itemForm, setItemForm] = useState({ name: "", category: "Electrical", brand: "", partNo: "", unitPrice: 0, reorderLevel: 5 });
+  const scopedLocations = useMemo(() => inventoryLocationsByBranch(inventoryLocations, selectedBranchId), [inventoryLocations, selectedBranchId]);
+  const scopedStock = useMemo(() => inventoryStockByBranch(inventoryStock, inventoryLocations, selectedBranchId), [inventoryStock, inventoryLocations, selectedBranchId]);
+  const scopedTransactions = useMemo(() => inventoryTransactionsByBranch(inventoryTransactions, inventoryLocations, selectedBranchId), [inventoryTransactions, inventoryLocations, selectedBranchId]);
+  const scopedBranches = useMemo(() => selectedBranchId === "all" ? branches : branches.filter((branch) => branch.id === selectedBranchId), [branches, selectedBranchId]);
 
   const stockByItem = useMemo(() => {
     const map = new Map<string, number>();
-    for (const s of inventoryStock) map.set(s.itemId, (map.get(s.itemId) ?? 0) + s.qty);
+    for (const s of scopedStock) map.set(s.itemId, (map.get(s.itemId) ?? 0) + s.qty);
     return map;
-  }, [inventoryStock]);
+  }, [scopedStock]);
 
   const itemSortValue = (i: InventoryItem, key: ItemSortKey) => {
     if (key === "name") return i.name;
@@ -39,19 +44,19 @@ export default function Inventory() {
   const { sorted: sortedItems, sortKey: itemSortKey, dir: itemDir, toggle: toggleItemSort } = useSort<InventoryItem, ItemSortKey>(inventoryItems, itemSortValue, "name");
 
   const branchStock = useMemo(
-    () => stockByBranch(inventoryItems, inventoryLocations, inventoryStock, branches),
-    [inventoryItems, inventoryLocations, inventoryStock, branches]
+    () => stockByBranch(inventoryItems, scopedLocations, scopedStock, scopedBranches),
+    [inventoryItems, scopedLocations, scopedStock, scopedBranches]
   );
   const branchValueChart = branchStock.map((b) => ({ branch: b.branch.name, value: b.totalValue }));
   const reorderSuggestions = useMemo(
-    () => smartReorderSuggestions(inventoryItems, inventoryTransactions, inventoryStock),
-    [inventoryItems, inventoryTransactions, inventoryStock]
+    () => smartReorderSuggestions(inventoryItems, scopedTransactions, scopedStock),
+    [inventoryItems, scopedTransactions, scopedStock]
   );
 
   function submitTxn() {
     if (!txnForm.itemId || !txnForm.locationId || txnForm.qty <= 0) return;
     if (!txnModal) return;
-    addInventoryTransaction({
+    const result = addInventoryTransaction({
       itemId: txnForm.itemId,
       locationId: txnForm.locationId,
       type: txnModal,
@@ -59,10 +64,11 @@ export default function Inventory() {
       createdBy: "You",
       destLocationId: txnModal === "transfer" ? txnForm.destLocationId : undefined,
     });
-    const itemName = inventoryItems.find((i) => i.id === txnForm.itemId)?.name;
-    setTxnForm({ itemId: "", locationId: "", destLocationId: "", qty: 1 });
-    setTxnModal(null);
-    toast(`${txnModal.charAt(0).toUpperCase() + txnModal.slice(1)} recorded for ${itemName}.`);
+    toast(result.message, result.ok ? "success" : "error");
+    if (result.ok) {
+      setTxnForm({ itemId: "", locationId: "", destLocationId: "", qty: 1 });
+      setTxnModal(null);
+    }
   }
 
   function submitItem() {
@@ -80,13 +86,13 @@ export default function Inventory() {
           <h1 className="text-xl font-semibold tracking-tight">Inventory & Spare Parts</h1>
           <p className="text-sm text-[var(--color-ink-muted)] mt-0.5">Stores, technician vans, and branch stock</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        {canPerform(role, "manage_inventory") && <div className="flex gap-2 flex-wrap">
           <Button variant="secondary" onClick={() => setTxnModal("receive")}><PackagePlus size={14} /> Receive</Button>
           <Button variant="secondary" onClick={() => setTxnModal("issue")}><PackageMinus size={14} /> Issue</Button>
           <Button variant="secondary" onClick={() => setTxnModal("return")}><Undo2 size={14} /> Return</Button>
           <Button variant="secondary" onClick={() => setTxnModal("transfer")}><ArrowLeftRight size={14} /> Transfer</Button>
           <Button onClick={() => setItemModal(true)}>+ Add Item</Button>
-        </div>
+        </div>}
       </div>
 
       <Card padded={false}>
@@ -137,7 +143,7 @@ export default function Inventory() {
                 </tr>
               </thead>
               <tbody>
-                {[...inventoryTransactions].sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp)).slice(0, 60).map((txn) => {
+                {[...scopedTransactions].sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp)).slice(0, 60).map((txn) => {
                   const item = inventoryItems.find((i) => i.id === txn.itemId);
                   const loc = inventoryLocations.find((l) => l.id === txn.locationId);
                   return (
@@ -157,8 +163,8 @@ export default function Inventory() {
 
           {tab === "Locations & Van Stock" && (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {inventoryLocations.map((loc) => {
-                const items = inventoryStock.filter((s) => s.locationId === loc.id && s.qty > 0);
+              {scopedLocations.map((loc) => {
+                const items = scopedStock.filter((s) => s.locationId === loc.id && s.qty > 0);
                 return (
                   <Card key={loc.id}>
                     <CardHeader title={loc.name} subtitle={loc.type === "van" ? "Technician van" : loc.type === "store" ? "Main store" : "Branch store"} />
@@ -270,14 +276,14 @@ export default function Inventory() {
           <Field label={txnModal === "transfer" ? "From location" : "Location"}>
             <Select value={txnForm.locationId} onChange={(e) => setTxnForm({ ...txnForm, locationId: e.target.value })}>
               <option value="">Choose location…</option>
-              {inventoryLocations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+              {scopedLocations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
             </Select>
           </Field>
           {txnModal === "transfer" && (
             <Field label="To location">
               <Select value={txnForm.destLocationId} onChange={(e) => setTxnForm({ ...txnForm, destLocationId: e.target.value })}>
                 <option value="">Choose destination…</option>
-                {inventoryLocations.filter((l) => l.id !== txnForm.locationId).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                {scopedLocations.filter((l) => l.id !== txnForm.locationId).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
               </Select>
             </Field>
           )}

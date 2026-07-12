@@ -73,14 +73,15 @@ export const BRANDS: Brand[] = [
 
 export const CUSTOMERS: Customer[] = Array.from({ length: 60 }, (_, i) => {
   const name = `${pick(firstNames)} ${pick(lastNames)}`;
+  const branch = pick(BRANCHES);
   return {
     id: id("cust", i + 1),
     name,
     phone: `+9665${int(0, 9)}${int(1000000, 9999999)}`,
     whatsapp: `+9665${int(0, 9)}${int(1000000, 9999999)}`,
     email: `${name.toLowerCase().replace(/\s+/g, ".")}@example.com`,
-    address: `Building ${int(1, 40)}, Street ${int(1, 20)}, ${pick(BRANCHES).city}`,
-    branchId: pick(BRANCHES).id,
+    address: `Building ${int(1, 40)}, Street ${int(1, 20)}, ${branch.city}`,
+    branchId: branch.id,
     createdAt: daysAgo(int(10, 700)),
     whatsappVerified: rand() > 0.35,
   };
@@ -134,22 +135,22 @@ export const APPLIANCE_TELEMETRY: ApplianceTelemetry[] = APPLIANCES.filter((a) =
 });
 
 export const TECHNICIANS: Technician[] = [
-  { name: "Imran Qureshi", skills: ["AC", "Refrigerator"], zone: "Zone A" },
-  { name: "Zainab Malik", skills: ["Mobile", "TV"], zone: "Zone B" },
-  { name: "Hassan Raza", skills: ["Washer", "Microwave"], zone: "Zone A" },
-  { name: "Priya Nair", skills: ["AC", "Washer"], zone: "Zone C" },
-  { name: "Ali Akbar", skills: ["Refrigerator", "TV"], zone: "Zone B" },
-  { name: "Nadia Farooq", skills: ["Mobile", "AC"], zone: "Zone C" },
-  { name: "Waqas Ahmed", skills: ["Washer", "Refrigerator"], zone: "Zone A" },
-  { name: "Sana Tariq", skills: ["TV", "Microwave"], zone: "Zone B" },
+  { name: "Imran Qureshi", skills: ["AC", "Refrigerator", "Mobile"], zone: "Riyadh North", branchId: "br-1" },
+  { name: "Zainab Malik", skills: ["Mobile", "TV", "AC"], zone: "Jeddah Central", branchId: "br-2" },
+  { name: "Hassan Raza", skills: ["Washer", "Microwave", "TV"], zone: "Dammam East", branchId: "br-3" },
+  { name: "Priya Nair", skills: ["AC", "Washer", "Microwave"], zone: "Riyadh South", branchId: "br-1" },
+  { name: "Ali Akbar", skills: ["Refrigerator", "TV", "Washer"], zone: "Jeddah North", branchId: "br-2" },
+  { name: "Nadia Farooq", skills: ["Mobile", "AC", "Refrigerator"], zone: "Dammam West", branchId: "br-3" },
+  { name: "Waqas Ahmed", skills: ["Washer", "Refrigerator", "TV"], zone: "Riyadh Central", branchId: "br-1" },
+  { name: "Sana Tariq", skills: ["TV", "Microwave", "Mobile"], zone: "Jeddah South", branchId: "br-2" },
 ].map((t, i) => ({
   id: id("tech", i + 1),
   name: t.name,
   phone: `+9665${int(0, 9)}${int(1000000, 9999999)}`,
   skills: t.skills as ApplianceCategory[],
   zone: t.zone,
-  branchId: pick(BRANCHES).id,
-  status: pick(["Available", "On Job", "Off Duty"] as const),
+  branchId: t.branchId,
+  status: "Available" as const,
   avatarColor: pick(["#2a78d6", "#1baf7a", "#eda100", "#4a3aa7", "#e34948", "#e87ba4", "#eb6834"]),
 }));
 
@@ -259,10 +260,11 @@ export const PARTS_USED: JobCardPartUsed[] = [];
 export const PURCHASE_BILLS: PurchaseBill[] = [];
 export const COMMUNICATION_LOGS: CommunicationLog[] = [];
 
-let stageHistId = 1, attId = 1, partId = 1, billId = 1, commId = 1;
+let stageHistId = 1, attId = 1, partId = 1, billId = 1, commId = 1, jobTxnId = 5000;
 
 for (let i = 0; i < 130; i++) {
   const appliance = pick(APPLIANCES);
+  const customer = CUSTOMERS.find((candidate) => candidate.id === appliance.customerId)!;
   const jobType = appliance.warrantyStatus === "In Warranty" && rand() > 0.3 ? "warranty" : "non_warranty";
   const stages = jobType === "warranty" ? STAGES_WARRANTY : STAGES_NONWARRANTY;
   // progress index: weighted so most jobs are in-flight, some done, a few just received
@@ -272,9 +274,10 @@ for (let i = 0; i < 130; i++) {
   // ensure enough elapsed time exists for the full stage progression to play out without clamping
   const minDaysNeeded = Math.ceil((progressIdx * 20) / 24) + 1;
   const createdAt = daysAgo(int(Math.min(minDaysNeeded, 20), Math.max(minDaysNeeded, 20)));
-  const technician = rand() > 0.1 ? pick(TECHNICIANS) : null;
+  const eligibleTechnicians = TECHNICIANS.filter((candidate) => candidate.branchId === customer.branchId && candidate.skills.includes(appliance.category));
+  const technician = eligibleTechnicians.length && (progressIdx > 0 || rand() > 0.35) ? pick(eligibleTechnicians) : null;
   const jobCardId = id("job", i + 1);
-  const estimateAmount = jobType === "non_warranty" || rand() > 0.7 ? int(80, 1800) : null;
+  let estimateAmount = jobType === "non_warranty" && progressIdx >= stages.indexOf("Estimate") ? int(350, 2200) : null;
   const isDelivered = currentStage === "Delivered";
 
   // stage history up to progressIdx — each step advances a realistic 3-20 hours
@@ -282,63 +285,104 @@ for (let i = 0; i < 130; i++) {
   const now = Date.now();
   for (let s = 0; s <= progressIdx; s++) {
     ts = Math.min(ts + int(3, 20) * 3600 * 1000, now);
+    const stageName = stages[s];
+    const changedBy = stageName === "Received" || stageName === "Ready for Handover" || stageName === "Delivered"
+      ? "Front Desk"
+      : stageName === "QA" || stageName === "Warranty Validation"
+        ? "Service Supervisor"
+        : technician?.name ?? "Service Team";
     STAGE_HISTORY.push({
       id: id("hist", stageHistId++),
       jobcardId: jobCardId,
-      stageName: stages[s],
-      changedBy: technician?.name ?? "Front Desk",
+      stageName,
+      changedBy,
       timestamp: new Date(ts).toISOString(),
-      notes: s === 0 ? "Item received at counter." : `Moved to ${stages[s]}.`,
+      notes: s === 0 ? "Item received at counter." : `Moved to ${stageName}.`,
     });
     if (rand() > 0.4) {
       ATTACHMENTS.push({
         id: id("att", attId++),
         jobcardId: jobCardId,
-        stageName: stages[s],
+        stageName,
         fileUrl: "#",
-        label: `${stages[s]} photo`,
-        uploadedBy: technician?.name ?? "Front Desk",
+        label: `${stageName} photo`,
+        uploadedBy: changedBy,
         timestamp: new Date(ts).toISOString(),
       });
     }
   }
 
-  JOB_CARDS.push({
+  const diagnosisIndex = stages.indexOf("Diagnosis");
+  const repairIndex = stages.indexOf("Repair");
+  const qaIndex = stages.indexOf("QA");
+  const approvalIndex = stages.indexOf("Customer Approval");
+  const readyIndex = stages.indexOf("Ready for Handover");
+  const job: JobCard = {
     id: jobCardId,
     customerId: appliance.customerId,
     applianceId: appliance.id,
     technicianId: technician?.id ?? null,
-    branchId: pick(BRANCHES).id,
+    branchId: customer.branchId,
     jobType,
     status: STAGE_TO_STATUS[currentStage],
     currentStage,
     problemDescription: pick(problems),
     estimateAmount,
-    finalAmount: isDelivered ? (estimateAmount ?? int(80, 1800)) : null,
+    finalAmount: null,
     createdAt,
     updatedAt: new Date(ts).toISOString(),
     scheduledAt: technician ? daysAgo(int(-3, 3)) : null,
-    customerApproved: jobType === "non_warranty" && progressIdx >= 3 ? true : null,
+    customerApproved: jobType === "non_warranty" && approvalIndex >= 0 && progressIdx > approvalIndex ? true : null,
+    diagnosisNotes: diagnosisIndex >= 0 && progressIdx > diagnosisIndex ? `Confirmed ${appliance.category.toLowerCase()} fault after diagnostic inspection.` : null,
+    repairNotes: repairIndex >= 0 && progressIdx > repairIndex ? "Repair completed and unit tested under normal operating load." : null,
+    qaApproved: qaIndex >= 0 && progressIdx > qaIndex,
+    customerSignature: isDelivered ? customer.name : null,
     oemClaimNo: jobType === "warranty" && progressIdx >= 1 && rand() > 0.5 ? `OEM-${int(100000, 999999)}` : undefined,
-  });
+  };
+  JOB_CARDS.push(job);
 
-  if (progressIdx >= stages.indexOf("Repair") && stages.includes("Repair")) {
+  if (repairIndex >= 0 && progressIdx >= repairIndex) {
     const numParts = int(1, 3);
     for (let p = 0; p < numParts; p++) {
-      const item = pick(INVENTORY_ITEMS);
-      const qty = int(1, 2);
+      const branchLocationIds = new Set(INVENTORY_LOCATIONS.filter((location) => location.branchId === job.branchId).map((location) => location.id));
+      const stockOptions = INVENTORY_STOCK.filter((entry) => branchLocationIds.has(entry.locationId) && entry.qty > 0);
+      if (!stockOptions.length) break;
+      const stockEntry = pick(stockOptions);
+      const item = INVENTORY_ITEMS.find((candidate) => candidate.id === stockEntry.itemId)!;
+      const qty = Math.min(stockEntry.qty, int(1, 2));
+      stockEntry.qty -= qty;
       PARTS_USED.push({
         id: id("part", partId++),
         jobcardId: jobCardId,
         itemId: item.id,
+        locationId: stockEntry.locationId,
         qty,
         unitPrice: item.unitPrice,
         totalPrice: item.unitPrice * qty,
       });
+      INVENTORY_TRANSACTIONS.push({
+        id: id("txn", jobTxnId++),
+        itemId: item.id,
+        locationId: stockEntry.locationId,
+        jobcardId: jobCardId,
+        type: "issue",
+        qty,
+        timestamp: STAGE_HISTORY.find((history) => history.jobcardId === jobCardId && history.stageName === "Repair")?.timestamp ?? job.updatedAt,
+        createdBy: technician?.name ?? "Service Team",
+      });
     }
   }
 
-  if (jobType === "warranty") {
+  const partsTotal = PARTS_USED.filter((part) => part.jobcardId === jobCardId).reduce((sum, part) => sum + part.totalPrice, 0);
+  if (jobType === "non_warranty" && estimateAmount != null && partsTotal > 0) {
+    estimateAmount = Math.max(estimateAmount, partsTotal + 350);
+    job.estimateAmount = estimateAmount;
+  }
+  if (jobType === "non_warranty" && readyIndex >= 0 && progressIdx >= readyIndex) {
+    job.finalAmount = partsTotal + int(120, 350);
+  }
+
+  if (jobType === "warranty" && progressIdx >= 1) {
     PURCHASE_BILLS.push({
       id: id("bill", billId++),
       jobcardId: jobCardId,
@@ -348,25 +392,40 @@ for (let i = 0; i < 130; i++) {
     });
   }
 
-  const numMsgs = int(0, 4);
-  for (let m = 0; m < numMsgs; m++) {
-    const channel = pick(["whatsapp", "sms", "email"] as const);
+  const addMessage = (stageName: StageName, channel: "whatsapp" | "sms" | "email", message: string) => {
+    const stageEvent = STAGE_HISTORY.find((history) => history.jobcardId === jobCardId && history.stageName === stageName);
+    if (!stageEvent) return;
     COMMUNICATION_LOGS.push({
       id: id("comm", commId++),
       jobcardId: jobCardId,
+      customerId: customer.id,
+      applianceId: appliance.id,
+      stageName,
       channel,
-      to: channel === "email" ? "customer@example.com" : "+9665xxxxxxxx",
-      message: pick([
-        "Your item has been received and is being processed.",
-        "Your job estimate is ready for approval.",
-        "Repair completed, your item is ready for pickup.",
-        "Your item has been delivered. Thank you!",
-        "OTP for confirmation: 4821",
-      ]),
-      status: pick(["sent", "delivered", "read", "failed"] as const),
-      timestamp: daysAgo(int(0, 40)),
+      to: channel === "email" ? customer.email : channel === "whatsapp" ? customer.whatsapp : customer.phone,
+      message,
+      status: rand() < 0.04 ? "failed" : channel === "whatsapp" && rand() > 0.35 ? "read" : "delivered",
+      timestamp: stageEvent.timestamp,
     });
+  };
+
+  addMessage("Received", "whatsapp", `Hi ${customer.name.split(" ")[0]}, we received your ${appliance.model} (${jobCardId}).`);
+  addMessage("Received", "sms", `FixFlow received ${jobCardId}. We will share a diagnosis shortly.`);
+  if (jobType === "non_warranty" && approvalIndex >= 0 && progressIdx >= approvalIndex) {
+    addMessage("Customer Approval", "whatsapp", `Estimate ready for ${jobCardId}: SAR ${estimateAmount?.toLocaleString()} for parts and labor.`);
+    addMessage("Customer Approval", "email", `Your FixFlow estimate for ${jobCardId} is ready for approval.`);
   }
+  if (readyIndex >= 0 && progressIdx >= readyIndex) {
+    addMessage("Ready for Handover", "whatsapp", `Your ${appliance.model} is repaired and ready for pickup.`);
+    addMessage("Ready for Handover", "sms", `${jobCardId} is ready for handover.`);
+  }
+  if (isDelivered) {
+    addMessage("Delivered", "whatsapp", `Your ${appliance.model} (${jobCardId}) has been delivered. Thank you.`);
+  }
+}
+
+for (const technician of TECHNICIANS) {
+  technician.status = JOB_CARDS.some((job) => job.status !== "Delivered" && job.technicianId === technician.id) ? "On Job" : "Available";
 }
 
 export const PAYMENTS: Payment[] = [];
@@ -391,7 +450,6 @@ function pickPaymentMethod(): Payment["method"] {
 
 for (const job of JOB_CARDS) {
   if (job.jobType !== "non_warranty" || job.status !== "Delivered" || job.finalAmount == null) continue;
-  if (rand() > 0.82) continue; // a few delivered jobs remain unpaid, realistically
   const method = pickPaymentMethod();
   const isBnpl = method === "tabby" || method === "tamara";
   PAYMENTS.push({
@@ -400,7 +458,7 @@ for (const job of JOB_CARDS) {
     method,
     amount: job.finalAmount,
     installments: isBnpl ? pick([3, 4]) : undefined,
-    status: rand() > 0.05 ? "paid" : "failed",
+    status: "paid",
     timestamp: job.updatedAt,
   });
 }
@@ -417,7 +475,7 @@ export const WORKFLOWS: WorkflowDefinition[] = [
       { stepOrder: 2, stepName: "Warranty Validation", mandatoryFields: ["purchase_bill", "serial_no", "purchase_date"], approvalRequired: true, approverRole: "supervisor", triggers: { whatsapp: false, sms: false, email: true } },
       { stepOrder: 3, stepName: "Diagnosis", mandatoryFields: ["diagnosis_notes"], approvalRequired: false, approverRole: null, triggers: { whatsapp: false, sms: false, email: false } },
       { stepOrder: 4, stepName: "Repair", mandatoryFields: ["parts_used", "repair_notes"], approvalRequired: false, approverRole: null, triggers: { whatsapp: false, sms: false, email: false } },
-      { stepOrder: 5, stepName: "QA", mandatoryFields: ["qa_checklist"], approvalRequired: true, approverRole: "qa_supervisor", triggers: { whatsapp: false, sms: false, email: false } },
+      { stepOrder: 5, stepName: "QA", mandatoryFields: ["qa_approved"], approvalRequired: true, approverRole: "supervisor", triggers: { whatsapp: false, sms: false, email: false } },
       { stepOrder: 6, stepName: "Ready for Handover", mandatoryFields: [], approvalRequired: false, approverRole: null, triggers: { whatsapp: true, sms: true, email: true } },
       { stepOrder: 7, stepName: "Delivered", mandatoryFields: ["customer_signature"], approvalRequired: false, approverRole: null, triggers: { whatsapp: true, sms: true, email: false } },
     ],
@@ -431,10 +489,10 @@ export const WORKFLOWS: WorkflowDefinition[] = [
     steps: [
       { stepOrder: 1, stepName: "Received", mandatoryFields: ["customer_id", "appliance_id"], approvalRequired: false, approverRole: null, triggers: { whatsapp: true, sms: true, email: false } },
       { stepOrder: 2, stepName: "Diagnosis", mandatoryFields: ["diagnosis_notes"], approvalRequired: false, approverRole: null, triggers: { whatsapp: false, sms: false, email: false } },
-      { stepOrder: 3, stepName: "Estimate", mandatoryFields: ["estimate_amount"], approvalRequired: false, approverRole: null, triggers: { whatsapp: true, sms: true, email: true } },
-      { stepOrder: 4, stepName: "Customer Approval", mandatoryFields: ["customer_approval_status"], approvalRequired: true, approverRole: "frontdesk", triggers: { whatsapp: true, sms: true, email: false } },
+      { stepOrder: 3, stepName: "Estimate", mandatoryFields: ["estimate_amount"], approvalRequired: false, approverRole: null, triggers: { whatsapp: false, sms: false, email: false } },
+      { stepOrder: 4, stepName: "Customer Approval", mandatoryFields: ["customer_approval_status"], approvalRequired: true, approverRole: "front_desk", triggers: { whatsapp: true, sms: true, email: true } },
       { stepOrder: 5, stepName: "Repair", mandatoryFields: ["parts_used", "repair_notes"], approvalRequired: false, approverRole: null, triggers: { whatsapp: false, sms: false, email: false } },
-      { stepOrder: 6, stepName: "QA", mandatoryFields: ["qa_checklist"], approvalRequired: true, approverRole: "qa_supervisor", triggers: { whatsapp: false, sms: false, email: false } },
+      { stepOrder: 6, stepName: "QA", mandatoryFields: ["qa_approved"], approvalRequired: true, approverRole: "supervisor", triggers: { whatsapp: false, sms: false, email: false } },
       { stepOrder: 7, stepName: "Ready for Handover", mandatoryFields: [], approvalRequired: false, approverRole: null, triggers: { whatsapp: true, sms: true, email: true } },
       { stepOrder: 8, stepName: "Delivered", mandatoryFields: ["customer_signature", "final_amount"], approvalRequired: false, approverRole: null, triggers: { whatsapp: true, sms: true, email: false } },
     ],

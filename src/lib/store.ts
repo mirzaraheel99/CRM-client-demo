@@ -1,12 +1,18 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import * as seed from "./seed";
+import { canAdvanceCurrentStage, canPerform } from "./permissions";
+import { MESSAGE_TEMPLATES, renderTemplate } from "./templates";
+import { stageBlockers } from "./workflow";
 import type {
-  Customer, Appliance, ApplianceTelemetry, Brand, Technician, InventoryItem, InventoryLocation,
+  ActionResult, Customer, Appliance, ApplianceTelemetry, Brand, Technician, InventoryItem, InventoryLocation,
   InventoryStock, InventoryTransaction, JobCard, JobCardStageHistory,
   JobCardAttachment, JobCardPartUsed, PurchaseBill, CommunicationLog,
-  WorkflowDefinition, Role, StageName, Branch, Payment, PaymentMethod,
+  WorkflowDefinition, Role, StageName, Branch, Payment, PaymentMethod, Channel,
 } from "./types";
+
+type JobResult = ActionResult & { job?: JobCard };
+type PaymentResult = ActionResult & { payment?: Payment };
 
 interface DemoState {
   branches: Branch[];
@@ -28,7 +34,6 @@ interface DemoState {
   workflows: WorkflowDefinition[];
   payments: Payment[];
 
-  // UI/global chrome state
   role: Role;
   selectedBranchId: string | "all";
   theme: "light" | "dark";
@@ -36,61 +41,76 @@ interface DemoState {
   sidebarCollapsed: boolean;
   maintenanceRemindersSent: Record<string, string>;
 
-  setRole: (r: Role) => void;
-  setBranch: (b: string | "all") => void;
-  setTheme: (t: "light" | "dark") => void;
-  setLang: (l: "en" | "ar") => void;
+  setRole: (role: Role) => void;
+  setBranch: (branchId: string | "all") => void;
+  setTheme: (theme: "light" | "dark") => void;
+  setLang: (lang: "en" | "ar") => void;
   toggleSidebar: () => void;
 
-  addCustomer: (c: Omit<Customer, "id" | "createdAt" | "whatsappVerified">) => Customer;
+  addCustomer: (customer: Omit<Customer, "id" | "createdAt" | "whatsappVerified">) => Customer;
   verifyWhatsapp: (customerId: string) => void;
-  addAppliance: (a: Omit<Appliance, "id">) => Appliance;
-  addBrand: (b: Omit<Brand, "id">) => Brand;
-  addTechnician: (t: Omit<Technician, "id">) => Technician;
-  addInventoryItem: (i: Omit<InventoryItem, "id">) => InventoryItem;
-  addInventoryTransaction: (t: Omit<InventoryTransaction, "id" | "timestamp">) => void;
+  addAppliance: (appliance: Omit<Appliance, "id">) => Appliance;
+  addBrand: (brand: Omit<Brand, "id">) => Brand;
+  addTechnician: (technician: Omit<Technician, "id">) => Technician;
+  addInventoryItem: (item: Omit<InventoryItem, "id">) => InventoryItem;
+  addInventoryTransaction: (transaction: Omit<InventoryTransaction, "id" | "timestamp">) => ActionResult;
 
   createJobCard: (input: {
-    customerId: string; applianceId: string; jobType: JobCard["jobType"];
-    problemDescription: string; branchId: string;
-  }) => JobCard;
-  advanceStage: (jobcardId: string, stage: StageName, notes: string, changedBy: string) => void;
-  assignTechnician: (jobcardId: string, technicianId: string) => void;
-  setEstimate: (jobcardId: string, amount: number) => void;
-  approveCustomer: (jobcardId: string, approved: boolean) => void;
-  addPartUsed: (jobcardId: string, itemId: string, qty: number) => void;
-  addAttachment: (jobcardId: string, stageName: StageName, label: string) => void;
-  sendCommunication: (jobcardId: string, channel: CommunicationLog["channel"], message: string) => void;
-  updateWorkflowStep: (workflowId: string, stepOrder: number, patch: Partial<WorkflowDefinition["steps"][number]>) => void;
-  addWorkflowStep: (workflowId: string, step: WorkflowDefinition["steps"][number]) => void;
-  sendMaintenanceReminder: (applianceId: string) => void;
-  recordPayment: (jobcardId: string, method: PaymentMethod, amount: number, installments?: number) => Payment;
+    customerId: string;
+    applianceId: string;
+    jobType: JobCard["jobType"];
+    problemDescription: string;
+    branchId: string;
+  }) => JobResult;
+  advanceStage: (jobcardId: string, stage: StageName, notes: string, changedBy: string) => ActionResult;
+  assignTechnician: (jobcardId: string, technicianId: string) => ActionResult;
+  setDiagnosis: (jobcardId: string, notes: string) => ActionResult;
+  setEstimate: (jobcardId: string, amount: number) => ActionResult;
+  approveCustomer: (jobcardId: string, approved: boolean, source?: "internal" | "customer") => ActionResult;
+  setRepairNotes: (jobcardId: string, notes: string) => ActionResult;
+  setQaApproved: (jobcardId: string, approved: boolean) => ActionResult;
+  setFinalAmount: (jobcardId: string, amount: number) => ActionResult;
+  captureCustomerSignature: (jobcardId: string, signature: string) => ActionResult;
+  savePurchaseBill: (jobcardId: string, bill: Omit<PurchaseBill, "id" | "jobcardId">) => ActionResult;
+  addPartUsed: (jobcardId: string, itemId: string, qty: number) => ActionResult;
+  removePartUsed: (partUsedId: string) => ActionResult;
+  addAttachment: (jobcardId: string, stageName: StageName, label: string) => ActionResult;
+  sendCommunication: (jobcardId: string, channel: CommunicationLog["channel"], message: string) => ActionResult;
+  updateWorkflowStep: (workflowId: string, stepOrder: number, patch: Partial<WorkflowDefinition["steps"][number]>) => ActionResult;
+  addWorkflowStep: (workflowId: string, step: WorkflowDefinition["steps"][number]) => ActionResult;
+  sendMaintenanceReminder: (applianceId: string) => ActionResult;
+  recordPayment: (jobcardId: string, method: PaymentMethod, amount: number, installments?: number, source?: "internal" | "customer") => PaymentResult;
 
   resetDemoData: () => void;
 }
 
-let counter = 100000;
-const nextId = (prefix: string) => `${prefix}-${(counter++).toString(36)}`;
+const COUNTER_START = 100000;
+let counter = COUNTER_START;
+const nextId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${(counter++).toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+
+function clone<T>(value: T): T {
+  return structuredClone(value);
+}
 
 const initialSlice = () => ({
-  branches: seed.BRANCHES,
-  customers: seed.CUSTOMERS,
-  brands: seed.BRANDS,
-  appliances: seed.APPLIANCES,
-  applianceTelemetry: seed.APPLIANCE_TELEMETRY,
-  technicians: seed.TECHNICIANS,
-  inventoryItems: seed.INVENTORY_ITEMS,
-  inventoryLocations: seed.INVENTORY_LOCATIONS,
-  inventoryStock: seed.INVENTORY_STOCK,
-  inventoryTransactions: seed.INVENTORY_TRANSACTIONS,
-  jobCards: seed.JOB_CARDS,
-  stageHistory: seed.STAGE_HISTORY,
-  attachments: seed.ATTACHMENTS,
-  partsUsed: seed.PARTS_USED,
-  purchaseBills: seed.PURCHASE_BILLS,
-  communicationLogs: seed.COMMUNICATION_LOGS,
-  workflows: seed.WORKFLOWS,
-  payments: seed.PAYMENTS,
+  branches: clone(seed.BRANCHES),
+  customers: clone(seed.CUSTOMERS),
+  brands: clone(seed.BRANDS),
+  appliances: clone(seed.APPLIANCES),
+  applianceTelemetry: clone(seed.APPLIANCE_TELEMETRY),
+  technicians: clone(seed.TECHNICIANS),
+  inventoryItems: clone(seed.INVENTORY_ITEMS),
+  inventoryLocations: clone(seed.INVENTORY_LOCATIONS),
+  inventoryStock: clone(seed.INVENTORY_STOCK),
+  inventoryTransactions: clone(seed.INVENTORY_TRANSACTIONS),
+  jobCards: clone(seed.JOB_CARDS),
+  stageHistory: clone(seed.STAGE_HISTORY),
+  attachments: clone(seed.ATTACHMENTS),
+  partsUsed: clone(seed.PARTS_USED),
+  purchaseBills: clone(seed.PURCHASE_BILLS),
+  communicationLogs: clone(seed.COMMUNICATION_LOGS),
+  workflows: clone(seed.WORKFLOWS),
+  payments: clone(seed.PAYMENTS),
 });
 
 const STAGE_TO_STATUS: Record<StageName, JobCard["status"]> = {
@@ -106,6 +126,72 @@ const STAGE_TO_STATUS: Record<StageName, JobCard["status"]> = {
   Delivered: "Delivered",
 };
 
+const STAGE_TEMPLATE: Partial<Record<StageName, string>> = {
+  Received: "received",
+  "Customer Approval": "estimate_ready",
+  "Ready for Handover": "repair_complete",
+  Delivered: "delivered",
+};
+
+function contactFor(channel: Channel, customer: Customer) {
+  if (channel === "email") return customer.email;
+  if (channel === "whatsapp") return customer.whatsapp;
+  return customer.phone;
+}
+
+function buildTriggeredLogs(state: DemoState, job: JobCard, stageName: StageName, timestamp: string) {
+  const workflow = state.workflows.find((candidate) => candidate.active && candidate.jobType === job.jobType);
+  const step = workflow?.steps.find((candidate) => candidate.stepName === stageName);
+  const templateId = STAGE_TEMPLATE[stageName];
+  const template = MESSAGE_TEMPLATES.find((candidate) => candidate.id === templateId);
+  const customer = state.customers.find((candidate) => candidate.id === job.customerId);
+  const appliance = state.appliances.find((candidate) => candidate.id === job.applianceId);
+  if (!step || !template || !customer || !appliance) return [];
+
+  const channels = (Object.keys(step.triggers) as Channel[]).filter((channel) => step.triggers[channel] && template.channels.includes(channel));
+  return channels.map<CommunicationLog>((channel) => ({
+    id: nextId("comm"),
+    jobcardId: job.id,
+    customerId: customer.id,
+    applianceId: appliance.id,
+    stageName,
+    channel,
+    to: contactFor(channel, customer),
+    message: renderTemplate(template.body, {
+      customer: customer.name.split(" ")[0],
+      appliance: appliance.model,
+      jobId: job.id,
+      amount: job.estimateAmount == null ? "pending" : `SAR ${job.estimateAmount.toLocaleString()}`,
+    }),
+    status: "sent",
+    timestamp,
+  }));
+}
+
+function syncTechnicianStatuses(technicians: Technician[], jobs: JobCard[]) {
+  const activeTechnicianIds = new Set(jobs.filter((job) => job.status !== "Delivered" && job.technicianId).map((job) => job.technicianId));
+  return technicians.map((technician) => ({
+    ...technician,
+    status: activeTechnicianIds.has(technician.id) ? "On Job" as const : "Available" as const,
+  }));
+}
+
+function scheduleCommunicationReceipts(logs: CommunicationLog[]) {
+  for (const log of logs) {
+    const setStatus = (status: CommunicationLog["status"]) => {
+      useStore.setState((state) => ({
+        communicationLogs: state.communicationLogs.map((communication) => communication.id === log.id ? { ...communication, status } : communication),
+      }));
+    };
+    setTimeout(() => setStatus("delivered"), 2200);
+    if (log.channel === "whatsapp") setTimeout(() => setStatus("read"), 5500);
+  }
+}
+
+function result(ok: boolean, message: string): ActionResult {
+  return { ok, message };
+}
+
 export const useStore = create<DemoState>()(
   persist(
     (set, get) => ({
@@ -117,62 +203,80 @@ export const useStore = create<DemoState>()(
       sidebarCollapsed: false,
       maintenanceRemindersSent: {},
 
-      setRole: (r) => set({ role: r }),
-      setBranch: (b) => set({ selectedBranchId: b }),
-      setTheme: (t) => set({ theme: t }),
-      setLang: (l) => set({ lang: l }),
-      toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+      setRole: (role) => set({ role }),
+      setBranch: (selectedBranchId) => set({ selectedBranchId }),
+      setTheme: (theme) => set({ theme }),
+      setLang: (lang) => set({ lang }),
+      toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
 
-      addCustomer: (c) => {
-        const customer: Customer = { ...c, id: nextId("cust"), createdAt: new Date().toISOString(), whatsappVerified: false };
-        set((s) => ({ customers: [customer, ...s.customers] }));
+      addCustomer: (input) => {
+        const customer: Customer = { ...input, id: nextId("cust"), createdAt: new Date().toISOString(), whatsappVerified: false };
+        set((state) => ({ customers: [customer, ...state.customers] }));
         return customer;
       },
       verifyWhatsapp: (customerId) => {
-        set((s) => ({ customers: s.customers.map((c) => (c.id === customerId ? { ...c, whatsappVerified: true } : c)) }));
+        set((state) => ({ customers: state.customers.map((customer) => customer.id === customerId ? { ...customer, whatsappVerified: true } : customer) }));
       },
-      addAppliance: (a) => {
-        const appliance: Appliance = { ...a, id: nextId("app") };
-        set((s) => ({ appliances: [appliance, ...s.appliances] }));
+      addAppliance: (input) => {
+        const appliance: Appliance = { ...input, id: nextId("app") };
+        set((state) => ({ appliances: [appliance, ...state.appliances] }));
         return appliance;
       },
-      addBrand: (b) => {
-        const brand: Brand = { ...b, id: nextId("brand") };
-        set((s) => ({ brands: [brand, ...s.brands] }));
+      addBrand: (input) => {
+        const brand: Brand = { ...input, id: nextId("brand") };
+        set((state) => ({ brands: [brand, ...state.brands] }));
         return brand;
       },
-      addTechnician: (t) => {
-        const tech: Technician = { ...t, id: nextId("tech") };
-        set((s) => ({ technicians: [tech, ...s.technicians] }));
-        return tech;
+      addTechnician: (input) => {
+        const technician: Technician = { ...input, id: nextId("tech") };
+        set((state) => ({ technicians: [technician, ...state.technicians] }));
+        return technician;
       },
-      addInventoryItem: (i) => {
-        const item: InventoryItem = { ...i, id: nextId("item") };
-        set((s) => ({ inventoryItems: [item, ...s.inventoryItems] }));
+      addInventoryItem: (input) => {
+        const item: InventoryItem = { ...input, id: nextId("item") };
+        set((state) => ({ inventoryItems: [item, ...state.inventoryItems] }));
         return item;
       },
-      addInventoryTransaction: (t) => {
-        const txn: InventoryTransaction = { ...t, id: nextId("txn"), timestamp: new Date().toISOString() };
-        set((s) => {
-          const stock = [...s.inventoryStock];
+      addInventoryTransaction: (input) => {
+        const state = get();
+        if (!canPerform(state.role, "manage_inventory")) return result(false, "Your role cannot manage inventory.");
+        if (!state.inventoryItems.some((item) => item.id === input.itemId)) return result(false, "Inventory item not found.");
+        if (!state.inventoryLocations.some((location) => location.id === input.locationId)) return result(false, "Inventory location not found.");
+        if (input.qty <= 0) return result(false, "Quantity must be greater than zero.");
+        if (input.type === "transfer" && (!input.destLocationId || input.destLocationId === input.locationId)) return result(false, "Choose a different destination location.");
+        if (input.type === "transfer" && !state.inventoryLocations.some((location) => location.id === input.destLocationId)) return result(false, "Destination location not found.");
+        const sourceStock = state.inventoryStock.find((entry) => entry.itemId === input.itemId && entry.locationId === input.locationId)?.qty ?? 0;
+        if ((input.type === "issue" || input.type === "transfer") && sourceStock < input.qty) return result(false, `Only ${sourceStock} units are available at the source location.`);
+
+        const transaction: InventoryTransaction = { ...input, id: nextId("txn"), timestamp: new Date().toISOString() };
+        set((current) => {
+          const stock = [...current.inventoryStock];
           const applyDelta = (locationId: string, delta: number) => {
-            const idx = stock.findIndex((st) => st.itemId === t.itemId && st.locationId === locationId);
-            if (idx >= 0) stock[idx] = { ...stock[idx], qty: Math.max(0, stock[idx].qty + delta) };
-            else stock.push({ itemId: t.itemId, locationId, qty: Math.max(0, delta) });
+            const index = stock.findIndex((entry) => entry.itemId === input.itemId && entry.locationId === locationId);
+            if (index >= 0) stock[index] = { ...stock[index], qty: stock[index].qty + delta };
+            else stock.push({ itemId: input.itemId, locationId, qty: delta });
           };
-          if (t.type === "receive") applyDelta(t.locationId, t.qty);
-          if (t.type === "issue") applyDelta(t.locationId, -t.qty);
-          if (t.type === "return") applyDelta(t.locationId, t.qty);
-          if (t.type === "adjust") applyDelta(t.locationId, t.qty);
-          if (t.type === "transfer" && t.destLocationId) {
-            applyDelta(t.locationId, -t.qty);
-            applyDelta(t.destLocationId, t.qty);
+          if (input.type === "receive" || input.type === "return" || input.type === "adjust") applyDelta(input.locationId, input.qty);
+          if (input.type === "issue") applyDelta(input.locationId, -input.qty);
+          if (input.type === "transfer" && input.destLocationId) {
+            applyDelta(input.locationId, -input.qty);
+            applyDelta(input.destLocationId, input.qty);
           }
-          return { inventoryTransactions: [txn, ...s.inventoryTransactions], inventoryStock: stock };
+          return { inventoryTransactions: [transaction, ...current.inventoryTransactions], inventoryStock: stock };
         });
+        return result(true, "Inventory transaction recorded.");
       },
 
       createJobCard: ({ customerId, applianceId, jobType, problemDescription, branchId }) => {
+        const state = get();
+        if (!canPerform(state.role, "create_job")) return { ...result(false, "Your role cannot create job cards.") };
+        const customer = state.customers.find((candidate) => candidate.id === customerId);
+        const appliance = state.appliances.find((candidate) => candidate.id === applianceId);
+        if (!customer || !appliance) return { ...result(false, "Choose a valid customer and appliance.") };
+        if (appliance.customerId !== customer.id) return { ...result(false, "The selected appliance does not belong to this customer.") };
+        if (branchId !== customer.branchId) return { ...result(false, "Receiving branch must match the customer branch. Transfer the customer before opening this job.") };
+        if (problemDescription.trim().length < 4) return { ...result(false, "Describe the reported problem before creating the job.") };
+
         const now = new Date().toISOString();
         const job: JobCard = {
           id: nextId("job"),
@@ -183,107 +287,331 @@ export const useStore = create<DemoState>()(
           jobType,
           status: "Received",
           currentStage: "Received",
-          problemDescription,
+          problemDescription: problemDescription.trim(),
           estimateAmount: null,
           finalAmount: null,
           createdAt: now,
           updatedAt: now,
           scheduledAt: null,
           customerApproved: null,
+          diagnosisNotes: null,
+          repairNotes: null,
+          qaApproved: false,
+          customerSignature: null,
         };
-        set((s) => ({
-          jobCards: [job, ...s.jobCards],
-          stageHistory: [
-            { id: nextId("hist"), jobcardId: job.id, stageName: "Received", changedBy: "Front Desk", timestamp: now, notes: "Item received at counter." },
-            ...s.stageHistory,
-          ],
+        const history: JobCardStageHistory = { id: nextId("hist"), jobcardId: job.id, stageName: "Received", changedBy: "Front Desk", timestamp: now, notes: "Item received at counter." };
+        const logs = buildTriggeredLogs(state, job, "Received", now);
+        set((current) => ({
+          jobCards: [job, ...current.jobCards],
+          stageHistory: [history, ...current.stageHistory],
+          communicationLogs: [...logs, ...current.communicationLogs],
         }));
-        return job;
+        scheduleCommunicationReceipts(logs);
+        return { ...result(true, `Job card ${job.id} created.`), job };
       },
 
-      advanceStage: (jobcardId, stage, notes, changedBy) => {
+      advanceStage: (jobcardId, targetStage, notes, changedBy) => {
+        const state = get();
+        const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
+        if (!job) return result(false, "Job card not found.");
+        if (!canAdvanceCurrentStage(state.role, job.currentStage)) return result(false, `${state.role.replace("_", " ")} cannot complete ${job.currentStage}.`);
+        const workflow = state.workflows.find((candidate) => candidate.active && candidate.jobType === job.jobType);
+        const currentIndex = workflow?.steps.findIndex((step) => step.stepName === job.currentStage) ?? -1;
+        const nextStep = currentIndex >= 0 ? workflow?.steps[currentIndex + 1] : undefined;
+        if (!nextStep || nextStep.stepName !== targetStage) return result(false, "Workflow changed. Refresh the job before advancing.");
+        const blockers = stageBlockers(job, {
+          payments: state.payments.filter((payment) => payment.jobcardId === job.id),
+          purchaseBill: state.purchaseBills.find((bill) => bill.jobcardId === job.id),
+        });
+        if (blockers.length) return result(false, `Complete first: ${blockers.join(", ")}.`);
+
         const now = new Date().toISOString();
-        set((s) => ({
-          jobCards: s.jobCards.map((j) =>
-            j.id === jobcardId ? { ...j, currentStage: stage, status: STAGE_TO_STATUS[stage], updatedAt: now } : j
-          ),
-          stageHistory: [
-            { id: nextId("hist"), jobcardId, stageName: stage, changedBy, timestamp: now, notes },
-            ...s.stageHistory,
-          ],
-        }));
+        const updatedJob: JobCard = { ...job, currentStage: targetStage, status: STAGE_TO_STATUS[targetStage], updatedAt: now };
+        const history: JobCardStageHistory = { id: nextId("hist"), jobcardId, stageName: targetStage, changedBy, timestamp: now, notes };
+        const logs = buildTriggeredLogs(state, updatedJob, targetStage, now);
+        const jobs = state.jobCards.map((candidate) => candidate.id === jobcardId ? updatedJob : candidate);
+        set({
+          jobCards: jobs,
+          stageHistory: [history, ...state.stageHistory],
+          communicationLogs: [...logs, ...state.communicationLogs],
+          technicians: syncTechnicianStatuses(state.technicians, jobs),
+        });
+        scheduleCommunicationReceipts(logs);
+        return result(true, `Advanced to ${targetStage}.`);
       },
 
       assignTechnician: (jobcardId, technicianId) => {
-        set((s) => ({
-          jobCards: s.jobCards.map((j) => (j.id === jobcardId ? { ...j, technicianId, updatedAt: new Date().toISOString() } : j)),
-        }));
+        const state = get();
+        if (!canPerform(state.role, "assign_technician")) return result(false, "Your role cannot assign technicians.");
+        const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
+        const technician = state.technicians.find((candidate) => candidate.id === technicianId);
+        const appliance = state.appliances.find((candidate) => candidate.id === job?.applianceId);
+        if (!job || !technician || !appliance) return result(false, "Job, technician, or appliance was not found.");
+        if (job.status === "Delivered") return result(false, "Delivered jobs cannot be reassigned.");
+        if (technician.branchId !== job.branchId) return result(false, "Technician must belong to the job branch.");
+        if (!technician.skills.includes(appliance.category)) return result(false, `Technician is not qualified for ${appliance.category}.`);
+        if (technician.status === "Off Duty") return result(false, "Technician is off duty.");
+        const scheduled = new Date();
+        scheduled.setDate(scheduled.getDate() + 1);
+        scheduled.setHours(9, 0, 0, 0);
+        const jobs = state.jobCards.map((candidate) => candidate.id === jobcardId ? { ...candidate, technicianId, scheduledAt: candidate.scheduledAt ?? scheduled.toISOString(), updatedAt: new Date().toISOString() } : candidate);
+        set({ jobCards: jobs, technicians: syncTechnicianStatuses(state.technicians, jobs) });
+        return result(true, `Assigned to ${technician.name}.`);
       },
 
+      setDiagnosis: (jobcardId, notes) => {
+        const state = get();
+        if (!canPerform(state.role, "set_diagnosis")) return result(false, "Your role cannot record diagnosis notes.");
+        if (!notes.trim()) return result(false, "Diagnosis notes are required.");
+        const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
+        if (!job) return result(false, "Job card not found.");
+        if (job.currentStage !== "Diagnosis") return result(false, "Diagnosis notes can only be changed during Diagnosis.");
+        set({ jobCards: state.jobCards.map((job) => job.id === jobcardId ? { ...job, diagnosisNotes: notes.trim(), updatedAt: new Date().toISOString() } : job) });
+        return result(true, "Diagnosis notes saved.");
+      },
       setEstimate: (jobcardId, amount) => {
-        set((s) => ({
-          jobCards: s.jobCards.map((j) => (j.id === jobcardId ? { ...j, estimateAmount: amount, updatedAt: new Date().toISOString() } : j)),
-        }));
+        const state = get();
+        if (!canPerform(state.role, "set_estimate")) return result(false, "Your role cannot set estimates.");
+        const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
+        if (!job) return result(false, "Job card not found.");
+        if (job.currentStage !== "Estimate" && job.currentStage !== "Customer Approval") return result(false, "Estimates can only be changed before repair begins.");
+        const partsTotal = state.partsUsed.filter((part) => part.jobcardId === jobcardId).reduce((sum, part) => sum + part.totalPrice, 0);
+        if (!Number.isFinite(amount) || amount <= 0) return result(false, "Estimate must be greater than zero.");
+        if (amount < partsTotal) return result(false, `Estimate cannot be below the ${partsTotal.toLocaleString()} SAR parts total.`);
+        const now = new Date().toISOString();
+        const updatedJob = { ...job, estimateAmount: amount, customerApproved: null, updatedAt: now };
+        const logs = job.currentStage === "Customer Approval" ? buildTriggeredLogs(state, updatedJob, "Customer Approval", now) : [];
+        set({
+          jobCards: state.jobCards.map((candidate) => candidate.id === jobcardId ? updatedJob : candidate),
+          communicationLogs: [...logs, ...state.communicationLogs],
+        });
+        scheduleCommunicationReceipts(logs);
+        return result(true, `Estimate set to SAR ${amount.toLocaleString()}.`);
       },
-
-      approveCustomer: (jobcardId, approved) => {
-        set((s) => ({
-          jobCards: s.jobCards.map((j) => (j.id === jobcardId ? { ...j, customerApproved: approved, updatedAt: new Date().toISOString() } : j)),
-        }));
+      approveCustomer: (jobcardId, approved, source = "internal") => {
+        const state = get();
+        if (source === "internal" && !canPerform(state.role, "record_customer_approval")) return result(false, "Your role cannot record customer approval.");
+        const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
+        if (!job) return result(false, "Job card not found.");
+        if (job.currentStage !== "Customer Approval") return result(false, "Customer approval is only available at the approval stage.");
+        if ((job.estimateAmount ?? 0) <= 0) return result(false, "Set the estimate before recording approval.");
+        if (job.customerApproved === approved) return result(false, approved ? "Customer approval is already recorded." : "Customer decline is already recorded.");
+        const now = new Date().toISOString();
+        const template = MESSAGE_TEMPLATES.find((candidate) => candidate.id === (approved ? "approval_received" : "approval_declined"));
+        const customer = state.customers.find((candidate) => candidate.id === job.customerId);
+        const appliance = state.appliances.find((candidate) => candidate.id === job.applianceId);
+        const logs: CommunicationLog[] = template && customer && appliance ? [{
+          id: nextId("comm"), jobcardId: job.id, customerId: customer.id, applianceId: appliance.id, stageName: job.currentStage,
+          channel: "whatsapp", to: customer.whatsapp,
+          message: renderTemplate(template.body, { customer: customer.name.split(" ")[0], appliance: appliance.model, jobId: job.id, amount: `SAR ${job.estimateAmount?.toLocaleString()}` }),
+          status: "sent", timestamp: now,
+        }] : [];
+        set({
+          jobCards: state.jobCards.map((candidate) => candidate.id === jobcardId ? { ...candidate, customerApproved: approved, updatedAt: now } : candidate),
+          communicationLogs: [...logs, ...state.communicationLogs],
+        });
+        scheduleCommunicationReceipts(logs);
+        return result(true, approved ? "Customer approval recorded." : "Customer decline recorded.");
+      },
+      setRepairNotes: (jobcardId, notes) => {
+        const state = get();
+        if (!canPerform(state.role, "set_repair_notes")) return result(false, "Your role cannot record repair notes.");
+        if (!notes.trim()) return result(false, "Repair notes are required.");
+        const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
+        if (!job) return result(false, "Job card not found.");
+        if (job.currentStage !== "Repair") return result(false, "Repair notes can only be changed during Repair.");
+        set({ jobCards: state.jobCards.map((job) => job.id === jobcardId ? { ...job, repairNotes: notes.trim(), updatedAt: new Date().toISOString() } : job) });
+        return result(true, "Repair notes saved.");
+      },
+      setQaApproved: (jobcardId, approved) => {
+        const state = get();
+        if (!canPerform(state.role, "approve_qa")) return result(false, "Supervisor, Manager, or Admin approval is required.");
+        const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
+        if (!job) return result(false, "Job card not found.");
+        if (job.currentStage !== "QA") return result(false, "QA can only be approved during the QA stage.");
+        set({ jobCards: state.jobCards.map((job) => job.id === jobcardId ? { ...job, qaApproved: approved, updatedAt: new Date().toISOString() } : job) });
+        return result(true, approved ? "QA approved." : "QA approval removed.");
+      },
+      setFinalAmount: (jobcardId, amount) => {
+        const state = get();
+        if (!canPerform(state.role, "finalize_job")) return result(false, "Your role cannot finalize charges.");
+        const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
+        if (!job) return result(false, "Job card not found.");
+        if (job.currentStage !== "Ready for Handover") return result(false, "Final charges are confirmed at Ready for Handover.");
+        if (job.jobType !== "non_warranty") return result(false, "Warranty jobs do not require customer payment.");
+        const partsTotal = state.partsUsed.filter((part) => part.jobcardId === jobcardId).reduce((sum, part) => sum + part.totalPrice, 0);
+        if (!Number.isFinite(amount) || amount <= 0) return result(false, "Final amount must be greater than zero.");
+        if (amount < partsTotal) return result(false, `Final amount cannot be below the ${partsTotal.toLocaleString()} SAR parts total.`);
+        if ((job.estimateAmount ?? 0) > 0 && amount > (job.estimateAmount ?? 0)) return result(false, "Final amount cannot exceed the customer-approved estimate.");
+        if (state.payments.some((payment) => payment.jobcardId === jobcardId && payment.status === "paid")) return result(false, "Final amount cannot change after payment.");
+        set({ jobCards: state.jobCards.map((candidate) => candidate.id === jobcardId ? { ...candidate, finalAmount: amount, updatedAt: new Date().toISOString() } : candidate) });
+        return result(true, `Final amount set to SAR ${amount.toLocaleString()}.`);
+      },
+      captureCustomerSignature: (jobcardId, signature) => {
+        const state = get();
+        if (!canPerform(state.role, "capture_signature")) return result(false, "Your role cannot capture handover signatures.");
+        if (!signature.trim()) return result(false, "Customer name or signature is required.");
+        const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
+        if (!job) return result(false, "Job card not found.");
+        if (job.currentStage !== "Ready for Handover") return result(false, "Customer signature is captured at Ready for Handover.");
+        set({ jobCards: state.jobCards.map((job) => job.id === jobcardId ? { ...job, customerSignature: signature.trim(), updatedAt: new Date().toISOString() } : job) });
+        return result(true, "Customer signature captured.");
+      },
+      savePurchaseBill: (jobcardId, input) => {
+        const state = get();
+        if (!canPerform(state.role, "create_job")) return result(false, "Your role cannot record purchase bills.");
+        const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
+        if (!job) return result(false, "Job card not found.");
+        if (job.jobType !== "warranty" || job.currentStage !== "Warranty Validation") return result(false, "Purchase bills are recorded during Warranty Validation.");
+        if (!input.billNo.trim() || !input.vendorName.trim() || !input.billDate) return result(false, "Bill number, date, and vendor are required.");
+        const existing = state.purchaseBills.find((bill) => bill.jobcardId === jobcardId);
+        const bill: PurchaseBill = { ...input, id: existing?.id ?? nextId("bill"), jobcardId };
+        set({
+          purchaseBills: existing ? state.purchaseBills.map((candidate) => candidate.id === existing.id ? bill : candidate) : [bill, ...state.purchaseBills],
+          jobCards: state.jobCards.map((candidate) => candidate.id === jobcardId ? { ...candidate, updatedAt: new Date().toISOString() } : candidate),
+        });
+        return result(true, "Purchase bill recorded.");
       },
 
       addPartUsed: (jobcardId, itemId, qty) => {
-        const item = get().inventoryItems.find((i) => i.id === itemId);
-        if (!item) return;
-        const part: JobCardPartUsed = { id: nextId("part"), jobcardId, itemId, qty, unitPrice: item.unitPrice, totalPrice: item.unitPrice * qty };
-        set((s) => ({ partsUsed: [part, ...s.partsUsed] }));
+        const state = get();
+        if (!canPerform(state.role, "add_part")) return result(false, "Your role cannot issue parts to jobs.");
+        const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
+        const item = state.inventoryItems.find((candidate) => candidate.id === itemId);
+        if (!job || !item) return result(false, "Job card or part was not found.");
+        if (job.currentStage !== "Diagnosis" && job.currentStage !== "Repair") return result(false, "Parts can only be issued during Diagnosis or Repair.");
+        if (!Number.isInteger(qty) || qty <= 0) return result(false, "Part quantity must be a positive whole number.");
+        const currentPartsTotal = state.partsUsed.filter((part) => part.jobcardId === jobcardId).reduce((sum, part) => sum + part.totalPrice, 0);
+        if (job.jobType === "non_warranty" && job.currentStage === "Repair" && job.customerApproved === true && currentPartsTotal + item.unitPrice * qty > (job.estimateAmount ?? 0)) {
+          return result(false, "This part would exceed the approved estimate. Record a revised estimate and customer approval before repair.");
+        }
+        const branchLocations = state.inventoryLocations.filter((location) => location.branchId === job.branchId);
+        const preferredLocationId = job.technicianId ? `van-${job.technicianId}` : undefined;
+        const stockOptions = state.inventoryStock
+          .filter((entry) => entry.itemId === itemId && entry.qty >= qty && branchLocations.some((location) => location.id === entry.locationId))
+          .sort((a, b) => Number(b.locationId === preferredLocationId) - Number(a.locationId === preferredLocationId) || b.qty - a.qty);
+        const source = stockOptions[0];
+        if (!source) return result(false, `Insufficient ${item.name} stock in this job's branch.`);
+        const now = new Date().toISOString();
+        const part: JobCardPartUsed = { id: nextId("part"), jobcardId, itemId, locationId: source.locationId, qty, unitPrice: item.unitPrice, totalPrice: item.unitPrice * qty };
+        const transaction: InventoryTransaction = { id: nextId("txn"), itemId, locationId: source.locationId, jobcardId, type: "issue", qty, timestamp: now, createdBy: "Job workflow" };
+        set({
+          partsUsed: [part, ...state.partsUsed],
+          inventoryTransactions: [transaction, ...state.inventoryTransactions],
+          inventoryStock: state.inventoryStock.map((entry) => entry.itemId === itemId && entry.locationId === source.locationId ? { ...entry, qty: entry.qty - qty } : entry),
+          jobCards: state.jobCards.map((candidate) => candidate.id === jobcardId ? { ...candidate, updatedAt: now } : candidate),
+        });
+        return result(true, `${qty} ${item.name} issued to ${job.id}.`);
       },
-
+      removePartUsed: (partUsedId) => {
+        const state = get();
+        if (!canPerform(state.role, "add_part")) return result(false, "Your role cannot return job parts.");
+        const part = state.partsUsed.find((candidate) => candidate.id === partUsedId);
+        if (!part) return result(false, "Job part was not found.");
+        const job = state.jobCards.find((candidate) => candidate.id === part.jobcardId);
+        if (!job || (job.currentStage !== "Diagnosis" && job.currentStage !== "Repair")) return result(false, "Parts can only be returned during Diagnosis or Repair.");
+        const now = new Date().toISOString();
+        const transaction: InventoryTransaction = { id: nextId("txn"), itemId: part.itemId, locationId: part.locationId, jobcardId: part.jobcardId, type: "return", qty: part.qty, timestamp: now, createdBy: "Job workflow" };
+        const existingStock = state.inventoryStock.some((entry) => entry.itemId === part.itemId && entry.locationId === part.locationId);
+        set({
+          partsUsed: state.partsUsed.filter((candidate) => candidate.id !== partUsedId),
+          inventoryTransactions: [transaction, ...state.inventoryTransactions],
+          inventoryStock: existingStock
+            ? state.inventoryStock.map((entry) => entry.itemId === part.itemId && entry.locationId === part.locationId ? { ...entry, qty: entry.qty + part.qty } : entry)
+            : [...state.inventoryStock, { itemId: part.itemId, locationId: part.locationId, qty: part.qty }],
+          jobCards: state.jobCards.map((job) => job.id === part.jobcardId ? { ...job, updatedAt: now } : job),
+        });
+        return result(true, "Part returned to inventory.");
+      },
       addAttachment: (jobcardId, stageName, label) => {
-        const att: JobCardAttachment = { id: nextId("att"), jobcardId, stageName, fileUrl: "#", label, uploadedBy: "You", timestamp: new Date().toISOString() };
-        set((s) => ({ attachments: [att, ...s.attachments] }));
+        const state = get();
+        if (!state.jobCards.some((job) => job.id === jobcardId)) return result(false, "Job card not found.");
+        const attachment: JobCardAttachment = { id: nextId("att"), jobcardId, stageName, fileUrl: "#", label, uploadedBy: "You", timestamp: new Date().toISOString() };
+        set({ attachments: [attachment, ...state.attachments] });
+        return result(true, "Attachment added.");
       },
-
       sendCommunication: (jobcardId, channel, message) => {
-        const id = nextId("comm");
-        const log: CommunicationLog = { id, jobcardId, channel, to: "+9665xxxxxxxx", message, status: "sent", timestamp: new Date().toISOString() };
-        set((s) => ({ communicationLogs: [log, ...s.communicationLogs] }));
-        // Simulate a delivery receipt arriving shortly after send, the way a real
-        // WhatsApp/SMS webhook callback would update status asynchronously.
-        const setStatus = (status: CommunicationLog["status"]) =>
-          set((s) => ({ communicationLogs: s.communicationLogs.map((c) => (c.id === id ? { ...c, status } : c)) }));
-        setTimeout(() => setStatus("delivered"), 2200);
-        if (channel === "whatsapp") setTimeout(() => setStatus("read"), 5500);
+        const state = get();
+        if (!canPerform(state.role, "send_message")) return result(false, "Your role cannot send customer messages.");
+        const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
+        const customer = state.customers.find((candidate) => candidate.id === job?.customerId);
+        if (!job || !customer || !message.trim()) return result(false, "Job, customer, and message are required.");
+        const log: CommunicationLog = {
+          id: nextId("comm"), jobcardId, customerId: customer.id, applianceId: job.applianceId, stageName: job.currentStage,
+          channel, to: contactFor(channel, customer), message: message.trim(), status: "sent", timestamp: new Date().toISOString(),
+        };
+        set({ communicationLogs: [log, ...state.communicationLogs] });
+        scheduleCommunicationReceipts([log]);
+        return result(true, `Message sent via ${channel === "whatsapp" ? "WhatsApp" : channel.toUpperCase()}.`);
       },
 
       updateWorkflowStep: (workflowId, stepOrder, patch) => {
-        set((s) => ({
-          workflows: s.workflows.map((w) =>
-            w.id === workflowId
-              ? { ...w, steps: w.steps.map((step) => (step.stepOrder === stepOrder ? { ...step, ...patch } : step)) }
-              : w
-          ),
-        }));
+        const state = get();
+        if (!canPerform(state.role, "edit_workflow")) return result(false, "Your role cannot edit workflows.");
+        set({ workflows: state.workflows.map((workflow) => workflow.id === workflowId ? { ...workflow, steps: workflow.steps.map((step) => step.stepOrder === stepOrder ? { ...step, ...patch } : step) } : workflow) });
+        return result(true, "Workflow step updated.");
       },
-
       addWorkflowStep: (workflowId, step) => {
-        set((s) => ({
-          workflows: s.workflows.map((w) => (w.id === workflowId ? { ...w, steps: [...w.steps, step] } : w)),
-        }));
+        const state = get();
+        if (!canPerform(state.role, "edit_workflow")) return result(false, "Your role cannot edit workflows.");
+        set({ workflows: state.workflows.map((workflow) => workflow.id === workflowId ? { ...workflow, steps: [...workflow.steps, step].sort((a, b) => a.stepOrder - b.stepOrder) } : workflow) });
+        return result(true, "Workflow step added.");
       },
-
       sendMaintenanceReminder: (applianceId) => {
-        set((s) => ({ maintenanceRemindersSent: { ...s.maintenanceRemindersSent, [applianceId]: new Date().toISOString() } }));
+        const state = get();
+        const appliance = state.appliances.find((candidate) => candidate.id === applianceId);
+        const customer = state.customers.find((candidate) => candidate.id === appliance?.customerId);
+        const template = MESSAGE_TEMPLATES.find((candidate) => candidate.id === "maintenance_reminder");
+        if (!appliance || !customer || !template) return result(false, "Appliance or customer was not found.");
+        if (state.maintenanceRemindersSent[applianceId]) return result(false, "A maintenance reminder was already sent for this appliance.");
+        const now = new Date().toISOString();
+        const log: CommunicationLog = {
+          id: nextId("comm"), customerId: customer.id, applianceId: appliance.id, channel: "whatsapp", to: customer.whatsapp,
+          message: renderTemplate(template.body, { customer: customer.name.split(" ")[0], appliance: appliance.model, jobId: "", amount: "" }),
+          status: "sent", timestamp: now,
+        };
+        set({ maintenanceRemindersSent: { ...state.maintenanceRemindersSent, [applianceId]: now }, communicationLogs: [log, ...state.communicationLogs] });
+        scheduleCommunicationReceipts([log]);
+        return result(true, `Maintenance reminder sent for ${appliance.model}.`);
+      },
+      recordPayment: (jobcardId, method, amount, installments, source = "internal") => {
+        const state = get();
+        if (source === "internal" && !canPerform(state.role, "collect_payment")) return { ...result(false, "Your role cannot collect customer payments.") };
+        const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
+        if (!job || (job.finalAmount ?? 0) <= 0) return { ...result(false, "Set the final amount before taking payment.") };
+        if (job.currentStage !== "Ready for Handover" && job.currentStage !== "Delivered") return { ...result(false, "Payment is collected at handover.") };
+        const paid = state.payments.filter((payment) => payment.jobcardId === jobcardId && payment.status === "paid").reduce((sum, payment) => sum + payment.amount, 0);
+        const outstanding = Math.max(0, (job.finalAmount ?? 0) - paid);
+        if (outstanding <= 0) return { ...result(false, "This job is already paid.") };
+        if (Math.abs(amount - outstanding) > 0.01) return { ...result(false, `Payment must match the outstanding SAR ${outstanding.toLocaleString()}.`) };
+        const now = new Date().toISOString();
+        const payment: Payment = { id: nextId("pay"), jobcardId, method, amount, installments, status: "paid", timestamp: now };
+        set({
+          payments: [payment, ...state.payments],
+          jobCards: state.jobCards.map((candidate) => candidate.id === jobcardId ? { ...candidate, updatedAt: now } : candidate),
+        });
+        return { ...result(true, `Payment of SAR ${amount.toLocaleString()} recorded.`), payment };
       },
 
-      recordPayment: (jobcardId, method, amount, installments) => {
-        const payment: Payment = { id: nextId("pay"), jobcardId, method, amount, installments, status: "paid", timestamp: new Date().toISOString() };
-        set((s) => ({ payments: [payment, ...s.payments] }));
-        return payment;
+      resetDemoData: () => {
+        counter = COUNTER_START;
+        set({
+          ...initialSlice(),
+          role: "admin",
+          selectedBranchId: "all",
+          theme: "light",
+          lang: "en",
+          sidebarCollapsed: false,
+          maintenanceRemindersSent: {},
+        });
       },
-
-      resetDemoData: () => set({ ...initialSlice(), maintenanceRemindersSent: {} }),
     }),
-    { name: "crm-demo-store-v1" }
+    { name: "crm-demo-store-v2", version: 2 }
   )
 );
+
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (event) => {
+    if (event.key === "crm-demo-store-v2") void useStore.persist.rehydrate();
+  });
+}

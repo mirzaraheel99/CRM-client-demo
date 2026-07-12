@@ -8,15 +8,17 @@ import { formatDate } from "../../lib/utils";
 import { toast } from "../../lib/toast";
 import { useSort } from "../../lib/useSort";
 import type { Customer } from "../../lib/types";
+import { canPerform } from "../../lib/permissions";
 
 type SortKey = "name" | "phone" | "appliances" | "jobs" | "since";
 const PAGE_SIZE = 15;
 
 export default function CustomerList() {
-  const { customers, appliances, jobCards, selectedBranchId, addCustomer } = useStore();
+  const { customers, appliances, jobCards, branches, selectedBranchId, role, addCustomer } = useStore();
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name: "", phone: "", whatsapp: "", email: "", address: "" });
+  const defaultBranchId = selectedBranchId === "all" ? branches[0]?.id ?? "" : selectedBranchId;
+  const [form, setForm] = useState({ name: "", phone: "", whatsapp: "", email: "", address: "", branchId: defaultBranchId });
   const [page, setPage] = useState(1);
 
   const applianceCounts = useMemo(() => {
@@ -52,9 +54,8 @@ export default function CustomerList() {
 
   function submit() {
     if (!form.name.trim() || !form.phone.trim()) return;
-    const branchId = selectedBranchId === "all" ? "br-1" : selectedBranchId;
-    addCustomer({ ...form, branchId });
-    setForm({ name: "", phone: "", whatsapp: "", email: "", address: "" });
+    addCustomer(form);
+    setForm({ name: "", phone: "", whatsapp: "", email: "", address: "", branchId: defaultBranchId });
     setOpen(false);
     toast(`${form.name} added to customers.`);
   }
@@ -66,7 +67,7 @@ export default function CustomerList() {
           <h1 className="text-xl font-semibold tracking-tight">Customers</h1>
           <p className="text-sm text-[var(--color-ink-muted)] mt-0.5">{rows.length} customers</p>
         </div>
-        <Button onClick={() => setOpen(true)}>+ Add Customer</Button>
+        {canPerform(role, "create_customer") && <Button onClick={() => { setForm((current) => ({ ...current, branchId: defaultBranchId })); setOpen(true); }}>+ Add Customer</Button>}
       </div>
 
       <Card>
@@ -138,6 +139,11 @@ export default function CustomerList() {
           <Field label="WhatsApp"><Input value={form.whatsapp} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} /></Field>
           <Field label="Email"><Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
           <Field label="Address"><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></Field>
+          <Field label="Branch">
+            <select value={form.branchId} onChange={(e) => setForm({ ...form, branchId: e.target.value })} className="w-full rounded-lg border bg-[var(--color-surface-2)] px-3 py-2 text-sm outline-none [border-color:var(--color-border)]">
+              {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+            </select>
+          </Field>
           <Button className="w-full justify-center" onClick={submit}>Save Customer</Button>
         </div>
       </Modal>

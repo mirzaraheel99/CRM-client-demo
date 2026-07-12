@@ -79,8 +79,10 @@ export default function Workflow() {
               <p className="text-xs text-[var(--color-ink-muted)]">{step.approverRole ? `Approver: ${step.approverRole}` : "No approver assigned"}</p>
             </div>
             <button
-              onClick={() => { updateWorkflowStep(workflow.id, step.stepOrder, { approvalRequired: !step.approvalRequired }); toast(`Approval ${step.approvalRequired ? "disabled" : "enabled"} for ${step.stepName}.`); }}
-              className={cx("h-6 w-11 rounded-full transition-colors relative", step.approvalRequired ? "bg-[var(--color-brand-1)]" : "bg-black/15 dark:bg-white/15")}
+              type="button"
+              disabled
+              title="Approval safeguards are fixed in this demo"
+              className={cx("h-6 w-11 rounded-full relative cursor-not-allowed opacity-70", step.approvalRequired ? "bg-[var(--color-brand-1)]" : "bg-black/15 dark:bg-white/15")}
             >
               <span className={cx("absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform", step.approvalRequired ? "translate-x-5" : "translate-x-0.5")} />
             </button>
@@ -92,7 +94,7 @@ export default function Workflow() {
               <div key={ch} className="flex items-center justify-between">
                 <span className="text-sm capitalize text-[var(--color-ink-secondary)]">{ch}</span>
                 <button
-                  onClick={() => { updateWorkflowStep(workflow.id, step.stepOrder, { triggers: { ...step.triggers, [ch]: !step.triggers[ch] } }); toast(`${ch.toUpperCase()} trigger ${step.triggers[ch] ? "disabled" : "enabled"} for ${step.stepName}.`); }}
+                  onClick={() => { const result = updateWorkflowStep(workflow.id, step.stepOrder, { triggers: { ...step.triggers, [ch]: !step.triggers[ch] } }); toast(result.message, result.ok ? "success" : "error"); }}
                   className={cx("h-6 w-11 rounded-full transition-colors relative", step.triggers[ch] ? "bg-[var(--color-brand-1)]" : "bg-black/15 dark:bg-white/15")}
                 >
                   <span className={cx("absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform", step.triggers[ch] ? "translate-x-5" : "translate-x-0.5")} />

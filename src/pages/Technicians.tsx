@@ -3,24 +3,28 @@ import { useStore } from "../lib/store";
 import { Card, Button, Input, Select, Field, Modal, Badge, Avatar, Tabs } from "../components/ui";
 import { toast } from "../lib/toast";
 import type { ApplianceCategory } from "../lib/types";
+import { filterByBranch } from "../lib/selectors";
 
 const CATEGORIES: ApplianceCategory[] = ["AC", "Refrigerator", "Washer", "Mobile", "TV", "Microwave"];
 const TABS = ["Technician List", "Allocation Calendar"];
 
 export default function Technicians() {
-  const { technicians, jobCards, customers, addTechnician } = useStore();
+  const { technicians, jobCards, customers, branches, selectedBranchId, addTechnician } = useStore();
   const [tab, setTab] = useState(TABS[0]);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name: "", phone: "", zone: "Zone A", skills: [] as ApplianceCategory[], branchId: "br-1", status: "Available" as const, avatarColor: "#2a78d6" });
+  const defaultBranchId = selectedBranchId === "all" ? branches[0]?.id ?? "" : selectedBranchId;
+  const [form, setForm] = useState({ name: "", phone: "", zone: "Zone A", skills: [] as ApplianceCategory[], branchId: defaultBranchId, status: "Available" as const, avatarColor: "#2a78d6" });
+  const scopedTechnicians = filterByBranch(technicians, selectedBranchId);
+  const scopedJobs = filterByBranch(jobCards, selectedBranchId);
 
   function toggleSkill(s: ApplianceCategory) {
     setForm((f) => ({ ...f, skills: f.skills.includes(s) ? f.skills.filter((x) => x !== s) : [...f.skills, s] }));
   }
 
   function submit() {
-    if (!form.name.trim() || !form.phone.trim()) return;
+    if (!form.name.trim() || !form.phone.trim() || !form.branchId || form.skills.length === 0) return;
     addTechnician(form);
-    setForm({ name: "", phone: "", zone: "Zone A", skills: [], branchId: "br-1", status: "Available", avatarColor: "#2a78d6" });
+    setForm({ name: "", phone: "", zone: "Zone A", skills: [], branchId: defaultBranchId, status: "Available", avatarColor: "#2a78d6" });
     setOpen(false);
     toast(`${form.name} added to technicians.`);
   }
@@ -38,9 +42,9 @@ export default function Technicians() {
       <div className="flex items-center justify-between flex-wrap gap-3 animate-rise-in">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Technicians</h1>
-          <p className="text-sm text-[var(--color-ink-muted)] mt-0.5">{technicians.length} technicians across all branches</p>
+          <p className="text-sm text-[var(--color-ink-muted)] mt-0.5">{scopedTechnicians.length} technicians in the selected branch scope</p>
         </div>
-        <Button onClick={() => setOpen(true)}>+ Add Technician</Button>
+        <Button onClick={() => { setForm((current) => ({ ...current, branchId: defaultBranchId })); setOpen(true); }}>+ Add Technician</Button>
       </div>
 
       <Card padded={false}>
@@ -48,8 +52,8 @@ export default function Technicians() {
         <div className="p-5">
           {tab === "Technician List" && (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {technicians.map((t) => {
-                const activeJobs = jobCards.filter((j) => j.technicianId === t.id && j.status !== "Delivered").length;
+              {scopedTechnicians.map((t) => {
+                const activeJobs = scopedJobs.filter((j) => j.technicianId === t.id && j.status !== "Delivered").length;
                 return (
                   <Card key={t.id} interactive className="space-y-3">
                     <div className="flex items-center gap-3">
@@ -84,11 +88,11 @@ export default function Technicians() {
                   </tr>
                 </thead>
                 <tbody>
-                  {technicians.map((t) => (
+                  {scopedTechnicians.map((t) => (
                     <tr key={t.id} className="border-t [border-color:var(--color-border)]">
                       <td className="py-2 pr-3 font-medium sticky left-0 bg-[var(--color-surface-1)] whitespace-nowrap">{t.name}</td>
                       {days.map((d) => {
-                        const dayJobs = jobCards.filter(
+                        const dayJobs = scopedJobs.filter(
                           (j) => j.technicianId === t.id && j.scheduledAt && new Date(j.scheduledAt).toDateString() === d.toDateString()
                         );
                         return (
@@ -119,6 +123,11 @@ export default function Technicians() {
           <Field label="Zone">
             <Select value={form.zone} onChange={(e) => setForm({ ...form, zone: e.target.value })}>
               <option>Zone A</option><option>Zone B</option><option>Zone C</option>
+            </Select>
+          </Field>
+          <Field label="Branch">
+            <Select value={form.branchId} onChange={(e) => setForm({ ...form, branchId: e.target.value })}>
+              {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
             </Select>
           </Field>
           <Field label="Skills">

@@ -3,14 +3,16 @@ import { Link } from "react-router-dom";
 import { Radar, CheckCircle2, Sparkles } from "lucide-react";
 import { useStore } from "../lib/store";
 import { Card, CardHeader, Badge, Button, StatTile } from "../components/ui";
-import { predictiveMaintenanceCandidates } from "../lib/selectors";
+import { appliancesByBranch, filterByBranch, predictiveMaintenanceCandidates } from "../lib/selectors";
 import { relativeTime } from "../lib/utils";
 import { toast } from "../lib/toast";
 
 export default function PredictiveMaintenance() {
-  const { appliances, jobCards, brands, customers, maintenanceRemindersSent, sendMaintenanceReminder } = useStore();
+  const { appliances, jobCards, brands, customers, selectedBranchId, maintenanceRemindersSent, sendMaintenanceReminder } = useStore();
 
-  const candidates = useMemo(() => predictiveMaintenanceCandidates(appliances, jobCards, brands), [appliances, jobCards, brands]);
+  const scopedAppliances = useMemo(() => appliancesByBranch(appliances, customers, selectedBranchId), [appliances, customers, selectedBranchId]);
+  const scopedJobs = useMemo(() => filterByBranch(jobCards, selectedBranchId), [jobCards, selectedBranchId]);
+  const candidates = useMemo(() => predictiveMaintenanceCandidates(scopedAppliances, scopedJobs, brands), [scopedAppliances, scopedJobs, brands]);
   const custMap = useMemo(() => new Map(customers.map((c) => [c.id, c])), [customers]);
   const brandMap = useMemo(() => new Map(brands.map((b) => [b.id, b])), [brands]);
 
@@ -76,7 +78,7 @@ export default function PredictiveMaintenance() {
                       <span className="text-xs text-[var(--color-status-good)] flex items-center gap-1"><CheckCircle2 size={13} /> Reminded {relativeTime(sent)}</span>
                     ) : (
                       <div className="flex items-center gap-2">
-                        <Button size="sm" variant="secondary" onClick={() => { sendMaintenanceReminder(appliance.id); toast(`Maintenance reminder sent for ${appliance.model}.`); }}>Send Reminder</Button>
+                        <Button size="sm" variant="secondary" onClick={() => { const result = sendMaintenanceReminder(appliance.id); toast(result.message, result.ok ? "success" : "error"); }}>Send Reminder</Button>
                         <Link to={`/jobcards/new?customerId=${appliance.customerId}&applianceId=${appliance.id}`}>
                           <Button size="sm">Create Job Card</Button>
                         </Link>

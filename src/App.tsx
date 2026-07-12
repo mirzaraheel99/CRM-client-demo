@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Routes, Route, useLocation } from "react-router-dom";
 import { useStore } from "./lib/store";
+import { canAccessPath } from "./lib/permissions";
 import { Shell } from "./components/Shell";
 import { PageSkeleton } from "./components/ui";
 
@@ -23,6 +24,13 @@ const MobilePreview = lazy(() => import("./pages/Mobile/Preview"));
 const TrackingPage = lazy(() => import("./pages/Tracking"));
 
 function ShellRoutes() {
+  const role = useStore((state) => state.role);
+  const location = useLocation();
+
+  if (!canAccessPath(role, location.pathname)) {
+    return <Navigate to="/" replace />;
+  }
+
   return (
     <Shell>
       <Suspense fallback={<PageSkeleton />}>

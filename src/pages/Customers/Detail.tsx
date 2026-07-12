@@ -9,13 +9,13 @@ import { formatDate, formatDateTime } from "../../lib/utils";
 export default function CustomerDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { customers, appliances, jobCards, brands, communicationLogs } = useStore();
-  const customer = customers.find((c) => c.id === id);
+  const { customers, appliances, jobCards, brands, communicationLogs, selectedBranchId } = useStore();
+  const customer = customers.find((candidate) => candidate.id === id && (selectedBranchId === "all" || candidate.branchId === selectedBranchId));
   if (!customer) return <p className="text-sm text-[var(--color-ink-muted)]">Customer not found.</p>;
 
   const custAppliances = appliances.filter((a) => a.customerId === id);
   const custJobs = jobCards.filter((j) => j.customerId === id).sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
-  const custComms = communicationLogs.filter((c) => custJobs.some((j) => j.id === c.jobcardId)).sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp)).slice(0, 10);
+  const custComms = communicationLogs.filter((communication) => communication.customerId === customer.id).sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp)).slice(0, 10);
 
   return (
     <div className="space-y-5">

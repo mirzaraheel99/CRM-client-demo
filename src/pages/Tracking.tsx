@@ -46,7 +46,7 @@ export default function TrackingPage() {
   const jobPayments = payments.filter((p) => p.jobcardId === job.id);
 
   const stepIdx = workflow?.steps.findIndex((s) => s.stepName === job.currentStage) ?? -1;
-  const needsApproval = job.currentStage === "Customer Approval" && job.customerApproved == null;
+  const needsApproval = job.currentStage === "Customer Approval" && job.customerApproved !== true;
   const canPay = job.jobType === "non_warranty" && (job.status === "Ready" || job.status === "Delivered") && job.finalAmount != null;
 
   return (
@@ -97,23 +97,23 @@ export default function TrackingPage() {
 
         {needsApproval && (
           <Card className="border-2 [border-color:var(--color-brand-1)]">
-            <p className="text-sm font-medium mb-1">Your approval is needed to proceed</p>
+            <p className="text-sm font-medium mb-1">{job.customerApproved === false ? "You declined this estimate" : "Your approval is needed to proceed"}</p>
             <p className="text-xs text-[var(--color-ink-secondary)] mb-3">
               Estimated cost: <span className="font-semibold">{formatCurrency(job.estimateAmount)}</span> for parts + labor.
             </p>
             <div className="flex gap-2">
-              <Button onClick={() => { approveCustomer(job.id, true); toast("Estimate approved — we'll get started."); }}><CheckCircle2 size={14} /> Approve</Button>
-              <Button variant="danger" onClick={() => { approveCustomer(job.id, false); toast("Estimate declined.", "info"); }}><XCircle size={14} /> Decline</Button>
+              <Button onClick={() => { const result = approveCustomer(job.id, true, "customer"); toast(result.message, result.ok ? "success" : "error"); }}><CheckCircle2 size={14} /> Approve</Button>
+              {job.customerApproved == null && <Button variant="danger" onClick={() => { const result = approveCustomer(job.id, false, "customer"); toast(result.message, result.ok ? "info" : "error"); }}><XCircle size={14} /> Decline</Button>}
             </div>
           </Card>
         )}
-        {job.currentStage === "Customer Approval" && job.customerApproved != null && (
+        {job.currentStage === "Customer Approval" && job.customerApproved === true && (
           <Card>
             <Badge tone={job.customerApproved ? "good" : "critical"}>{job.customerApproved ? "You approved this estimate" : "You declined this estimate"}</Badge>
           </Card>
         )}
 
-        {canPay && <PaymentPanel jobcardId={job.id} amount={job.finalAmount} payments={jobPayments} />}
+        {canPay && <PaymentPanel jobcardId={job.id} amount={job.finalAmount} payments={jobPayments} source="customer" />}
 
         <Card>
           <p className="text-sm font-semibold mb-3">Progress timeline</p>

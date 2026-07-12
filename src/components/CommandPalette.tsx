@@ -6,6 +6,8 @@ import {
   UserCog, GitBranch, MessageSquare, BarChart3, Smartphone, Radar, ClipboardPlus,
 } from "lucide-react";
 import { useStore } from "../lib/store";
+import { canAccessPath } from "../lib/permissions";
+import { appliancesByBranch, filterByBranch } from "../lib/selectors";
 
 interface PaletteStore {
   open: boolean;
@@ -44,7 +46,7 @@ const STATIC_DESTINATIONS = [
 
 export function CommandPalette() {
   const navigate = useNavigate();
-  const { jobCards, customers, appliances } = useStore();
+  const { jobCards, customers, appliances, role, selectedBranchId } = useStore();
   const { open, setOpen } = useCommandPaletteStore();
   const [query, setQuery] = useState("");
   const [activeIdx, setActiveIdx] = useState(0);
@@ -60,7 +62,7 @@ export function CommandPalette() {
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [setOpen]);
 
   useEffect(() => {
     if (open) {
@@ -72,9 +74,12 @@ export function CommandPalette() {
 
   const custMap = useMemo(() => new Map(customers.map((c) => [c.id, c])), [customers]);
   const appMap = useMemo(() => new Map(appliances.map((a) => [a.id, a])), [appliances]);
+  const scopedJobs = useMemo(() => filterByBranch(jobCards, selectedBranchId), [jobCards, selectedBranchId]);
+  const scopedCustomers = useMemo(() => filterByBranch(customers, selectedBranchId), [customers, selectedBranchId]);
+  const scopedAppliances = useMemo(() => appliancesByBranch(appliances, customers, selectedBranchId), [appliances, customers, selectedBranchId]);
 
   const commands: Command[] = useMemo(() => {
-    const nav: Command[] = STATIC_DESTINATIONS.map((d) => ({
+    const nav: Command[] = STATIC_DESTINATIONS.filter((destination) => canAccessPath(role, destination.to)).map((d) => ({
       id: `nav-${d.to}`,
       label: d.label,
       hint: "Go to page",
@@ -82,7 +87,7 @@ export function CommandPalette() {
       action: () => navigate(d.to),
     }));
 
-    const jobs: Command[] = jobCards.slice(0, 300).map((j) => {
+    const jobs: Command[] = scopedJobs.slice(0, 300).map((j) => {
       const cust = custMap.get(j.customerId)?.name ?? "";
       const app = appMap.get(j.applianceId)?.model ?? "";
       return {
@@ -95,7 +100,7 @@ export function CommandPalette() {
       };
     });
 
-    const custs: Command[] = customers.slice(0, 300).map((c) => ({
+    const custs: Command[] = scopedCustomers.slice(0, 300).map((c) => ({
       id: `cust-${c.id}`,
       label: c.name,
       hint: c.phone,
@@ -104,7 +109,7 @@ export function CommandPalette() {
       keywords: `${c.name} ${c.phone}`.toLowerCase(),
     }));
 
-    const apps: Command[] = appliances.slice(0, 300).map((a) => ({
+    const apps: Command[] = scopedAppliances.slice(0, 300).map((a) => ({
       id: `app-${a.id}`,
       label: a.model,
       hint: `Serial ${a.serialNo}`,
@@ -114,7 +119,7 @@ export function CommandPalette() {
     }));
 
     return [...nav, ...jobs, ...custs, ...apps];
-  }, [jobCards, customers, appliances, custMap, appMap, navigate]);
+  }, [scopedJobs, scopedCustomers, scopedAppliances, custMap, appMap, navigate, role]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

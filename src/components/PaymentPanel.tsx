@@ -6,11 +6,12 @@ import { toast } from "../lib/toast";
 import { formatCurrency, formatDateTime } from "../lib/utils";
 import { PAYMENT_METHOD_LABELS, BNPL_METHODS } from "../lib/payments";
 import type { Payment, PaymentMethod } from "../lib/types";
+import { canPerform } from "../lib/permissions";
 
 const METHODS: PaymentMethod[] = ["mada", "apple_pay", "stc_pay", "tabby", "tamara", "cash"];
 
-export function PaymentPanel({ jobcardId, amount, payments }: { jobcardId: string; amount: number | null; payments: Payment[] }) {
-  const recordPayment = useStore((s) => s.recordPayment);
+export function PaymentPanel({ jobcardId, amount, payments, source = "internal" }: { jobcardId: string; amount: number | null; payments: Payment[]; source?: "internal" | "customer" }) {
+  const { recordPayment, role } = useStore();
   const [selected, setSelected] = useState<PaymentMethod | null>(null);
   const [processing, setProcessing] = useState(false);
 
@@ -38,13 +39,22 @@ export function PaymentPanel({ jobcardId, amount, payments }: { jobcardId: strin
     );
   }
 
+  if (source === "internal" && !canPerform(role, "collect_payment")) {
+    return (
+      <Card>
+        <p className="text-sm text-[var(--color-ink-muted)]">Front Desk or management must collect this payment.</p>
+      </Card>
+    );
+  }
+
   function pay() {
     if (!selected) return;
     setProcessing(true);
     setTimeout(() => {
-      recordPayment(jobcardId, selected, amount!, BNPL_METHODS.includes(selected) ? (selected === "tabby" ? 4 : 3) : undefined);
+      const result = recordPayment(jobcardId, selected, amount!, BNPL_METHODS.includes(selected) ? (selected === "tabby" ? 4 : 3) : undefined, source);
       setProcessing(false);
-      toast(`Payment of ${formatCurrency(amount!)} confirmed via ${PAYMENT_METHOD_LABELS[selected]}.`);
+      toast(result.message, result.ok ? "success" : "error");
+      if (result.ok) setSelected(null);
     }, 900);
   }
 

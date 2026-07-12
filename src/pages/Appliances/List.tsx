@@ -7,6 +7,8 @@ import { Badge } from "../../components/ui";
 import { formatDate } from "../../lib/utils";
 import { toast } from "../../lib/toast";
 import { useSort } from "../../lib/useSort";
+import { appliancesByBranch, filterByBranch } from "../../lib/selectors";
+import { canPerform } from "../../lib/permissions";
 import type { ApplianceCategory, Appliance } from "../../lib/types";
 
 const CATEGORIES: ApplianceCategory[] = ["AC", "Refrigerator", "Washer", "Mobile", "TV", "Microwave"];
@@ -14,7 +16,7 @@ const PAGE_SIZE = 15;
 type SortKey = "model" | "category" | "brand" | "customer" | "serial" | "purchased";
 
 export default function ApplianceList() {
-  const { appliances, customers, brands, addAppliance } = useStore();
+  const { appliances, customers, brands, selectedBranchId, role, addAppliance } = useStore();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<ApplianceCategory | "all">("all");
   const [open, setOpen] = useState(false);
@@ -23,16 +25,18 @@ export default function ApplianceList() {
 
   const custMap = useMemo(() => new Map(customers.map((c) => [c.id, c])), [customers]);
   const brandMap = useMemo(() => new Map(brands.map((b) => [b.id, b])), [brands]);
+  const scopedAppliances = useMemo(() => appliancesByBranch(appliances, customers, selectedBranchId), [appliances, customers, selectedBranchId]);
+  const scopedCustomers = useMemo(() => filterByBranch(customers, selectedBranchId), [customers, selectedBranchId]);
 
   const filtered = useMemo(() => {
-    let list = appliances;
+    let list = scopedAppliances;
     if (category !== "all") list = list.filter((a) => a.category === category);
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter((a) => a.model.toLowerCase().includes(q) || a.serialNo.toLowerCase().includes(q) || (a.imeiNo ?? "").includes(q));
     }
     return list;
-  }, [appliances, category, search]);
+  }, [scopedAppliances, category, search]);
 
   const getValue = (a: Appliance, key: SortKey) => {
     if (key === "model") return a.model;
@@ -68,7 +72,7 @@ export default function ApplianceList() {
           <h1 className="text-xl font-semibold tracking-tight">Appliances</h1>
           <p className="text-sm text-[var(--color-ink-muted)] mt-0.5">{rows.length} registered appliances</p>
         </div>
-        <Button onClick={() => setOpen(true)}>+ Add Appliance</Button>
+        {canPerform(role, "create_appliance") && <Button onClick={() => setOpen(true)}>+ Add Appliance</Button>}
       </div>
 
       <Card className="flex flex-wrap gap-3">
@@ -143,7 +147,7 @@ export default function ApplianceList() {
           <Field label="Customer">
             <Select value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value })}>
               <option value="">Choose customer…</option>
-              {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {scopedCustomers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </Select>
           </Field>
           <Field label="Brand">

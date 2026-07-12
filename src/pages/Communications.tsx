@@ -5,6 +5,7 @@ import { useStore } from "../lib/store";
 import { Card, Select, Input, Badge, EmptyState, Pagination } from "../components/ui";
 import { formatDateTime } from "../lib/utils";
 import type { Channel, CommunicationLog } from "../lib/types";
+import { communicationsByBranch } from "../lib/selectors";
 
 const PAGE_SIZE = 20;
 
@@ -15,36 +16,36 @@ const CHANNEL_ICON: Record<Channel, React.ReactNode> = {
 };
 
 export default function Communications() {
-  const { communicationLogs, jobCards, customers } = useStore();
+  const { communicationLogs, jobCards, customers, selectedBranchId } = useStore();
   const [channel, setChannel] = useState<Channel | "all">("all");
   const [status, setStatus] = useState<CommunicationLog["status"] | "all">("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
 
-  const jobMap = useMemo(() => new Map(jobCards.map((j) => [j.id, j])), [jobCards]);
   const custMap = useMemo(() => new Map(customers.map((c) => [c.id, c])), [customers]);
+  const scopedLogs = useMemo(() => communicationsByBranch(communicationLogs, jobCards, customers, selectedBranchId), [communicationLogs, jobCards, customers, selectedBranchId]);
 
   const rows = useMemo(() => {
-    let list = communicationLogs;
+    let list = scopedLogs;
     if (channel !== "all") list = list.filter((c) => c.channel === channel);
     if (status !== "all") list = list.filter((c) => c.status === status);
     if (search.trim()) {
       const q = search.toLowerCase();
-      list = list.filter((c) => c.message.toLowerCase().includes(q) || c.jobcardId.toLowerCase().includes(q));
+      list = list.filter((c) => c.message.toLowerCase().includes(q) || (c.jobcardId ?? "").toLowerCase().includes(q));
     }
     return [...list].sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp));
-  }, [communicationLogs, channel, status, search]);
+  }, [scopedLogs, channel, status, search]);
 
   const currentPage = Math.min(page, Math.max(1, Math.ceil(rows.length / PAGE_SIZE)));
   const pagedRows = rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const counts = {
-    whatsapp: communicationLogs.filter((c) => c.channel === "whatsapp").length,
-    sms: communicationLogs.filter((c) => c.channel === "sms").length,
-    email: communicationLogs.filter((c) => c.channel === "email").length,
+    whatsapp: scopedLogs.filter((c) => c.channel === "whatsapp").length,
+    sms: scopedLogs.filter((c) => c.channel === "sms").length,
+    email: scopedLogs.filter((c) => c.channel === "email").length,
   };
-  const successfullyDelivered = communicationLogs.filter((message) => message.status === "delivered" || message.status === "read").length;
-  const deliveryRate = communicationLogs.length ? Math.round((successfullyDelivered / communicationLogs.length) * 100) : 0;
+  const successfullyDelivered = scopedLogs.filter((message) => message.status === "delivered" || message.status === "read").length;
+  const deliveryRate = scopedLogs.length ? Math.round((successfullyDelivered / scopedLogs.length) * 100) : 0;
 
   return (
     <div className="space-y-4">
@@ -87,14 +88,13 @@ export default function Communications() {
       <Card padded={false}>
         <div className="divide-y [border-color:var(--color-border)] sm:hidden">
           {pagedRows.map((message) => {
-            const job = jobMap.get(message.jobcardId);
-            const customer = job ? custMap.get(job.customerId) : undefined;
+            const customer = custMap.get(message.customerId);
             return (
               <div key={message.id} className="p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-2">
                     {CHANNEL_ICON[message.channel]}
-                    <Link to={`/jobcards/${message.jobcardId}`} className="truncate text-sm font-semibold text-[var(--color-brand-1)]">{message.jobcardId}</Link>
+                    {message.jobcardId ? <Link to={`/jobcards/${message.jobcardId}`} className="truncate text-sm font-semibold text-[var(--color-brand-1)]">{message.jobcardId}</Link> : <span className="truncate text-sm font-semibold">Maintenance</span>}
                   </div>
                   <Badge tone={message.status === "failed" ? "critical" : message.status === "read" ? "good" : "neutral"}>{message.status}</Badge>
                 </div>
@@ -119,12 +119,11 @@ export default function Communications() {
             </thead>
             <tbody>
               {pagedRows.map((c) => {
-                const job = jobMap.get(c.jobcardId);
-                const cust = job ? custMap.get(job.customerId) : undefined;
+                const cust = custMap.get(c.customerId);
                 return (
                   <tr key={c.id} className="border-b last:border-0 [border-color:var(--color-border)] transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.03]">
                     <td className="px-5 py-2.5">{CHANNEL_ICON[c.channel]}</td>
-                    <td className="px-3 py-2.5"><Link to={`/jobcards/${c.jobcardId}`} className="font-medium text-[var(--color-brand-1)]">{c.jobcardId}</Link></td>
+                    <td className="px-3 py-2.5">{c.jobcardId ? <Link to={`/jobcards/${c.jobcardId}`} className="font-medium text-[var(--color-brand-1)]">{c.jobcardId}</Link> : <span className="text-[var(--color-ink-secondary)]">Maintenance</span>}</td>
                     <td className="px-3 py-2.5 text-[var(--color-ink-secondary)]">{cust?.name ?? "—"}</td>
                     <td className="px-3 py-2.5 text-[var(--color-ink-secondary)] max-w-xs truncate">{c.message}</td>
                     <td className="px-3 py-2.5"><Badge tone={c.status === "failed" ? "critical" : c.status === "read" ? "good" : "neutral"}>{c.status}</Badge></td>

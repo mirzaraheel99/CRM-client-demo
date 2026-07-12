@@ -145,6 +145,7 @@ export interface JobCardPartUsed {
   id: string;
   jobcardId: string;
   itemId: string;
+  locationId: string;
   qty: number;
   unitPrice: number;
   totalPrice: number;
@@ -160,7 +161,10 @@ export interface PurchaseBill {
 
 export interface CommunicationLog {
   id: string;
-  jobcardId: string;
+  jobcardId?: string;
+  customerId: string;
+  applianceId?: string;
+  stageName?: StageName;
   channel: Channel;
   to: string;
   message: string;
@@ -184,7 +188,16 @@ export interface JobCard {
   updatedAt: string;
   scheduledAt: string | null;
   customerApproved: boolean | null;
+  diagnosisNotes: string | null;
+  repairNotes: string | null;
+  qaApproved: boolean;
+  customerSignature: string | null;
   oemClaimNo?: string;
+}
+
+export interface ActionResult {
+  ok: boolean;
+  message: string;
 }
 
 export interface WorkflowStep {

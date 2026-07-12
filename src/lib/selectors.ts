@@ -1,9 +1,41 @@
-import type { JobCard, JobStatus, InventoryItem, InventoryLocation, InventoryStock, InventoryTransaction, Technician, Appliance, Brand } from "./types";
+import type { JobCard, JobStatus, InventoryItem, InventoryLocation, InventoryStock, InventoryTransaction, Technician, Appliance, Brand, Customer, CommunicationLog } from "./types";
 import { tatHours } from "./utils";
 
 export function filterByBranch<T extends { branchId: string }>(items: T[], branchId: string | "all"): T[] {
   if (branchId === "all") return items;
   return items.filter((i) => i.branchId === branchId);
+}
+
+export function appliancesByBranch(appliances: Appliance[], customers: Customer[], branchId: string | "all") {
+  if (branchId === "all") return appliances;
+  const customerIds = new Set(customers.filter((customer) => customer.branchId === branchId).map((customer) => customer.id));
+  return appliances.filter((appliance) => customerIds.has(appliance.customerId));
+}
+
+export function communicationsByBranch(communications: CommunicationLog[], jobs: JobCard[], customers: Customer[], branchId: string | "all") {
+  if (branchId === "all") return communications;
+  const jobIds = new Set(jobs.filter((job) => job.branchId === branchId).map((job) => job.id));
+  const customerIds = new Set(customers.filter((customer) => customer.branchId === branchId).map((customer) => customer.id));
+  return communications.filter((communication) => (
+    (communication.jobcardId ? jobIds.has(communication.jobcardId) : false)
+    || customerIds.has(communication.customerId)
+  ));
+}
+
+export function inventoryLocationsByBranch(locations: InventoryLocation[], branchId: string | "all") {
+  return filterByBranch(locations, branchId);
+}
+
+export function inventoryStockByBranch(stock: InventoryStock[], locations: InventoryLocation[], branchId: string | "all") {
+  if (branchId === "all") return stock;
+  const locationIds = new Set(inventoryLocationsByBranch(locations, branchId).map((location) => location.id));
+  return stock.filter((entry) => locationIds.has(entry.locationId));
+}
+
+export function inventoryTransactionsByBranch(transactions: InventoryTransaction[], locations: InventoryLocation[], branchId: string | "all") {
+  if (branchId === "all") return transactions;
+  const locationIds = new Set(inventoryLocationsByBranch(locations, branchId).map((location) => location.id));
+  return transactions.filter((transaction) => locationIds.has(transaction.locationId) || Boolean(transaction.destLocationId && locationIds.has(transaction.destLocationId)));
 }
 
 const STATUS_ORDER: JobStatus[] = ["Received", "In Diagnosis", "Waiting Approval", "In Repair", "QA", "Ready", "Delivered"];
@@ -206,8 +238,10 @@ export function predictiveMaintenanceCandidates(
   { minCohortSize = 3, windowRatio = 0.22 }: { minCohortSize?: number; windowRatio?: number } = {}
 ): PredictiveMaintenanceCandidate[] {
   const monthsBetween = (a: string, b: string) => (new Date(b).getTime() - new Date(a).getTime()) / (1000 * 60 * 60 * 24 * 30);
+  const appliancesWithAnyJob = new Set(jobCards.map((job) => job.applianceId));
   const firstJobByAppliance = new Map<string, string>();
   for (const j of jobCards) {
+    if (j.status !== "Delivered") continue;
     const existing = firstJobByAppliance.get(j.applianceId);
     if (!existing || new Date(j.createdAt) < new Date(existing)) firstJobByAppliance.set(j.applianceId, j.createdAt);
   }
@@ -232,7 +266,7 @@ export function predictiveMaintenanceCandidates(
   const now = new Date().toISOString();
   const candidates: PredictiveMaintenanceCandidate[] = [];
   for (const a of appliances) {
-    if (firstJobByAppliance.has(a.id)) continue; // already has service history
+    if (appliancesWithAnyJob.has(a.id)) continue;
     const key = `${a.brandId}|${a.category}`;
     const cohort = cohortAvg.get(key);
     if (!cohort) continue;

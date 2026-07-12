@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, MessageCircle, Smartphone, Mail, CheckCircle2, XCircle, ImagePlus, Printer, Sparkles } from "lucide-react";
+import { ArrowLeft, MessageCircle, Smartphone, Mail, CheckCircle2, Circle, XCircle, ImagePlus, Printer, Sparkles, Trash2, AlertTriangle } from "lucide-react";
 import { useStore } from "../../lib/store";
-import { Card, CardHeader, Tabs, Button, Select, Textarea, Badge, Avatar, WorkflowStepper } from "../../components/ui";
+import { Card, CardHeader, Tabs, Button, Select, Textarea, Input, Field, Badge, Avatar, WorkflowStepper } from "../../components/ui";
 import { JobStatusBadge, JobTypeBadge } from "../../components/StatusBadge";
 import { PartsGrid } from "../../components/PartsGrid";
 import { TrackingShare } from "../../components/TrackingShare";
 import { formatCurrency, formatDateTime, relativeTime } from "../../lib/utils";
-import { totalStockByItem } from "../../lib/selectors";
+import { inventoryStockByBranch, totalStockByItem } from "../../lib/selectors";
 import { MESSAGE_TEMPLATES, renderTemplate } from "../../lib/templates";
 import { printEstimate } from "../../lib/print";
 import { printTaxInvoice } from "../../lib/zatca";
@@ -15,7 +15,9 @@ import { suggestDiagnosis, suggestFromTelemetry } from "../../lib/diagnosisAI";
 import { PaymentPanel } from "../../components/PaymentPanel";
 import { toast } from "../../lib/toast";
 import { Wifi } from "lucide-react";
-import type { StageName, Channel } from "../../lib/types";
+import { canPerform } from "../../lib/permissions";
+import { stageAccessBlocker, stageRequirements } from "../../lib/workflow";
+import type { StageName, Channel, ActionResult } from "../../lib/types";
 
 const TAB_LIST = ["Timeline", "Details", "Parts", "Attachments", "Communication"];
 
@@ -37,8 +39,9 @@ export default function JobCardDetail() {
   const navigate = useNavigate();
   const {
     jobCards, customers, appliances, applianceTelemetry, brands, technicians, workflows,
-    stageHistory, attachments, partsUsed, communicationLogs, inventoryItems, inventoryStock, purchaseBills, payments,
-    role, advanceStage, assignTechnician, setEstimate, approveCustomer, addPartUsed, addAttachment, sendCommunication,
+    stageHistory, attachments, partsUsed, communicationLogs, inventoryItems, inventoryLocations, inventoryStock, purchaseBills, payments,
+    role, selectedBranchId, advanceStage, assignTechnician, setDiagnosis, setEstimate, approveCustomer, setRepairNotes, setQaApproved,
+    setFinalAmount, captureCustomerSignature, savePurchaseBill, addPartUsed, removePartUsed, addAttachment, sendCommunication,
   } = useStore();
 
   const [tab, setTab] = useState("Timeline");
@@ -47,8 +50,13 @@ export default function JobCardDetail() {
   const [templateId, setTemplateId] = useState("received");
   const [message, setMessage] = useState("");
   const [estimateInput, setEstimateInput] = useState("");
+  const [diagnosisInput, setDiagnosisInput] = useState("");
+  const [repairInput, setRepairInput] = useState("");
+  const [finalAmountInput, setFinalAmountInput] = useState("");
+  const [signatureInput, setSignatureInput] = useState("");
+  const [billForm, setBillForm] = useState({ billNo: "", billDate: new Date().toISOString().slice(0, 10), vendorName: "" });
 
-  const job = jobCards.find((j) => j.id === id);
+  const job = jobCards.find((candidate) => candidate.id === id && (selectedBranchId === "all" || candidate.branchId === selectedBranchId));
 
   const workflow = useMemo(() => workflows.find((w) => w.jobType === job?.jobType), [workflows, job]);
   const jobHistory = useMemo(() => stageHistory.filter((h) => h.jobcardId === id), [stageHistory, id]);
@@ -56,7 +64,8 @@ export default function JobCardDetail() {
   const jobParts = useMemo(() => partsUsed.filter((p) => p.jobcardId === id), [partsUsed, id]);
   const jobComms = useMemo(() => communicationLogs.filter((c) => c.jobcardId === id), [communicationLogs, id]);
   const bill = useMemo(() => purchaseBills.find((b) => b.jobcardId === id), [purchaseBills, id]);
-  const stockByItem = useMemo(() => totalStockByItem(inventoryStock), [inventoryStock]);
+  const branchStock = useMemo(() => inventoryStockByBranch(inventoryStock, inventoryLocations, job?.branchId ?? "all"), [inventoryStock, inventoryLocations, job?.branchId]);
+  const stockByItem = useMemo(() => totalStockByItem(branchStock), [branchStock]);
   const jobPayments = useMemo(() => payments.filter((p) => p.jobcardId === id), [payments, id]);
   const telemetry = useMemo(() => applianceTelemetry.find((t) => t.applianceId === job?.applianceId), [applianceTelemetry, job?.applianceId]);
   const diagnosisSuggestions = useMemo(() => {
@@ -71,6 +80,18 @@ export default function JobCardDetail() {
     if (job) applyTemplate("received");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job?.id]);
+
+  useEffect(() => {
+    setDiagnosisInput(job?.diagnosisNotes ?? "");
+    setRepairInput(job?.repairNotes ?? "");
+    setFinalAmountInput(job?.finalAmount?.toString() ?? "");
+    setSignatureInput(job?.customerSignature ?? "");
+    setBillForm({
+      billNo: bill?.billNo ?? "",
+      billDate: bill?.billDate.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
+      vendorName: bill?.vendorName ?? "",
+    });
+  }, [job?.id, job?.diagnosisNotes, job?.repairNotes, job?.finalAmount, job?.customerSignature, bill?.id, bill?.billNo, bill?.billDate, bill?.vendorName]);
 
   const timelineEntries = useMemo(() => {
     const stageEntries = jobHistory.map((h) => ({ kind: "stage" as const, id: h.id, timestamp: h.timestamp, data: h }));
@@ -94,7 +115,11 @@ export default function JobCardDetail() {
 
   const currentStepIdx = workflow?.steps.findIndex((s) => s.stepName === job.currentStage) ?? -1;
   const nextStep = workflow && currentStepIdx >= 0 ? workflow.steps[currentStepIdx + 1] : undefined;
-  const canApprove = ["supervisor", "manager", "admin"].includes(role);
+  const requirements = stageRequirements(job, { payments: jobPayments, purchaseBill: bill });
+  const accessBlocker = stageAccessBlocker(job, role);
+  const blockers = requirements.filter((requirement) => !requirement.met).map((requirement) => requirement.label);
+  const eligibleTechnicians = technicians.filter((candidate) => candidate.branchId === job.branchId && candidate.status !== "Off Duty" && (!appliance || candidate.skills.includes(appliance.category)));
+  const canEditParts = canPerform(role, "add_part") && (job.currentStage === "Diagnosis" || job.currentStage === "Repair");
 
   const availableTemplates = MESSAGE_TEMPLATES.filter((t) => t.channels.includes(channel));
   const selectedTemplate = availableTemplates.find((t) => t.id === templateId) ?? availableTemplates[0];
@@ -115,15 +140,17 @@ export default function JobCardDetail() {
 
   function handleAdvance() {
     if (!nextStep) return;
-    advanceStage(job!.id, nextStep.stepName as StageName, `Advanced to ${nextStep.stepName}`, "You");
-    toast(`Advanced to ${nextStep.stepName}.`);
+    showResult(advanceStage(job!.id, nextStep.stepName as StageName, `Completed ${job!.currentStage}`, "You"));
   }
 
   function handleSend() {
     if (!message.trim()) return;
-    sendCommunication(job!.id, channel, message.trim());
-    setMessage("");
-    toast(`Message sent via ${channel === "whatsapp" ? "WhatsApp" : channel.toUpperCase()}.`);
+    showResult(sendCommunication(job!.id, channel, message.trim()), () => setMessage(""));
+  }
+
+  function showResult(action: ActionResult, onSuccess?: () => void) {
+    toast(action.message, action.ok ? "success" : "error");
+    if (action.ok) onSuccess?.();
   }
 
   const partsTotal = jobParts.reduce((acc, p) => acc + p.totalPrice, 0);
@@ -220,7 +247,7 @@ export default function JobCardDetail() {
                             </div>
                           ))}
                           <button
-                            onClick={() => { addAttachment(job.id, h.stageName, `${h.stageName} photo`); toast("Photo added to timeline."); }}
+                            onClick={() => showResult(addAttachment(job.id, h.stageName, `${h.stageName} photo`))}
                             className="flex items-center gap-1 rounded-md border border-dashed px-2 py-1 text-[11px] text-[var(--color-ink-muted)] hover:text-[var(--color-brand-1)] hover:border-[var(--color-brand-1)] [border-color:var(--color-border)]"
                           >
                             <ImagePlus size={12} /> Add photo
@@ -267,7 +294,7 @@ export default function JobCardDetail() {
                     <p className="font-medium">{formatDateTime(job.createdAt)}</p>
                   </div>
                 </div>
-                {job.jobType === "non_warranty" && (
+                {job.jobType === "non_warranty" && canPerform(role, "set_estimate") && (
                   <div className="border-t pt-4 [border-color:var(--color-border)] flex items-end gap-2">
                     <div className="flex-1">
                       <p className="text-xs text-[var(--color-ink-muted)] mb-1">Set / update estimate (SAR)</p>
@@ -280,16 +307,16 @@ export default function JobCardDetail() {
                     </div>
                     <Button
                       variant="secondary"
-                      onClick={() => { const n = Number(estimateInput); if (n > 0) { setEstimate(job.id, n); setEstimateInput(""); toast(`Estimate set to ${formatCurrency(n)}.`); } }}
+                      onClick={() => showResult(setEstimate(job.id, Number(estimateInput)), () => setEstimateInput(""))}
                     >
                       Save Estimate
                     </Button>
                   </div>
                 )}
-                {job.currentStage === "Customer Approval" && job.customerApproved == null && (
+                {job.currentStage === "Customer Approval" && job.customerApproved !== true && canPerform(role, "record_customer_approval") && (
                   <div className="border-t pt-4 [border-color:var(--color-border)] flex gap-2">
-                    <Button onClick={() => { approveCustomer(job.id, true); toast("Customer approval recorded."); }}><CheckCircle2 size={14} /> Approve</Button>
-                    <Button variant="danger" onClick={() => { approveCustomer(job.id, false); toast("Customer decline recorded.", "info"); }}><XCircle size={14} /> Decline</Button>
+                    <Button onClick={() => showResult(approveCustomer(job.id, true))}><CheckCircle2 size={14} /> Approve</Button>
+                    {job.customerApproved == null && <Button variant="danger" onClick={() => showResult(approveCustomer(job.id, false))}><XCircle size={14} /> Decline</Button>}
                   </div>
                 )}
                 <div className="border-t pt-4 [border-color:var(--color-border)] flex gap-2 flex-wrap">
@@ -339,8 +366,9 @@ export default function JobCardDetail() {
                               return (
                                 <button
                                   key={name}
-                                  onClick={() => { addPartUsed(job.id, item.id, 1); toast(`${name} added to job card.`); }}
-                                  className="rounded-full border px-2.5 py-1 text-xs text-[var(--color-ink-secondary)] hover:text-[var(--color-brand-1)] hover:border-[var(--color-brand-1)] [border-color:var(--color-border)]"
+                                  disabled={!canEditParts}
+                                  onClick={() => showResult(addPartUsed(job.id, item.id, 1))}
+                                  className="rounded-full border px-2.5 py-1 text-xs text-[var(--color-ink-secondary)] hover:text-[var(--color-brand-1)] hover:border-[var(--color-brand-1)] disabled:cursor-not-allowed disabled:opacity-45 [border-color:var(--color-border)]"
                                 >
                                   + {name}
                                 </button>
@@ -353,14 +381,16 @@ export default function JobCardDetail() {
                     </div>
                   </Card>
                 )}
-                <PartsGrid
+                {canEditParts && <PartsGrid
                   items={inventoryItems}
                   stockByItem={stockByItem}
                   onAdd={(selections) => {
-                    selections.forEach((s) => addPartUsed(job.id, s.itemId, s.qty));
-                    if (selections.length > 0) toast(`${selections.length} part${selections.length > 1 ? "s" : ""} added to job card.`);
+                    const results = selections.map((selection) => addPartUsed(job.id, selection.itemId, selection.qty));
+                    const failed = results.find((result) => !result.ok);
+                    if (failed) toast(failed.message, "error");
+                    else if (results.length > 0) toast(`${results.length} part${results.length > 1 ? "s" : ""} issued to this job.`);
                   }}
-                />
+                />}
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-xs text-[var(--color-ink-muted)] border-y [border-color:var(--color-border)]">
@@ -368,6 +398,7 @@ export default function JobCardDetail() {
                       <th className="py-2 font-medium">Qty</th>
                       <th className="py-2 font-medium">Unit Price</th>
                       <th className="py-2 font-medium">Total</th>
+                      <th className="py-2 font-medium text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -379,14 +410,21 @@ export default function JobCardDetail() {
                           <td className="py-2 tabular-nums">{p.qty}</td>
                           <td className="py-2 tabular-nums">{formatCurrency(p.unitPrice)}</td>
                           <td className="py-2 tabular-nums">{formatCurrency(p.totalPrice)}</td>
+                          <td className="py-2 text-right">
+                            {canEditParts && (
+                              <button type="button" title="Return part to inventory" onClick={() => showResult(removePartUsed(p.id))} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-ink-muted)] hover:bg-black/5 hover:text-[var(--color-status-critical)] dark:hover:bg-white/10">
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </td>
                         </tr>
                       );
                     })}
-                    {jobParts.length === 0 && <tr><td colSpan={4} className="py-6 text-center text-[var(--color-ink-muted)]">No parts recorded yet.</td></tr>}
+                    {jobParts.length === 0 && <tr><td colSpan={5} className="py-6 text-center text-[var(--color-ink-muted)]">No parts recorded yet.</td></tr>}
                   </tbody>
                   {jobParts.length > 0 && (
                     <tfoot>
-                      <tr><td colSpan={3} className="py-2 pr-4 text-right font-medium">Parts total</td><td className="py-2 font-semibold tabular-nums">{formatCurrency(partsTotal)}</td></tr>
+                      <tr><td colSpan={3} className="py-2 pr-4 text-right font-medium">Parts total</td><td className="py-2 font-semibold tabular-nums">{formatCurrency(partsTotal)}</td><td /></tr>
                     </tfoot>
                   )}
                 </table>
@@ -395,7 +433,7 @@ export default function JobCardDetail() {
 
             {tab === "Attachments" && (
               <div className="space-y-3">
-                <Button variant="secondary" onClick={() => { addAttachment(job.id, job.currentStage, `${job.currentStage} photo`); toast("Photo uploaded."); }}>
+                <Button variant="secondary" onClick={() => showResult(addAttachment(job.id, job.currentStage, `${job.currentStage} photo`))}>
                   <ImagePlus size={14} /> Upload photo (simulated)
                 </Button>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -438,22 +476,102 @@ export default function JobCardDetail() {
             <TrackingShare jobId={job.id} />
           </Card>
 
+          {job.currentStage !== "Delivered" && (
+            <Card className="space-y-3">
+              <CardHeader title={job.currentStage} subtitle="Complete the stage requirements below" />
+
+              {requirements.length > 0 && (
+                <div className="space-y-1.5">
+                  {requirements.map((requirement) => (
+                    <div key={requirement.label} className="flex items-start gap-2 text-xs">
+                      {requirement.met ? <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-[var(--color-status-good)]" /> : <Circle size={14} className="mt-0.5 shrink-0 text-[var(--color-ink-muted)]" />}
+                      <span className={requirement.met ? "text-[var(--color-ink-secondary)]" : "font-medium"}>{requirement.label}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {job.currentStage === "Warranty Validation" && canPerform(role, "create_job") && (
+                <div className="space-y-2 border-t pt-3 [border-color:var(--color-border)]">
+                  <Field label="Purchase bill number"><Input value={billForm.billNo} onChange={(event) => setBillForm({ ...billForm, billNo: event.target.value })} /></Field>
+                  <Field label="Vendor"><Input value={billForm.vendorName} onChange={(event) => setBillForm({ ...billForm, vendorName: event.target.value })} /></Field>
+                  <Field label="Bill date"><Input type="date" value={billForm.billDate} onChange={(event) => setBillForm({ ...billForm, billDate: event.target.value })} /></Field>
+                  <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(savePurchaseBill(job.id, billForm))}>Save Purchase Bill</Button>
+                </div>
+              )}
+
+              {job.currentStage === "Diagnosis" && canPerform(role, "set_diagnosis") && (
+                <div className="space-y-2 border-t pt-3 [border-color:var(--color-border)]">
+                  <Textarea rows={4} value={diagnosisInput} onChange={(event) => setDiagnosisInput(event.target.value)} placeholder="Record fault, checks, and likely cause..." />
+                  <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(setDiagnosis(job.id, diagnosisInput))}>Save Diagnosis</Button>
+                </div>
+              )}
+
+              {job.currentStage === "Estimate" && canPerform(role, "set_estimate") && (
+                <div className="space-y-2 border-t pt-3 [border-color:var(--color-border)]">
+                  <Field label="Estimate amount (SAR)"><Input type="number" min={partsTotal} value={estimateInput} onChange={(event) => setEstimateInput(event.target.value)} /></Field>
+                  <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(setEstimate(job.id, Number(estimateInput)), () => setEstimateInput(""))}>Save Estimate</Button>
+                </div>
+              )}
+
+              {job.currentStage === "Customer Approval" && job.customerApproved !== true && canPerform(role, "record_customer_approval") && (
+                <div className="grid grid-cols-2 gap-2 border-t pt-3 [border-color:var(--color-border)]">
+                  <Button onClick={() => showResult(approveCustomer(job.id, true))}><CheckCircle2 size={14} /> Approve</Button>
+                  {job.customerApproved == null && <Button variant="danger" onClick={() => showResult(approveCustomer(job.id, false))}><XCircle size={14} /> Decline</Button>}
+                </div>
+              )}
+
+              {job.currentStage === "Repair" && canPerform(role, "set_repair_notes") && (
+                <div className="space-y-2 border-t pt-3 [border-color:var(--color-border)]">
+                  <Textarea rows={4} value={repairInput} onChange={(event) => setRepairInput(event.target.value)} placeholder="Record work completed and parts fitted..." />
+                  <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(setRepairNotes(job.id, repairInput))}>Save Repair Notes</Button>
+                </div>
+              )}
+
+              {job.currentStage === "QA" && canPerform(role, "approve_qa") && (
+                <div className="border-t pt-3 [border-color:var(--color-border)]">
+                  <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(setQaApproved(job.id, true))}><CheckCircle2 size={14} /> Approve QA</Button>
+                </div>
+              )}
+
+              {job.currentStage === "Ready for Handover" && (
+                <div className="space-y-3 border-t pt-3 [border-color:var(--color-border)]">
+                  {job.jobType === "non_warranty" && canPerform(role, "finalize_job") && (
+                    <div className="space-y-2">
+                      <Field label="Final amount (SAR)"><Input type="number" min={partsTotal} value={finalAmountInput} onChange={(event) => setFinalAmountInput(event.target.value)} /></Field>
+                      <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(setFinalAmount(job.id, Number(finalAmountInput)))}>Confirm Final Amount</Button>
+                    </div>
+                  )}
+                  {canPerform(role, "capture_signature") && (
+                    <div className="space-y-2">
+                      <Field label="Customer signature / name"><Input value={signatureInput} onChange={(event) => setSignatureInput(event.target.value)} /></Field>
+                      <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(captureCustomerSignature(job.id, signatureInput))}>Capture Signature</Button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </Card>
+          )}
+
+          {job.currentStage === "Ready for Handover" && job.jobType === "non_warranty" && (
+            <PaymentPanel jobcardId={job.id} amount={job.finalAmount} payments={jobPayments} />
+          )}
+
           <Card className="space-y-3">
             <CardHeader title="Workflow" subtitle={workflow ? `${workflow.steps.length}-step ${job.jobType.replace("_", " ")} flow` : undefined} />
             {workflow && <WorkflowStepper steps={workflow.steps} currentIdx={currentStepIdx} orientation="vertical" />}
             {nextStep ? (
               <div className="border-t pt-3 [border-color:var(--color-border)] space-y-2">
-                <p className="text-xs text-[var(--color-ink-muted)]">Next: <span className="font-medium text-[var(--color-ink-secondary)]">{nextStep.stepName}</span>{nextStep.approvalRequired ? ` (needs ${nextStep.approverRole} approval)` : ""}</p>
+                <p className="text-xs text-[var(--color-ink-muted)]">Next: <span className="font-medium text-[var(--color-ink-secondary)]">{nextStep.stepName}</span></p>
                 <Button
                   className="w-full justify-center"
                   onClick={handleAdvance}
-                  disabled={nextStep.approvalRequired && !canApprove}
+                  disabled={Boolean(accessBlocker) || blockers.length > 0}
                 >
-                  Advance to {nextStep.stepName}
+                  Complete {job.currentStage}
                 </Button>
-                {nextStep.approvalRequired && !canApprove && (
-                  <p className="text-[11px] text-[var(--color-status-serious)]">Switch role to Supervisor/Manager/Admin to approve this stage.</p>
-                )}
+                {accessBlocker && <p className="flex items-start gap-1.5 text-[11px] text-[var(--color-status-serious)]"><AlertTriangle size={12} className="mt-0.5 shrink-0" />{accessBlocker}</p>}
+                {!accessBlocker && blockers.length > 0 && <p className="text-[11px] text-[var(--color-ink-muted)]">Complete {blockers.join(" and ").toLowerCase()} before advancing.</p>}
               </div>
             ) : (
               <p className="text-xs text-[var(--color-status-good)] font-medium border-t pt-3 [border-color:var(--color-border)]">Job complete — delivered.</p>
@@ -468,11 +586,12 @@ export default function JobCardDetail() {
             </div>
             <Select value={techSelect} onChange={(e) => setTechSelect(e.target.value)}>
               <option value="">Reassign to…</option>
-              {technicians.map((t) => <option key={t.id} value={t.id}>{t.name} · {t.zone}</option>)}
+              {eligibleTechnicians.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name} - {candidate.zone} - {candidate.status}</option>)}
             </Select>
-            <Button variant="secondary" className="w-full justify-center" disabled={!techSelect} onClick={() => { const tech = technicians.find((t) => t.id === techSelect); assignTechnician(job.id, techSelect); setTechSelect(""); toast(`Assigned to ${tech?.name ?? "technician"}.`); }}>
+            <Button variant="secondary" className="w-full justify-center" disabled={!techSelect || !canPerform(role, "assign_technician")} onClick={() => showResult(assignTechnician(job.id, techSelect), () => setTechSelect(""))}>
               Assign
             </Button>
+            {eligibleTechnicians.length === 0 && <p className="text-[11px] text-[var(--color-status-serious)]">No on-duty technician in this branch has the required {appliance?.category} skill.</p>}
           </Card>
 
           <Card className="space-y-3">

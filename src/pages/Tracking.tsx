@@ -1,10 +1,10 @@
 import { useParams } from "react-router-dom";
 import { CheckCircle2, XCircle, Wrench, ImagePlus, MessageCircle, Smartphone, Mail } from "lucide-react";
 import { useStore } from "../lib/store";
-import { Card, Badge, Button } from "../components/ui";
+import { Card, Badge, Button, WorkflowStepper } from "../components/ui";
 import { JobStatusBadge } from "../components/StatusBadge";
 import { PaymentPanel } from "../components/PaymentPanel";
-import { formatCurrency, formatDate, cx } from "../lib/utils";
+import { formatCurrency, formatDate } from "../lib/utils";
 import type { Channel } from "../lib/types";
 
 const CHANNEL_ICON: Record<Channel, React.ReactNode> = {
@@ -70,26 +70,7 @@ export default function TrackingPage() {
 
         {workflow && (
           <Card>
-            <div className="flex items-center overflow-x-auto pb-1">
-              {workflow.steps.map((s, i) => (
-                <div key={s.stepOrder} className="flex items-center shrink-0">
-                  <div className="flex flex-col items-center gap-1.5 min-w-[86px]">
-                    <div
-                      className={cx(
-                        "h-7 w-7 rounded-full flex items-center justify-center text-xs font-semibold",
-                        i < stepIdx ? "bg-[var(--color-status-good)] text-white" :
-                        i === stepIdx ? "bg-[var(--color-brand-1)] text-white" :
-                        "bg-black/10 dark:bg-white/10 text-[var(--color-ink-muted)]"
-                      )}
-                    >
-                      {i < stepIdx ? <CheckCircle2 size={15} /> : i + 1}
-                    </div>
-                    <span className={cx("text-[11px] text-center", i === stepIdx ? "font-semibold" : "text-[var(--color-ink-muted)]")}>{s.stepName}</span>
-                  </div>
-                  {i < workflow.steps.length - 1 && <div className={cx("h-0.5 w-6 sm:w-10", i < stepIdx ? "bg-[var(--color-status-good)]" : "bg-black/10 dark:bg-white/10")} />}
-                </div>
-              ))}
-            </div>
+            <WorkflowStepper steps={workflow.steps} currentIdx={stepIdx} orientation="horizontal" />
           </Card>
         )}
 

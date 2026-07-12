@@ -1,12 +1,19 @@
 import type { ReactNode } from "react";
+import { Check } from "lucide-react";
 import { cx } from "../lib/utils";
+import { useCountUp } from "../lib/useCountUp";
 
-export function Card({ children, className, padded = true }: { children: ReactNode; className?: string; padded?: boolean }) {
+export function Card({
+  children, className, padded = true, interactive = false,
+}: {
+  children: ReactNode; className?: string; padded?: boolean; interactive?: boolean;
+}) {
   return (
     <div
       className={cx(
-        "rounded-xl border bg-[var(--color-surface-1)] [border-color:var(--color-border)]",
+        "rounded-xl border bg-[var(--color-surface-1)] shadow-[var(--shadow-xs)] transition-[box-shadow,transform] duration-200 [border-color:var(--color-border)]",
         padded && "p-5",
+        interactive && "hover:shadow-[var(--shadow-md)] hover:-translate-y-0.5",
         className
       )}
     >
@@ -19,7 +26,7 @@ export function CardHeader({ title, subtitle, action }: { title: string; subtitl
   return (
     <div className="flex items-start justify-between gap-4 mb-4">
       <div>
-        <h3 className="text-sm font-semibold text-[var(--color-ink-primary)]">{title}</h3>
+        <h3 className="text-sm font-semibold tracking-tight text-[var(--color-ink-primary)]">{title}</h3>
         {subtitle && <p className="text-xs text-[var(--color-ink-muted)] mt-0.5">{subtitle}</p>}
       </div>
       {action}
@@ -38,7 +45,7 @@ const badgeStyles: Record<string, string> = {
 
 export function Badge({ children, tone = "neutral", icon, className }: { children: ReactNode; tone?: keyof typeof badgeStyles; icon?: ReactNode; className?: string }) {
   return (
-    <span className={cx("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap", badgeStyles[tone], className)}>
+    <span className={cx("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium tracking-tight whitespace-nowrap ring-1 ring-inset ring-black/[0.03] dark:ring-white/[0.04]", badgeStyles[tone], className)}>
       {icon}
       {children}
     </span>
@@ -52,10 +59,10 @@ export function Button({
   size?: "sm" | "md"; className?: string; type?: "button" | "submit"; disabled?: boolean;
 }) {
   const variants: Record<string, string> = {
-    primary: "bg-[var(--color-brand-1)] text-white hover:bg-[var(--color-brand-2)]",
+    primary: "bg-[var(--color-brand-1)] text-white shadow-[var(--shadow-sm)] hover:bg-[var(--color-brand-2)] hover:shadow-[var(--shadow-md)]",
     secondary: "bg-black/5 text-[var(--color-ink-primary)] hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/15",
     ghost: "text-[var(--color-ink-secondary)] hover:bg-black/5 dark:hover:bg-white/10",
-    danger: "bg-[var(--color-status-critical)] text-white hover:opacity-90",
+    danger: "bg-[var(--color-status-critical)] text-white shadow-[var(--shadow-sm)] hover:opacity-90",
   };
   const sizes: Record<string, string> = {
     sm: "px-2.5 py-1.5 text-xs",
@@ -67,7 +74,7 @@ export function Button({
       disabled={disabled}
       onClick={onClick}
       className={cx(
-        "inline-flex items-center gap-1.5 rounded-lg font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
+        "inline-flex items-center gap-1.5 rounded-lg font-medium transition-[background-color,box-shadow,transform] duration-150 active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand-1)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface-1)]",
         variants[variant],
         sizes[size],
         className
@@ -83,8 +90,9 @@ export function StatTile({
 }: {
   label: string; value: string; delta?: string; deltaTone?: "good" | "critical"; icon?: ReactNode; accent?: string;
 }) {
+  const animatedValue = useCountUp(value);
   return (
-    <Card className="flex flex-col gap-3">
+    <Card interactive className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-[var(--color-ink-muted)]">{label}</span>
         {icon && (
@@ -97,7 +105,7 @@ export function StatTile({
         )}
       </div>
       <div className="flex items-end justify-between">
-        <span className="text-2xl font-semibold tabular-nums text-[var(--color-ink-primary)]">{value}</span>
+        <span className="text-2xl font-semibold tracking-tight tabular-nums text-[var(--color-ink-primary)]">{animatedValue}</span>
         {delta && (
           <span className={cx("text-xs font-medium tabular-nums", deltaTone === "good" ? "text-[var(--color-status-good)]" : "text-[var(--color-status-critical)]")}>
             {delta}
@@ -112,14 +120,14 @@ export function Modal({ open, onClose, title, children, width = "md" }: { open: 
   if (!open) return null;
   const widths = { sm: "max-w-md", md: "max-w-xl", lg: "max-w-3xl" };
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[2px] animate-rise-in" onClick={onClose}>
       <div
-        className={cx("w-full rounded-2xl bg-[var(--color-surface-2)] shadow-2xl max-h-[90vh] overflow-y-auto", widths[width])}
+        className={cx("w-full rounded-2xl bg-[var(--color-surface-2)] shadow-[var(--shadow-lg)] max-h-[90vh] overflow-y-auto", widths[width])}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b px-5 py-4 [border-color:var(--color-border)]">
-          <h3 className="text-base font-semibold">{title}</h3>
-          <button onClick={onClose} className="text-[var(--color-ink-muted)] hover:text-[var(--color-ink-primary)] text-xl leading-none">×</button>
+          <h3 className="text-base font-semibold tracking-tight">{title}</h3>
+          <button onClick={onClose} className="text-[var(--color-ink-muted)] hover:text-[var(--color-ink-primary)] text-xl leading-none transition-colors">×</button>
         </div>
         <div className="p-5">{children}</div>
       </div>
@@ -135,7 +143,7 @@ export function Tabs({ tabs, active, onChange }: { tabs: string[]; active: strin
           key={tab}
           onClick={() => onChange(tab)}
           className={cx(
-            "px-3.5 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 -mb-px transition-colors",
+            "px-3.5 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 -mb-px transition-[color,border-color] duration-200",
             active === tab
               ? "border-[var(--color-brand-1)] text-[var(--color-brand-1)]"
               : "border-transparent text-[var(--color-ink-muted)] hover:text-[var(--color-ink-primary)]"
@@ -148,11 +156,88 @@ export function Tabs({ tabs, active, onChange }: { tabs: string[]; active: strin
   );
 }
 
-export function EmptyState({ title, subtitle }: { title: string; subtitle?: string }) {
+export function EmptyState({ title, subtitle, icon }: { title: string; subtitle?: string; icon?: ReactNode }) {
   return (
     <div className="flex flex-col items-center justify-center py-12 text-center">
+      {icon && (
+        <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-black/5 text-[var(--color-ink-muted)] dark:bg-white/5">
+          {icon}
+        </span>
+      )}
       <p className="text-sm font-medium text-[var(--color-ink-secondary)]">{title}</p>
       {subtitle && <p className="text-xs text-[var(--color-ink-muted)] mt-1">{subtitle}</p>}
+    </div>
+  );
+}
+
+export function WorkflowStepper({
+  steps, currentIdx, orientation = "horizontal",
+}: {
+  steps: { stepOrder: number; stepName: string }[]; currentIdx: number; orientation?: "horizontal" | "vertical";
+}) {
+  if (orientation === "vertical") {
+    return (
+      <ol className="space-y-0">
+        {steps.map((s, i) => {
+          const done = i < currentIdx;
+          const active = i === currentIdx;
+          return (
+            <li key={s.stepOrder} className="flex gap-3">
+              <div className="flex flex-col items-center">
+                <span
+                  className={cx(
+                    "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold transition-colors",
+                    done ? "bg-[var(--color-status-good)] text-white" :
+                    active ? "bg-[var(--color-brand-1)] text-white shadow-[var(--shadow-sm)]" :
+                    "bg-black/[0.06] text-[var(--color-ink-muted)] dark:bg-white/10"
+                  )}
+                >
+                  {done ? <Check size={12} strokeWidth={3} /> : i + 1}
+                </span>
+                {i < steps.length - 1 && (
+                  <span className={cx("w-0.5 flex-1 min-h-[18px]", done ? "bg-[var(--color-status-good)]" : "bg-black/[0.08] dark:bg-white/10")} />
+                )}
+              </div>
+              <div className={cx("pb-4", active ? "pt-0" : "")}>
+                <p className={cx("text-sm leading-6", active ? "font-semibold text-[var(--color-ink-primary)]" : done ? "text-[var(--color-ink-secondary)]" : "text-[var(--color-ink-muted)]")}>
+                  {s.stepName}
+                </p>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    );
+  }
+
+  return (
+    <div className="flex items-center overflow-x-auto pb-1">
+      {steps.map((s, i) => {
+        const done = i < currentIdx;
+        const active = i === currentIdx;
+        return (
+          <div key={s.stepOrder} className="flex items-center shrink-0">
+            <div className="flex flex-col items-center gap-1.5 min-w-[86px]">
+              <span
+                className={cx(
+                  "flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold transition-colors",
+                  done ? "bg-[var(--color-status-good)] text-white" :
+                  active ? "bg-[var(--color-brand-1)] text-white shadow-[var(--shadow-sm)]" :
+                  "bg-black/10 text-[var(--color-ink-muted)] dark:bg-white/10"
+                )}
+              >
+                {done ? <Check size={14} strokeWidth={3} /> : i + 1}
+              </span>
+              <span className={cx("text-[11px] text-center", active ? "font-semibold text-[var(--color-ink-primary)]" : "text-[var(--color-ink-muted)]")}>
+                {s.stepName}
+              </span>
+            </div>
+            {i < steps.length - 1 && (
+              <div className={cx("h-0.5 w-6 sm:w-10 transition-colors", done ? "bg-[var(--color-status-good)]" : "bg-black/10 dark:bg-white/10")} />
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -174,7 +259,7 @@ export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
     <input
       {...props}
       className={cx(
-        "w-full rounded-lg border bg-[var(--color-surface-2)] px-3 py-2 text-sm outline-none [border-color:var(--color-border)] focus:border-[var(--color-brand-1)] transition-colors",
+        "w-full rounded-lg border bg-[var(--color-surface-2)] px-3 py-2 text-sm outline-none [border-color:var(--color-border)] transition-[border-color,box-shadow] duration-150 focus:border-[var(--color-brand-1)] focus:ring-4 focus:ring-[var(--color-brand-1)]/[0.12]",
         props.className
       )}
     />
@@ -186,7 +271,7 @@ export function Select({ children, ...props }: React.SelectHTMLAttributes<HTMLSe
     <select
       {...props}
       className={cx(
-        "w-full rounded-lg border bg-[var(--color-surface-2)] px-3 py-2 text-sm outline-none [border-color:var(--color-border)] focus:border-[var(--color-brand-1)] transition-colors",
+        "w-full rounded-lg border bg-[var(--color-surface-2)] px-3 py-2 text-sm outline-none [border-color:var(--color-border)] transition-[border-color,box-shadow] duration-150 focus:border-[var(--color-brand-1)] focus:ring-4 focus:ring-[var(--color-brand-1)]/[0.12]",
         props.className
       )}
     >
@@ -200,7 +285,7 @@ export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement
     <textarea
       {...props}
       className={cx(
-        "w-full rounded-lg border bg-[var(--color-surface-2)] px-3 py-2 text-sm outline-none [border-color:var(--color-border)] focus:border-[var(--color-brand-1)] transition-colors",
+        "w-full rounded-lg border bg-[var(--color-surface-2)] px-3 py-2 text-sm outline-none [border-color:var(--color-border)] transition-[border-color,box-shadow] duration-150 focus:border-[var(--color-brand-1)] focus:ring-4 focus:ring-[var(--color-brand-1)]/[0.12]",
         props.className
       )}
     />

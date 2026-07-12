@@ -11,10 +11,10 @@ const tickStyle = { fill: axisColor, fontSize: 12 };
 function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg border bg-[var(--color-surface-2)] px-3 py-2 text-xs shadow-lg [border-color:var(--color-border)]">
-      {label && <p className="mb-1 font-medium text-[var(--color-ink-primary)]">{label}</p>}
+    <div className="rounded-xl border bg-[var(--color-surface-2)] px-3 py-2.5 text-xs shadow-[var(--shadow-md)] [border-color:var(--color-border)]">
+      {label && <p className="mb-1.5 font-semibold tracking-tight text-[var(--color-ink-primary)]">{label}</p>}
       {payload.map((p: any, i: number) => (
-        <div key={i} className="flex items-center gap-1.5">
+        <div key={i} className="flex items-center gap-1.5 py-0.5">
           <span className="h-2 w-2 rounded-full shrink-0" style={{ background: p.color ?? p.fill }} />
           <span className="text-[var(--color-ink-secondary)]">{p.name}:</span>
           <span className="font-medium tabular-nums text-[var(--color-ink-primary)]">{p.value}</span>
@@ -37,7 +37,7 @@ export function HorizontalBarChart({
         <XAxis type="number" tick={tickStyle} axisLine={{ stroke: gridColor }} tickLine={false} allowDecimals={false} />
         <YAxis type="category" dataKey={categoryKey} tick={tickStyle} axisLine={false} tickLine={false} width={110} />
         <Tooltip cursor={{ fill: "rgba(0,0,0,0.04)" }} content={<ChartTooltip />} />
-        <Bar dataKey={dataKey} fill={color} radius={[0, 4, 4, 0]} maxBarSize={18} name={dataKey}>
+        <Bar dataKey={dataKey} fill={color} radius={[0, 4, 4, 0]} maxBarSize={18} name={dataKey} animationDuration={600} animationEasing="ease-out">
           {valueFormatter && null}
         </Bar>
       </BarChart>
@@ -57,7 +57,7 @@ export function VerticalBarChart({
         <XAxis dataKey={categoryKey} tick={tickStyle} axisLine={{ stroke: gridColor }} tickLine={false} />
         <YAxis tick={tickStyle} axisLine={false} tickLine={false} allowDecimals={false} />
         <Tooltip cursor={{ fill: "rgba(0,0,0,0.04)" }} content={<ChartTooltip />} />
-        <Bar dataKey={dataKey} fill={color} radius={[4, 4, 0, 0]} maxBarSize={32} name={dataKey} />
+        <Bar dataKey={dataKey} fill={color} radius={[4, 4, 0, 0]} maxBarSize={32} name={dataKey} animationDuration={600} animationEasing="ease-out" />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -72,7 +72,7 @@ export function DonutChart({
     <div className="relative">
       <ResponsiveContainer width="100%" height={height}>
         <PieChart>
-          <Pie data={data} dataKey="value" nameKey="name" innerRadius="62%" outerRadius="90%" paddingAngle={2} strokeWidth={2} stroke="var(--color-surface-1)">
+          <Pie data={data} dataKey="value" nameKey="name" innerRadius="62%" outerRadius="90%" paddingAngle={2} strokeWidth={2} stroke="var(--color-surface-1)" animationDuration={700} animationEasing="ease-out">
             {data.map((_, i) => (
               <Cell key={i} fill={SERIES[i % SERIES.length]} />
             ))}
@@ -113,7 +113,7 @@ export function TrendAreaChart({
         <XAxis dataKey={categoryKey} tick={tickStyle} axisLine={{ stroke: gridColor }} tickLine={false} />
         <YAxis tick={tickStyle} axisLine={false} tickLine={false} allowDecimals={false} />
         <Tooltip content={<ChartTooltip />} />
-        <Area type="monotone" dataKey={dataKey} stroke={color} strokeWidth={2} fill="url(#trendFill)" dot={false} name={dataKey} />
+        <Area type="monotone" dataKey={dataKey} stroke={color} strokeWidth={2} fill="url(#trendFill)" dot={false} name={dataKey} animationDuration={700} animationEasing="ease-out" />
       </AreaChart>
     </ResponsiveContainer>
   );

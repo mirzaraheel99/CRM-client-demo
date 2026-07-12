@@ -29,6 +29,12 @@
 
   --color-brand-1: #c2410c;
   --color-brand-2: #9a3412;
+
+  --shadow-xs: 0 1px 2px rgba(11, 11, 11, 0.04);
+  --shadow-sm: 0 1px 3px rgba(11, 11, 11, 0.06), 0 1px 2px rgba(11, 11, 11, 0.04);
+  --shadow-md: 0 4px 12px rgba(11, 11, 11, 0.08), 0 2px 4px rgba(11, 11, 11, 0.04);
+  --shadow-lg: 0 12px 32px rgba(11, 11, 11, 0.12), 0 4px 8px rgba(11, 11, 11, 0.04);
+  --ease-out-premium: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 :root[data-theme="dark"] {
@@ -53,6 +59,11 @@
 
   --color-brand-1: #f0763a;
   --color-brand-2: #e0621f;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.24);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.32), 0 1px 2px rgba(0, 0, 0, 0.24);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.36), 0 2px 4px rgba(0, 0, 0, 0.24);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.44), 0 4px 8px rgba(0, 0, 0, 0.28);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -78,6 +89,11 @@
 
     --color-brand-1: #f0763a;
     --color-brand-2: #e0621f;
+
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.24);
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.32), 0 1px 2px rgba(0, 0, 0, 0.24);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.36), 0 2px 4px rgba(0, 0, 0, 0.24);
+    --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.44), 0 4px 8px rgba(0, 0, 0, 0.28);
   }
 }
 
@@ -107,4 +123,25 @@ body {
 
 .tabular-nums {
   font-variant-numeric: tabular-nums;
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-rise-in {
+  animation: rise-in 0.45s var(--ease-out-premium) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise-in {
+    animation: none;
+  }
 }

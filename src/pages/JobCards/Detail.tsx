@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, MessageCircle, Smartphone, Mail, CheckCircle2, XCircle, ImagePlus, Printer, Sparkles } from "lucide-react";
 import { useStore } from "../../lib/store";
-import { Card, CardHeader, Tabs, Button, Select, Textarea, Badge, Avatar } from "../../components/ui";
+import { Card, CardHeader, Tabs, Button, Select, Textarea, Badge, Avatar, WorkflowStepper } from "../../components/ui";
 import { JobStatusBadge, JobTypeBadge } from "../../components/StatusBadge";
 import { PartsGrid } from "../../components/PartsGrid";
 import { TrackingShare } from "../../components/TrackingShare";
@@ -131,16 +131,16 @@ export default function JobCardDetail() {
         <ArrowLeft size={15} /> Back
       </button>
 
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-3 animate-rise-in">
         <div className="flex items-center gap-3 flex-wrap">
-          <h1 className="text-xl font-semibold">{job.id}</h1>
+          <h1 className="text-xl font-semibold tracking-tight">{job.id}</h1>
           <JobStatusBadge status={job.status} />
           <JobTypeBadge jobType={job.jobType} />
           {job.oemClaimNo && <Badge tone="brand">OEM {job.oemClaimNo}</Badge>}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr_280px] gap-5 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr_280px] gap-5 items-start animate-rise-in" style={{ animationDelay: "40ms" }}>
         {/* Left panel */}
         <Card className="space-y-4">
           <div>
@@ -317,7 +317,7 @@ export default function JobCardDetail() {
             {tab === "Parts" && (
               <div className="space-y-5">
                 {diagnosisSuggestions.length > 0 && (
-                  <Card className="!bg-[var(--color-brand-1)]/[0.04]">
+                  <Card interactive className="!bg-[var(--color-brand-1)]/[0.04]">
                     <div className="flex items-center gap-1.5 mb-2">
                       <Sparkles size={14} className="text-[var(--color-brand-1)]" />
                       <p className="text-sm font-semibold">AI Diagnosis Assistant</p>
@@ -427,18 +427,17 @@ export default function JobCardDetail() {
 
         {/* Right panel */}
         <div className="space-y-4">
-          <Card className="space-y-3">
+          <Card interactive className="space-y-3">
             <CardHeader title="Customer Tracking" subtitle="Self-service link — no login required" />
             <TrackingShare jobId={job.id} />
           </Card>
 
           <Card className="space-y-3">
-            <CardHeader title="Workflow" />
-            <p className="text-xs text-[var(--color-ink-muted)]">Current stage</p>
-            <p className="text-sm font-medium">{job.currentStage}</p>
+            <CardHeader title="Workflow" subtitle={workflow ? `${workflow.steps.length}-step ${job.jobType.replace("_", " ")} flow` : undefined} />
+            {workflow && <WorkflowStepper steps={workflow.steps} currentIdx={currentStepIdx} orientation="vertical" />}
             {nextStep ? (
-              <>
-                <p className="text-xs text-[var(--color-ink-muted)]">Next: {nextStep.stepName}{nextStep.approvalRequired ? ` (needs ${nextStep.approverRole} approval)` : ""}</p>
+              <div className="border-t pt-3 [border-color:var(--color-border)] space-y-2">
+                <p className="text-xs text-[var(--color-ink-muted)]">Next: <span className="font-medium text-[var(--color-ink-secondary)]">{nextStep.stepName}</span>{nextStep.approvalRequired ? ` (needs ${nextStep.approverRole} approval)` : ""}</p>
                 <Button
                   className="w-full justify-center"
                   onClick={handleAdvance}
@@ -449,9 +448,9 @@ export default function JobCardDetail() {
                 {nextStep.approvalRequired && !canApprove && (
                   <p className="text-[11px] text-[var(--color-status-serious)]">Switch role to Supervisor/Manager/Admin to approve this stage.</p>
                 )}
-              </>
+              </div>
             ) : (
-              <p className="text-xs text-[var(--color-status-good)] font-medium">Job complete — delivered.</p>
+              <p className="text-xs text-[var(--color-status-good)] font-medium border-t pt-3 [border-color:var(--color-border)]">Job complete — delivered.</p>
             )}
           </Card>
 

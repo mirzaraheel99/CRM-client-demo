@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
-import { ClipboardList, Clock, ShieldCheck, PackageX, Users, Sparkles, ArrowRight } from "lucide-react";
+import { ClipboardList, Clock, ShieldCheck, PackageX, Users, Sparkles, ArrowRight, PackageCheck } from "lucide-react";
 import { useStore } from "../lib/store";
-import { Card, CardHeader, StatTile, Button } from "../components/ui";
+import { Card, CardHeader, StatTile, Button, EmptyState } from "../components/ui";
 import { HorizontalBarChart, VerticalBarChart, DonutChart, TrendAreaChart } from "../components/charts";
 import { JobStatusBadge } from "../components/StatusBadge";
 import { filterByBranch, jobsByStatus, technicianWorkload, warrantyRatio, tatTrend, inventoryAlerts, avgTat, predictiveMaintenanceCandidates } from "../lib/selectors";
@@ -29,9 +29,9 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between flex-wrap gap-3">
+      <div className="flex items-start justify-between flex-wrap gap-3 animate-rise-in">
         <div>
-          <h1 className="text-xl font-semibold">{t(lang, "welcomeBack")}</h1>
+          <h1 className="text-xl font-semibold tracking-tight">{t(lang, "welcomeBack")}</h1>
           <p className="text-sm text-[var(--color-ink-muted)] mt-0.5">{t(lang, "overviewToday")}</p>
         </div>
         <Link to="/jobcards/new">
@@ -40,8 +40,8 @@ export default function Dashboard() {
       </div>
 
       {maintenanceCandidates.length > 0 && (
-        <Link to="/predictive-maintenance">
-          <Card className="!bg-[var(--color-brand-1)]/[0.05] hover:!bg-[var(--color-brand-1)]/[0.08] transition-colors">
+        <Link to="/predictive-maintenance" className="block animate-rise-in" style={{ animationDelay: "40ms" }}>
+          <Card interactive className="!bg-[var(--color-brand-1)]/[0.05] hover:!bg-[var(--color-brand-1)]/[0.08]">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2.5">
                 <Sparkles size={18} className="text-[var(--color-brand-1)] shrink-0" />
@@ -57,30 +57,36 @@ export default function Dashboard() {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
-        <StatTile label="Active Jobs" value={String(activeJobs.length)} icon={<ClipboardList size={16} />} accent="var(--color-series-1)" />
-        <StatTile label="Avg. Turnaround Time" value={`${avgTat(scopedJobs)}h`} icon={<Clock size={16} />} accent="var(--color-series-3)" />
-        <StatTile label="Warranty Share" value={`${warrantyPct}%`} icon={<ShieldCheck size={16} />} accent="var(--color-series-2)" />
-        <StatTile label="Low Stock Alerts" value={String(alerts.length)} icon={<PackageX size={16} />} accent="var(--color-status-critical)" delta={alerts.length > 0 ? "Needs attention" : undefined} deltaTone="critical" />
-        <StatTile label="Technicians Available" value={`${availableTechs}/${scopedTechs.length}`} icon={<Users size={16} />} accent="var(--color-series-5)" />
+        {[
+          <StatTile key="active" label="Active Jobs" value={String(activeJobs.length)} icon={<ClipboardList size={16} />} accent="var(--color-series-1)" />,
+          <StatTile key="tat" label="Avg. Turnaround Time" value={`${avgTat(scopedJobs)}h`} icon={<Clock size={16} />} accent="var(--color-series-3)" />,
+          <StatTile key="warranty" label="Warranty Share" value={`${warrantyPct}%`} icon={<ShieldCheck size={16} />} accent="var(--color-series-2)" />,
+          <StatTile key="stock" label="Low Stock Alerts" value={String(alerts.length)} icon={<PackageX size={16} />} accent="var(--color-status-critical)" delta={alerts.length > 0 ? "Needs attention" : undefined} deltaTone="critical" />,
+          <StatTile key="techs" label="Technicians Available" value={`${availableTechs}/${scopedTechs.length}`} icon={<Users size={16} />} accent="var(--color-series-5)" />,
+        ].map((tile, i) => (
+          <div key={tile.key} className="animate-rise-in" style={{ animationDelay: `${i * 40}ms` }}>
+            {tile}
+          </div>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <Card className="xl:col-span-2">
+        <Card className="xl:col-span-2" interactive>
           <CardHeader title={t(lang, "jobsByStatus")} subtitle="Live count across the selected branch scope" />
           <HorizontalBarChart data={jobsByStatus(scopedJobs)} dataKey="count" categoryKey="status" color="var(--color-series-1)" />
         </Card>
-        <Card>
+        <Card interactive>
           <CardHeader title={t(lang, "warrantyRatio")} />
           <DonutChart data={warrantyRatio(scopedJobs)} centerValue={`${warrantyPct}%`} centerLabel="Warranty" />
         </Card>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <Card className="xl:col-span-2">
+        <Card className="xl:col-span-2" interactive>
           <CardHeader title={t(lang, "tatTrend")} subtitle="Average turnaround hours per day, last 14 days" />
           <TrendAreaChart data={tatTrend(scopedJobs)} dataKey="avgHours" categoryKey="day" color="var(--color-series-1)" />
         </Card>
-        <Card>
+        <Card interactive>
           <CardHeader title={t(lang, "technicianWorkload")} subtitle="Open jobs assigned" />
           <VerticalBarChart data={technicianWorkload(scopedJobs, scopedTechs)} dataKey="jobs" categoryKey="name" color="var(--color-series-5)" height={240} />
         </Card>
@@ -89,7 +95,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <Card className="xl:col-span-2 overflow-x-auto" padded={false}>
           <div className="p-5 pb-0">
-            <CardHeader title={t(lang, "latestJobs")} action={<Link to="/jobcards" className="text-xs font-medium text-[var(--color-brand-1)]">View all →</Link>} />
+            <CardHeader title={t(lang, "latestJobs")} action={<Link to="/jobcards" className="text-xs font-medium text-[var(--color-brand-1)] hover:text-[var(--color-brand-2)] transition-colors">View all →</Link>} />
           </div>
           <table className="w-full text-sm">
             <thead>
@@ -104,9 +110,9 @@ export default function Dashboard() {
             </thead>
             <tbody>
               {latest.map((j) => (
-                <tr key={j.id} className="border-b last:border-0 [border-color:var(--color-border)] hover:bg-black/[0.02] dark:hover:bg-white/[0.03]">
+                <tr key={j.id} className="border-b last:border-0 [border-color:var(--color-border)] transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.03]">
                   <td className="px-5 py-2.5">
-                    <Link to={`/jobcards/${j.id}`} className="font-medium text-[var(--color-brand-1)]">{j.id}</Link>
+                    <Link to={`/jobcards/${j.id}`} className="font-medium text-[var(--color-brand-1)] hover:text-[var(--color-brand-2)] transition-colors">{j.id}</Link>
                   </td>
                   <td className="px-3 py-2.5">{custMap.get(j.customerId)?.name ?? "—"}</td>
                   <td className="px-3 py-2.5 text-[var(--color-ink-secondary)]">{appMap.get(j.applianceId)?.model ?? "—"}</td>
@@ -121,18 +127,21 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader title={t(lang, "inventoryAlerts")} subtitle="At or below reorder level" />
-          <div className="space-y-3">
-            {alerts.length === 0 && <p className="text-sm text-[var(--color-ink-muted)]">All stock levels healthy.</p>}
-            {alerts.map(({ item, total }) => (
-              <div key={item.id} className="flex items-center justify-between text-sm">
-                <div className="min-w-0">
-                  <p className="font-medium truncate">{item.name}</p>
-                  <p className="text-xs text-[var(--color-ink-muted)]">{item.partNo} · reorder at {item.reorderLevel}</p>
+          {alerts.length === 0 ? (
+            <EmptyState icon={<PackageCheck size={18} />} title="All stock levels healthy" subtitle="Nothing at or below its reorder level." />
+          ) : (
+            <div className="space-y-3">
+              {alerts.map(({ item, total }) => (
+                <div key={item.id} className="flex items-center justify-between text-sm">
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{item.name}</p>
+                    <p className="text-xs text-[var(--color-ink-muted)]">{item.partNo} · reorder at {item.reorderLevel}</p>
+                  </div>
+                  <span className="tabular-nums font-semibold text-[var(--color-status-critical)]">{total} left</span>
                 </div>
-                <span className="tabular-nums font-semibold text-[var(--color-status-critical)]">{total} left</span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </Card>
       </div>
     </div>

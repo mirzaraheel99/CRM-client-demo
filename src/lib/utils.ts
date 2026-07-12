@@ -32,6 +32,10 @@ export function cx(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
 }
 
+export function formatCompact(n: number) {
+  return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(n);
+}
+
 export function initials(name: string) {
   return name
     .split(" ")

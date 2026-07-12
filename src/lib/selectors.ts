@@ -53,6 +53,52 @@ export function tatTrend(jobCards: JobCard[], days = 14) {
   return buckets;
 }
 
+export function jobVolumeAndTat(jobCards: JobCard[], days = 14) {
+  const buckets: { day: string; jobs: number; avgHours: number }[] = [];
+  const now = new Date();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const label = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+    const dayJobs = jobCards.filter((j) => new Date(j.createdAt).toDateString() === d.toDateString());
+    const hrs = dayJobs.length
+      ? Math.round(dayJobs.reduce((acc, j) => acc + tatHours(j.createdAt, j.status === "Delivered" ? j.updatedAt : undefined), 0) / dayJobs.length)
+      : 0;
+    buckets.push({ day: label, jobs: dayJobs.length, avgHours: hrs });
+  }
+  return buckets;
+}
+
+export function activeJobsTrend(jobCards: JobCard[], days = 14) {
+  const now = new Date();
+  const points: number[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    d.setHours(23, 59, 59, 999);
+    const activeAsOf = jobCards.filter((j) => {
+      const created = new Date(j.createdAt);
+      if (created > d) return false;
+      if (j.status !== "Delivered") return true;
+      return new Date(j.updatedAt) > d;
+    }).length;
+    points.push(activeAsOf);
+  }
+  return points;
+}
+
+export function warrantyShareTrend(jobCards: JobCard[], days = 14) {
+  const now = new Date();
+  const points: number[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const upToDay = jobCards.filter((j) => new Date(j.createdAt) <= d);
+    points.push(upToDay.length ? Math.round((upToDay.filter((j) => j.jobType === "warranty").length / upToDay.length) * 100) : 0);
+  }
+  return points;
+}
+
 export function inventoryAlerts(items: InventoryItem[], locations: InventoryLocation[], stock: InventoryStock[], branchId: string | "all") {
   const relevantLocIds = new Set(filterByBranch(locations, branchId).map((l) => l.id));
   const totals = new Map<string, number>();

@@ -94,7 +94,7 @@ export default function Reports() {
           {tab === "Job TAT" && (
             <>
               <CardHeader title="Average turnaround time by brand" subtitle="Delivered jobs only, hours from receipt to handover" />
-              <HorizontalBarChart data={tatByBrand} dataKey="avgHours" categoryKey="brand" color="var(--color-series-1)" />
+              <HorizontalBarChart data={tatByBrand} dataKey="avgHours" categoryKey="brand" color="var(--color-series-1)" referenceValue={48} referenceLabel="48h SLA target" />
             </>
           )}
           {tab === "Technician Performance" && (

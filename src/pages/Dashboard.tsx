@@ -2,9 +2,12 @@ import { Link } from "react-router-dom";
 import { ClipboardList, Clock, ShieldCheck, PackageX, Users, Sparkles, ArrowRight, PackageCheck } from "lucide-react";
 import { useStore } from "../lib/store";
 import { Card, CardHeader, StatTile, Button, EmptyState } from "../components/ui";
-import { HorizontalBarChart, VerticalBarChart, DonutChart, TrendAreaChart } from "../components/charts";
+import { HorizontalBarChart, VerticalBarChart, DonutChart, ComboChart, Sparkline } from "../components/charts";
 import { JobStatusBadge } from "../components/StatusBadge";
-import { filterByBranch, jobsByStatus, technicianWorkload, warrantyRatio, tatTrend, inventoryAlerts, avgTat, predictiveMaintenanceCandidates } from "../lib/selectors";
+import {
+  filterByBranch, jobsByStatus, technicianWorkload, warrantyRatio, inventoryAlerts, avgTat,
+  predictiveMaintenanceCandidates, jobVolumeAndTat, activeJobsTrend, warrantyShareTrend,
+} from "../lib/selectors";
 import { formatDate } from "../lib/utils";
 import { t } from "../lib/i18n";
 
@@ -26,6 +29,9 @@ export default function Dashboard() {
   const latest = [...scopedJobs].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)).slice(0, 8);
   const warrantyPct = scopedJobs.length ? Math.round((scopedJobs.filter((j) => j.jobType === "warranty").length / scopedJobs.length) * 100) : 0;
   const availableTechs = scopedTechs.filter((tc) => tc.status === "Available").length;
+
+  const sparkData = (arr: number[]) => arr.map((v, i) => ({ i, v }));
+  const volumeTrend = jobVolumeAndTat(scopedJobs);
 
   return (
     <div className="space-y-6">
@@ -58,9 +64,18 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
         {[
-          <StatTile key="active" label="Active Jobs" value={String(activeJobs.length)} icon={<ClipboardList size={16} />} accent="var(--color-series-1)" />,
-          <StatTile key="tat" label="Avg. Turnaround Time" value={`${avgTat(scopedJobs)}h`} icon={<Clock size={16} />} accent="var(--color-series-3)" />,
-          <StatTile key="warranty" label="Warranty Share" value={`${warrantyPct}%`} icon={<ShieldCheck size={16} />} accent="var(--color-series-2)" />,
+          <StatTile
+            key="active" label="Active Jobs" value={String(activeJobs.length)} icon={<ClipboardList size={16} />} accent="var(--color-series-1)"
+            sparkline={<Sparkline data={sparkData(activeJobsTrend(scopedJobs))} dataKey="v" color="var(--color-series-1)" />}
+          />,
+          <StatTile
+            key="tat" label="Avg. Turnaround Time" value={`${avgTat(scopedJobs)}h`} icon={<Clock size={16} />} accent="var(--color-series-3)"
+            sparkline={<Sparkline data={volumeTrend} dataKey="avgHours" color="var(--color-series-3)" />}
+          />,
+          <StatTile
+            key="warranty" label="Warranty Share" value={`${warrantyPct}%`} icon={<ShieldCheck size={16} />} accent="var(--color-series-2)"
+            sparkline={<Sparkline data={sparkData(warrantyShareTrend(scopedJobs))} dataKey="v" color="var(--color-series-2)" />}
+          />,
           <StatTile key="stock" label="Low Stock Alerts" value={String(alerts.length)} icon={<PackageX size={16} />} accent="var(--color-status-critical)" delta={alerts.length > 0 ? "Needs attention" : undefined} deltaTone="critical" />,
           <StatTile key="techs" label="Technicians Available" value={`${availableTechs}/${scopedTechs.length}`} icon={<Users size={16} />} accent="var(--color-series-5)" />,
         ].map((tile, i) => (
@@ -83,8 +98,12 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <Card className="xl:col-span-2" interactive>
-          <CardHeader title={t(lang, "tatTrend")} subtitle="Average turnaround hours per day, last 14 days" />
-          <TrendAreaChart data={tatTrend(scopedJobs)} dataKey="avgHours" categoryKey="day" color="var(--color-series-1)" />
+          <CardHeader title={t(lang, "tatTrend")} subtitle="Daily job volume (bars) vs. average turnaround hours (line), last 14 days" />
+          <ComboChart
+            data={volumeTrend} categoryKey="day" barKey="jobs" lineKey="avgHours"
+            barColor="var(--color-series-1)" lineColor="var(--color-series-3)"
+            referenceValue={48} referenceLabel="48h SLA target"
+          />
         </Card>
         <Card interactive>
           <CardHeader title={t(lang, "technicianWorkload")} subtitle="Open jobs assigned" />

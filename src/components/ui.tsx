@@ -86,9 +86,10 @@ export function Button({
 }
 
 export function StatTile({
-  label, value, delta, deltaTone = "good", icon, accent,
+  label, value, delta, deltaTone = "good", icon, accent, sparkline,
 }: {
   label: string; value: string; delta?: string; deltaTone?: "good" | "critical"; icon?: ReactNode; accent?: string;
+  sparkline?: ReactNode;
 }) {
   const animatedValue = useCountUp(value);
   return (
@@ -112,6 +113,7 @@ export function StatTile({
           </span>
         )}
       </div>
+      {sparkline && <div className="-mx-1 -mb-1">{sparkline}</div>}
     </Card>
   );
 }

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useStore } from "../lib/store";
 import { Card, CardHeader, Button, Input, Field, Modal, Textarea } from "../components/ui";
+import { toast } from "../lib/toast";
 
 export default function Brands() {
   const { brands, appliances, addBrand } = useStore();
@@ -12,13 +13,14 @@ export default function Brands() {
     addBrand(form);
     setForm({ name: "", warrantyMonths: 12, rules: "" });
     setOpen(false);
+    toast(`${form.name} added to brands.`);
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-3 animate-rise-in">
         <div>
-          <h1 className="text-xl font-semibold">Brand Master</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Brand Master</h1>
           <p className="text-sm text-[var(--color-ink-muted)] mt-0.5">Warranty durations and OEM rules used by the workflow engine</p>
         </div>
         <Button onClick={() => setOpen(true)}>+ Add Brand</Button>
@@ -26,7 +28,7 @@ export default function Brands() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {brands.map((b) => (
-          <Card key={b.id}>
+          <Card key={b.id} interactive>
             <CardHeader title={b.name} subtitle={`${b.warrantyMonths} month warranty`} />
             <p className="text-sm text-[var(--color-ink-secondary)]">{b.rules}</p>
             <p className="text-xs text-[var(--color-ink-muted)] mt-3">{appliances.filter((a) => a.brandId === b.id).length} appliances registered</p>

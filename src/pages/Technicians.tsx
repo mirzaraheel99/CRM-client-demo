@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useStore } from "../lib/store";
 import { Card, Button, Input, Select, Field, Modal, Badge, Avatar, Tabs } from "../components/ui";
+import { toast } from "../lib/toast";
 import type { ApplianceCategory } from "../lib/types";
 
 const CATEGORIES: ApplianceCategory[] = ["AC", "Refrigerator", "Washer", "Mobile", "TV", "Microwave"];
@@ -21,6 +22,7 @@ export default function Technicians() {
     addTechnician(form);
     setForm({ name: "", phone: "", zone: "Zone A", skills: [], branchId: "br-1", status: "Available", avatarColor: "#2a78d6" });
     setOpen(false);
+    toast(`${form.name} added to technicians.`);
   }
 
   const days = Array.from({ length: 7 }, (_, i) => {
@@ -33,9 +35,9 @@ export default function Technicians() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-3 animate-rise-in">
         <div>
-          <h1 className="text-xl font-semibold">Technicians</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Technicians</h1>
           <p className="text-sm text-[var(--color-ink-muted)] mt-0.5">{technicians.length} technicians across all branches</p>
         </div>
         <Button onClick={() => setOpen(true)}>+ Add Technician</Button>
@@ -49,7 +51,7 @@ export default function Technicians() {
               {technicians.map((t) => {
                 const activeJobs = jobCards.filter((j) => j.technicianId === t.id && j.status !== "Delivered").length;
                 return (
-                  <Card key={t.id} className="space-y-3">
+                  <Card key={t.id} interactive className="space-y-3">
                     <div className="flex items-center gap-3">
                       <Avatar name={t.name} color={t.avatarColor} />
                       <div className="min-w-0">

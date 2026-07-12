@@ -4,6 +4,8 @@ import { useStore } from "../lib/store";
 import { Card, Badge, Button, WorkflowStepper } from "../components/ui";
 import { JobStatusBadge } from "../components/StatusBadge";
 import { PaymentPanel } from "../components/PaymentPanel";
+import { Toaster } from "../components/Toaster";
+import { toast } from "../lib/toast";
 import { formatCurrency, formatDate } from "../lib/utils";
 import type { Channel } from "../lib/types";
 
@@ -100,8 +102,8 @@ export default function TrackingPage() {
               Estimated cost: <span className="font-semibold">{formatCurrency(job.estimateAmount)}</span> for parts + labor.
             </p>
             <div className="flex gap-2">
-              <Button onClick={() => approveCustomer(job.id, true)}><CheckCircle2 size={14} /> Approve</Button>
-              <Button variant="danger" onClick={() => approveCustomer(job.id, false)}><XCircle size={14} /> Decline</Button>
+              <Button onClick={() => { approveCustomer(job.id, true); toast("Estimate approved — we'll get started."); }}><CheckCircle2 size={14} /> Approve</Button>
+              <Button variant="danger" onClick={() => { approveCustomer(job.id, false); toast("Estimate declined.", "info"); }}><XCircle size={14} /> Decline</Button>
             </div>
           </Card>
         )}
@@ -154,6 +156,7 @@ export default function TrackingPage() {
 
         <p className="text-center text-[11px] text-[var(--color-ink-muted)] pb-6">Powered by FixFlow</p>
       </main>
+      <Toaster />
     </div>
   );
 }

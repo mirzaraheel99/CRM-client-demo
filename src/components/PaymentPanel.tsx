@@ -2,6 +2,7 @@ import { useState } from "react";
 import { CheckCircle2, CreditCard } from "lucide-react";
 import { Card, Button, Badge } from "./ui";
 import { useStore } from "../lib/store";
+import { toast } from "../lib/toast";
 import { formatCurrency, formatDateTime } from "../lib/utils";
 import { PAYMENT_METHOD_LABELS, BNPL_METHODS } from "../lib/payments";
 import type { Payment, PaymentMethod } from "../lib/types";
@@ -43,6 +44,7 @@ export function PaymentPanel({ jobcardId, amount, payments }: { jobcardId: strin
     setTimeout(() => {
       recordPayment(jobcardId, selected, amount!, BNPL_METHODS.includes(selected) ? (selected === "tabby" ? 4 : 3) : undefined);
       setProcessing(false);
+      toast(`Payment of ${formatCurrency(amount!)} confirmed via ${PAYMENT_METHOD_LABELS[selected]}.`);
     }, 900);
   }
 

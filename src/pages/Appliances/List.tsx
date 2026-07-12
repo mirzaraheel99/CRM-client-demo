@@ -1,13 +1,16 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Search, Wifi } from "lucide-react";
+import { Search, Wifi, PackageSearch } from "lucide-react";
 import { useStore } from "../../lib/store";
-import { Card, Button, Input, Select, Modal, Field } from "../../components/ui";
+import { Card, Button, Input, Select, Modal, Field, EmptyState, SortableTh } from "../../components/ui";
 import { Badge } from "../../components/ui";
 import { formatDate } from "../../lib/utils";
-import type { ApplianceCategory } from "../../lib/types";
+import { toast } from "../../lib/toast";
+import { useSort } from "../../lib/useSort";
+import type { ApplianceCategory, Appliance } from "../../lib/types";
 
 const CATEGORIES: ApplianceCategory[] = ["AC", "Refrigerator", "Washer", "Mobile", "TV", "Microwave"];
+type SortKey = "model" | "category" | "brand" | "customer" | "serial" | "purchased";
 
 export default function ApplianceList() {
   const { appliances, customers, brands, addAppliance } = useStore();
@@ -16,7 +19,10 @@ export default function ApplianceList() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ customerId: "", brandId: "", category: "AC" as ApplianceCategory, model: "", serialNo: "", imeiNo: "", purchaseDate: "" });
 
-  const rows = useMemo(() => {
+  const custMap = new Map(customers.map((c) => [c.id, c]));
+  const brandMap = new Map(brands.map((b) => [b.id, b]));
+
+  const filtered = useMemo(() => {
     let list = appliances;
     if (category !== "all") list = list.filter((a) => a.category === category);
     if (search.trim()) {
@@ -26,8 +32,15 @@ export default function ApplianceList() {
     return list;
   }, [appliances, category, search]);
 
-  const custMap = new Map(customers.map((c) => [c.id, c]));
-  const brandMap = new Map(brands.map((b) => [b.id, b]));
+  const getValue = (a: Appliance, key: SortKey) => {
+    if (key === "model") return a.model;
+    if (key === "category") return a.category;
+    if (key === "brand") return brandMap.get(a.brandId)?.name ?? "";
+    if (key === "customer") return custMap.get(a.customerId)?.name ?? "";
+    if (key === "serial") return a.serialNo;
+    return new Date(a.purchaseDate).getTime();
+  };
+  const { sorted: rows, sortKey, dir, toggle } = useSort<Appliance, SortKey>(filtered, getValue, "purchased", "desc");
 
   function submit() {
     if (!form.customerId || !form.brandId || !form.model.trim() || !form.serialNo.trim() || !form.purchaseDate) return;
@@ -41,13 +54,14 @@ export default function ApplianceList() {
     });
     setForm({ customerId: "", brandId: "", category: "AC", model: "", serialNo: "", imeiNo: "", purchaseDate: "" });
     setOpen(false);
+    toast(`${form.model} added to appliances.`);
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-3 animate-rise-in">
         <div>
-          <h1 className="text-xl font-semibold">Appliances</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Appliances</h1>
           <p className="text-sm text-[var(--color-ink-muted)] mt-0.5">{rows.length} registered appliances</p>
         </div>
         <Button onClick={() => setOpen(true)}>+ Add Appliance</Button>
@@ -69,21 +83,21 @@ export default function ApplianceList() {
       <Card padded={false} className="overflow-x-auto">
         <table className="w-full text-sm min-w-[800px]">
           <thead>
-            <tr className="text-left text-xs text-[var(--color-ink-muted)] border-b [border-color:var(--color-border)]">
-              <th className="px-5 py-3 font-medium">Model</th>
-              <th className="px-3 py-3 font-medium">Category</th>
-              <th className="px-3 py-3 font-medium">Brand</th>
-              <th className="px-3 py-3 font-medium">Customer</th>
-              <th className="px-3 py-3 font-medium">Serial No.</th>
-              <th className="px-3 py-3 font-medium">Purchased</th>
+            <tr className="sticky top-0 z-10 bg-[var(--color-surface-1)] text-left text-xs text-[var(--color-ink-muted)] border-b [border-color:var(--color-border)]">
+              <SortableTh label="Model" active={sortKey === "model"} direction={dir} onClick={() => toggle("model")} className="px-5 py-3" />
+              <SortableTh label="Category" active={sortKey === "category"} direction={dir} onClick={() => toggle("category")} className="px-3 py-3" />
+              <SortableTh label="Brand" active={sortKey === "brand"} direction={dir} onClick={() => toggle("brand")} className="px-3 py-3" />
+              <SortableTh label="Customer" active={sortKey === "customer"} direction={dir} onClick={() => toggle("customer")} className="px-3 py-3" />
+              <SortableTh label="Serial No." active={sortKey === "serial"} direction={dir} onClick={() => toggle("serial")} className="px-3 py-3" />
+              <SortableTh label="Purchased" active={sortKey === "purchased"} direction={dir} onClick={() => toggle("purchased")} className="px-3 py-3" />
               <th className="px-5 py-3 font-medium">Warranty</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((a) => (
-              <tr key={a.id} className="border-b last:border-0 [border-color:var(--color-border)] hover:bg-black/[0.02] dark:hover:bg-white/[0.03]">
+              <tr key={a.id} className="border-b last:border-0 [border-color:var(--color-border)] transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.03]">
                 <td className="px-5 py-3">
-                  <Link to={`/appliances/${a.id}`} className="font-medium text-[var(--color-brand-1)]">{a.model}</Link>
+                  <Link to={`/appliances/${a.id}`} className="font-medium text-[var(--color-brand-1)] hover:text-[var(--color-brand-2)] transition-colors">{a.model}</Link>
                   {a.isSmartConnected && <Wifi size={12} className="inline ml-1.5 mb-0.5 text-[var(--color-status-good)]" />}
                 </td>
                 <td className="px-3 py-3 text-[var(--color-ink-secondary)]">{a.category}</td>
@@ -96,6 +110,7 @@ export default function ApplianceList() {
             ))}
           </tbody>
         </table>
+        {rows.length === 0 && <EmptyState icon={<PackageSearch size={18} />} title="No appliances found" subtitle="Try a different search or category filter." />}
       </Card>
 
       <Modal open={open} onClose={() => setOpen(false)} title="Add Appliance">

@@ -6,6 +6,7 @@ import { HorizontalBarChart, VerticalBarChart, TrendAreaChart, DonutChart } from
 import { formatCurrency, downloadCsv, tatHours } from "../lib/utils";
 import { tatTrend } from "../lib/selectors";
 import { PAYMENT_METHOD_LABELS } from "../lib/payments";
+import { toast } from "../lib/toast";
 
 const TABS = ["Job TAT", "Technician Performance", "Inventory Consumption", "Warranty Claims", "Revenue"];
 
@@ -79,12 +80,12 @@ export default function Reports() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-3 animate-rise-in">
         <div>
-          <h1 className="text-xl font-semibold">Reports</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Reports</h1>
           <p className="text-sm text-[var(--color-ink-muted)] mt-0.5">Operational and financial reporting across branches</p>
         </div>
-        <Button variant="secondary" onClick={exportCsv}><Download size={14} /> Export CSV</Button>
+        <Button variant="secondary" onClick={() => { exportCsv(); toast(`${tab} report exported.`); }}><Download size={14} /> Export CSV</Button>
       </div>
 
       <Card padded={false}>

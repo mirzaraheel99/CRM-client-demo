@@ -2,6 +2,7 @@ import { useState } from "react";
 import { MessageCircle, ShieldCheck } from "lucide-react";
 import { Badge, Button, Input } from "./ui";
 import { useStore } from "../lib/store";
+import { toast } from "../lib/toast";
 
 export function WhatsappVerify({ customerId, verified }: { customerId: string; verified: boolean }) {
   const verifyWhatsapp = useStore((s) => s.verifyWhatsapp);
@@ -41,7 +42,7 @@ export function WhatsappVerify({ customerId, verified }: { customerId: string; v
         <Button
           size="sm"
           onClick={() => {
-            if (entered === demoCode) verifyWhatsapp(customerId);
+            if (entered === demoCode) { verifyWhatsapp(customerId); toast("WhatsApp number verified."); }
             else setError(true);
           }}
         >

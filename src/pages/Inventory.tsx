@@ -1,13 +1,16 @@
 import { useMemo, useState } from "react";
 import { PackagePlus, PackageMinus, ArrowLeftRight, Undo2, Sparkles } from "lucide-react";
 import { useStore } from "../lib/store";
-import { Card, CardHeader, Tabs, Button, Input, Select, Field, Modal, Badge } from "../components/ui";
+import { Card, CardHeader, Tabs, Button, Input, Select, Field, Modal, Badge, SortableTh } from "../components/ui";
 import { HorizontalBarChart } from "../components/charts";
 import { formatCurrency, formatDateTime } from "../lib/utils";
 import { stockByBranch, smartReorderSuggestions } from "../lib/selectors";
-import type { InventoryTransaction } from "../lib/types";
+import { toast } from "../lib/toast";
+import { useSort } from "../lib/useSort";
+import type { InventoryTransaction, InventoryItem } from "../lib/types";
 
 const TABS = ["Item Master", "Stock Ledger", "Locations & Van Stock", "Stock by Branch", "Smart Reorder"];
+type ItemSortKey = "name" | "partNo" | "brand" | "unitPrice" | "reorderLevel" | "totalStock";
 
 export default function Inventory() {
   const { branches, inventoryItems, inventoryLocations, inventoryStock, inventoryTransactions, addInventoryItem, addInventoryTransaction } = useStore();
@@ -24,6 +27,16 @@ export default function Inventory() {
     for (const s of inventoryStock) map.set(s.itemId, (map.get(s.itemId) ?? 0) + s.qty);
     return map;
   }, [inventoryStock]);
+
+  const itemSortValue = (i: InventoryItem, key: ItemSortKey) => {
+    if (key === "name") return i.name;
+    if (key === "partNo") return i.partNo;
+    if (key === "brand") return i.brand;
+    if (key === "unitPrice") return i.unitPrice;
+    if (key === "reorderLevel") return i.reorderLevel;
+    return stockByItem.get(i.id) ?? 0;
+  };
+  const { sorted: sortedItems, sortKey: itemSortKey, dir: itemDir, toggle: toggleItemSort } = useSort<InventoryItem, ItemSortKey>(inventoryItems, itemSortValue, "name");
 
   const branchStock = useMemo(
     () => stockByBranch(inventoryItems, inventoryLocations, inventoryStock, branches),
@@ -46,8 +59,10 @@ export default function Inventory() {
       createdBy: "You",
       destLocationId: txnModal === "transfer" ? txnForm.destLocationId : undefined,
     });
+    const itemName = inventoryItems.find((i) => i.id === txnForm.itemId)?.name;
     setTxnForm({ itemId: "", locationId: "", destLocationId: "", qty: 1 });
     setTxnModal(null);
+    toast(`${txnModal.charAt(0).toUpperCase() + txnModal.slice(1)} recorded for ${itemName}.`);
   }
 
   function submitItem() {
@@ -55,13 +70,14 @@ export default function Inventory() {
     addInventoryItem(itemForm);
     setItemForm({ name: "", category: "Electrical", brand: "", partNo: "", unitPrice: 0, reorderLevel: 5 });
     setItemModal(false);
+    toast(`${itemForm.name} added to inventory.`);
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-3 animate-rise-in">
         <div>
-          <h1 className="text-xl font-semibold">Inventory & Spare Parts</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Inventory & Spare Parts</h1>
           <p className="text-sm text-[var(--color-ink-muted)] mt-0.5">Stores, technician vans, and branch stock</p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -79,20 +95,20 @@ export default function Inventory() {
           {tab === "Item Master" && (
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-xs text-[var(--color-ink-muted)] border-b [border-color:var(--color-border)]">
-                  <th className="py-2 font-medium">Name</th>
-                  <th className="py-2 font-medium">Part No.</th>
-                  <th className="py-2 font-medium">Brand</th>
-                  <th className="py-2 font-medium">Unit Price</th>
-                  <th className="py-2 font-medium">Reorder Level</th>
-                  <th className="py-2 font-medium">Total Stock</th>
+                <tr className="sticky top-0 z-10 bg-[var(--color-surface-1)] text-left text-xs text-[var(--color-ink-muted)] border-b [border-color:var(--color-border)]">
+                  <SortableTh label="Name" active={itemSortKey === "name"} direction={itemDir} onClick={() => toggleItemSort("name")} className="py-2" />
+                  <SortableTh label="Part No." active={itemSortKey === "partNo"} direction={itemDir} onClick={() => toggleItemSort("partNo")} className="py-2" />
+                  <SortableTh label="Brand" active={itemSortKey === "brand"} direction={itemDir} onClick={() => toggleItemSort("brand")} className="py-2" />
+                  <SortableTh label="Unit Price" active={itemSortKey === "unitPrice"} direction={itemDir} onClick={() => toggleItemSort("unitPrice")} className="py-2" />
+                  <SortableTh label="Reorder Level" active={itemSortKey === "reorderLevel"} direction={itemDir} onClick={() => toggleItemSort("reorderLevel")} className="py-2" />
+                  <SortableTh label="Total Stock" active={itemSortKey === "totalStock"} direction={itemDir} onClick={() => toggleItemSort("totalStock")} className="py-2" />
                 </tr>
               </thead>
               <tbody>
-                {inventoryItems.map((i) => {
+                {sortedItems.map((i) => {
                   const total = stockByItem.get(i.id) ?? 0;
                   return (
-                    <tr key={i.id} className="border-b last:border-0 [border-color:var(--color-border)]">
+                    <tr key={i.id} className="border-b last:border-0 [border-color:var(--color-border)] transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.03]">
                       <td className="py-2.5 font-medium">{i.name}</td>
                       <td className="py-2.5 text-[var(--color-ink-secondary)]">{i.partNo}</td>
                       <td className="py-2.5 text-[var(--color-ink-secondary)]">{i.brand}</td>
@@ -226,7 +242,7 @@ export default function Inventory() {
                         {orderedItems.has(s.item.id) ? (
                           <Badge tone="good">Order placed</Badge>
                         ) : (
-                          <Button size="sm" variant="secondary" onClick={() => setOrderedItems((prev) => new Set(prev).add(s.item.id))}>
+                          <Button size="sm" variant="secondary" onClick={() => { setOrderedItems((prev) => new Set(prev).add(s.item.id)); toast(`Purchase order created for ${s.item.name}.`); }}>
                             Create Purchase Order
                           </Button>
                         )}

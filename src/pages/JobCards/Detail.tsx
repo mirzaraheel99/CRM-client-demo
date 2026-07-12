@@ -13,6 +13,7 @@ import { printEstimate } from "../../lib/print";
 import { printTaxInvoice } from "../../lib/zatca";
 import { suggestDiagnosis, suggestFromTelemetry } from "../../lib/diagnosisAI";
 import { PaymentPanel } from "../../components/PaymentPanel";
+import { toast } from "../../lib/toast";
 import { Wifi } from "lucide-react";
 import type { StageName, Channel } from "../../lib/types";
 
@@ -115,12 +116,14 @@ export default function JobCardDetail() {
   function handleAdvance() {
     if (!nextStep) return;
     advanceStage(job!.id, nextStep.stepName as StageName, `Advanced to ${nextStep.stepName}`, "You");
+    toast(`Advanced to ${nextStep.stepName}.`);
   }
 
   function handleSend() {
     if (!message.trim()) return;
     sendCommunication(job!.id, channel, message.trim());
     setMessage("");
+    toast(`Message sent via ${channel === "whatsapp" ? "WhatsApp" : channel.toUpperCase()}.`);
   }
 
   const partsTotal = jobParts.reduce((acc, p) => acc + p.totalPrice, 0);
@@ -217,7 +220,7 @@ export default function JobCardDetail() {
                             </div>
                           ))}
                           <button
-                            onClick={() => addAttachment(job.id, h.stageName, `${h.stageName} photo`)}
+                            onClick={() => { addAttachment(job.id, h.stageName, `${h.stageName} photo`); toast("Photo added to timeline."); }}
                             className="flex items-center gap-1 rounded-md border border-dashed px-2 py-1 text-[11px] text-[var(--color-ink-muted)] hover:text-[var(--color-brand-1)] hover:border-[var(--color-brand-1)] [border-color:var(--color-border)]"
                           >
                             <ImagePlus size={12} /> Add photo
@@ -277,7 +280,7 @@ export default function JobCardDetail() {
                     </div>
                     <Button
                       variant="secondary"
-                      onClick={() => { const n = Number(estimateInput); if (n > 0) { setEstimate(job.id, n); setEstimateInput(""); } }}
+                      onClick={() => { const n = Number(estimateInput); if (n > 0) { setEstimate(job.id, n); setEstimateInput(""); toast(`Estimate set to ${formatCurrency(n)}.`); } }}
                     >
                       Save Estimate
                     </Button>
@@ -285,8 +288,8 @@ export default function JobCardDetail() {
                 )}
                 {job.currentStage === "Customer Approval" && job.customerApproved == null && (
                   <div className="border-t pt-4 [border-color:var(--color-border)] flex gap-2">
-                    <Button onClick={() => approveCustomer(job.id, true)}><CheckCircle2 size={14} /> Approve</Button>
-                    <Button variant="danger" onClick={() => approveCustomer(job.id, false)}><XCircle size={14} /> Decline</Button>
+                    <Button onClick={() => { approveCustomer(job.id, true); toast("Customer approval recorded."); }}><CheckCircle2 size={14} /> Approve</Button>
+                    <Button variant="danger" onClick={() => { approveCustomer(job.id, false); toast("Customer decline recorded.", "info"); }}><XCircle size={14} /> Decline</Button>
                   </div>
                 )}
                 <div className="border-t pt-4 [border-color:var(--color-border)] flex gap-2 flex-wrap">
@@ -336,7 +339,7 @@ export default function JobCardDetail() {
                               return (
                                 <button
                                   key={name}
-                                  onClick={() => addPartUsed(job.id, item.id, 1)}
+                                  onClick={() => { addPartUsed(job.id, item.id, 1); toast(`${name} added to job card.`); }}
                                   className="rounded-full border px-2.5 py-1 text-xs text-[var(--color-ink-secondary)] hover:text-[var(--color-brand-1)] hover:border-[var(--color-brand-1)] [border-color:var(--color-border)]"
                                 >
                                   + {name}
@@ -353,7 +356,10 @@ export default function JobCardDetail() {
                 <PartsGrid
                   items={inventoryItems}
                   stockByItem={stockByItem}
-                  onAdd={(selections) => selections.forEach((s) => addPartUsed(job.id, s.itemId, s.qty))}
+                  onAdd={(selections) => {
+                    selections.forEach((s) => addPartUsed(job.id, s.itemId, s.qty));
+                    if (selections.length > 0) toast(`${selections.length} part${selections.length > 1 ? "s" : ""} added to job card.`);
+                  }}
                 />
                 <table className="w-full text-sm">
                   <thead>
@@ -389,7 +395,7 @@ export default function JobCardDetail() {
 
             {tab === "Attachments" && (
               <div className="space-y-3">
-                <Button variant="secondary" onClick={() => addAttachment(job.id, job.currentStage, `${job.currentStage} photo`)}>
+                <Button variant="secondary" onClick={() => { addAttachment(job.id, job.currentStage, `${job.currentStage} photo`); toast("Photo uploaded."); }}>
                   <ImagePlus size={14} /> Upload photo (simulated)
                 </Button>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -464,7 +470,7 @@ export default function JobCardDetail() {
               <option value="">Reassign to…</option>
               {technicians.map((t) => <option key={t.id} value={t.id}>{t.name} · {t.zone}</option>)}
             </Select>
-            <Button variant="secondary" className="w-full justify-center" disabled={!techSelect} onClick={() => { assignTechnician(job.id, techSelect); setTechSelect(""); }}>
+            <Button variant="secondary" className="w-full justify-center" disabled={!techSelect} onClick={() => { const tech = technicians.find((t) => t.id === techSelect); assignTechnician(job.id, techSelect); setTechSelect(""); toast(`Assigned to ${tech?.name ?? "technician"}.`); }}>
               Assign
             </Button>
           </Card>

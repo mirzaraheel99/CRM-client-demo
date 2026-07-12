@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { MessageCircle, Smartphone, Mail } from "lucide-react";
 import { useStore } from "../lib/store";
-import { Card, Select, Input, Badge } from "../components/ui";
+import { Card, Select, Input, Badge, EmptyState } from "../components/ui";
 import { formatDateTime } from "../lib/utils";
 import type { Channel } from "../lib/types";
 
@@ -38,15 +38,15 @@ export default function Communications() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold">Communication Logs</h1>
+      <div className="animate-rise-in">
+        <h1 className="text-xl font-semibold tracking-tight">Communication Logs</h1>
         <p className="text-sm text-[var(--color-ink-muted)] mt-0.5">Every WhatsApp, SMS, and email trigger fired by the workflow engine</p>
       </div>
 
       <div className="grid grid-cols-3 gap-4 max-w-xl">
-        <Card className="flex items-center gap-2"><MessageCircle size={16} className="text-[var(--color-status-good)]" /><span className="text-sm font-semibold tabular-nums">{counts.whatsapp}</span><span className="text-xs text-[var(--color-ink-muted)]">WhatsApp</span></Card>
-        <Card className="flex items-center gap-2"><Smartphone size={16} className="text-[var(--color-series-3)]" /><span className="text-sm font-semibold tabular-nums">{counts.sms}</span><span className="text-xs text-[var(--color-ink-muted)]">SMS</span></Card>
-        <Card className="flex items-center gap-2"><Mail size={16} className="text-[var(--color-series-1)]" /><span className="text-sm font-semibold tabular-nums">{counts.email}</span><span className="text-xs text-[var(--color-ink-muted)]">Email</span></Card>
+        <Card interactive className="flex items-center gap-2"><MessageCircle size={16} className="text-[var(--color-status-good)]" /><span className="text-sm font-semibold tabular-nums">{counts.whatsapp}</span><span className="text-xs text-[var(--color-ink-muted)]">WhatsApp</span></Card>
+        <Card interactive className="flex items-center gap-2"><Smartphone size={16} className="text-[var(--color-series-3)]" /><span className="text-sm font-semibold tabular-nums">{counts.sms}</span><span className="text-xs text-[var(--color-ink-muted)]">SMS</span></Card>
+        <Card interactive className="flex items-center gap-2"><Mail size={16} className="text-[var(--color-series-1)]" /><span className="text-sm font-semibold tabular-nums">{counts.email}</span><span className="text-xs text-[var(--color-ink-muted)]">Email</span></Card>
       </div>
 
       <Card className="flex flex-wrap gap-3">
@@ -78,7 +78,7 @@ export default function Communications() {
               const job = jobMap.get(c.jobcardId);
               const cust = job ? custMap.get(job.customerId) : undefined;
               return (
-                <tr key={c.id} className="border-b last:border-0 [border-color:var(--color-border)] hover:bg-black/[0.02] dark:hover:bg-white/[0.03]">
+                <tr key={c.id} className="border-b last:border-0 [border-color:var(--color-border)] transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.03]">
                   <td className="px-5 py-2.5">{CHANNEL_ICON[c.channel]}</td>
                   <td className="px-3 py-2.5"><Link to={`/jobcards/${c.jobcardId}`} className="font-medium text-[var(--color-brand-1)]">{c.jobcardId}</Link></td>
                   <td className="px-3 py-2.5 text-[var(--color-ink-secondary)]">{cust?.name ?? "—"}</td>
@@ -90,6 +90,7 @@ export default function Communications() {
             })}
           </tbody>
         </table>
+        {rows.length === 0 && <EmptyState icon={<MessageCircle size={18} />} title="No messages found" subtitle="Try a different search or channel filter." />}
       </Card>
     </div>
   );

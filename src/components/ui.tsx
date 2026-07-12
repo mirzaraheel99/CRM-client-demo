@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Check } from "lucide-react";
+import { Check, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { cx } from "../lib/utils";
 import { useCountUp } from "../lib/useCountUp";
 
@@ -298,5 +298,67 @@ export function Field({ label, children }: { label: string; children: ReactNode 
       <span className="mb-1 block text-xs font-medium text-[var(--color-ink-secondary)]">{label}</span>
       {children}
     </label>
+  );
+}
+
+export function SortableTh({
+  label, active, direction, onClick, className,
+}: {
+  label: string; active: boolean; direction: "asc" | "desc"; onClick: () => void; className?: string;
+}) {
+  return (
+    <th className={cx("font-medium select-none", className)}>
+      <button
+        type="button"
+        onClick={onClick}
+        className={cx(
+          "group inline-flex items-center gap-1 transition-colors",
+          active ? "text-[var(--color-ink-primary)]" : "hover:text-[var(--color-ink-primary)]"
+        )}
+      >
+        {label}
+        {active ? (
+          direction === "asc" ? <ChevronUp size={13} /> : <ChevronDown size={13} />
+        ) : (
+          <ChevronsUpDown size={13} className="opacity-0 group-hover:opacity-50 transition-opacity" />
+        )}
+      </button>
+    </th>
+  );
+}
+
+export function Skeleton({ className }: { className?: string }) {
+  return <div className={cx("skeleton rounded-md", className)} aria-hidden="true" />;
+}
+
+export function PageSkeleton() {
+  return (
+    <div className="space-y-6" role="status" aria-label="Loading page">
+      <div className="flex items-start justify-between gap-3">
+        <div className="space-y-2">
+          <Skeleton className="h-5 w-40" />
+          <Skeleton className="h-3.5 w-64" />
+        </div>
+        <Skeleton className="h-9 w-32 rounded-lg" />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Card key={i} className="space-y-3">
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-7 w-16" />
+          </Card>
+        ))}
+      </div>
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <Card className="xl:col-span-2 space-y-4">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-56 w-full" />
+        </Card>
+        <Card className="space-y-4">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-56 w-full rounded-full mx-auto max-w-56" />
+        </Card>
+      </div>
+    </div>
   );
 }

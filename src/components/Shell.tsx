@@ -2,11 +2,14 @@ import { NavLink, Link } from "react-router-dom";
 import {
   LayoutDashboard, ClipboardList, Users, PackageSearch, Tag, Boxes,
   UserCog, GitBranch, MessageSquare, BarChart3, Smartphone, Sun, Moon,
-  Languages, ChevronDown, Wrench, Menu, RotateCcw, Radar, X,
+  Languages, ChevronDown, Wrench, Menu, RotateCcw, Radar, X, Search,
 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { t } from "../lib/i18n";
 import { Avatar } from "./ui";
+import { Toaster } from "./Toaster";
+import { CommandPalette, useCommandPaletteStore } from "./CommandPalette";
+import { toast } from "../lib/toast";
 import { cx } from "../lib/utils";
 import { useState, type ReactNode } from "react";
 import type { Role } from "../lib/types";
@@ -97,7 +100,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </nav>
         <div className="border-t [border-color:var(--color-border)]">
           <button
-            onClick={() => { if (confirm("Reset all demo data back to the original seed dataset?")) resetDemoData(); }}
+            onClick={() => { if (confirm("Reset all demo data back to the original seed dataset?")) { resetDemoData(); toast("Demo data reset."); } }}
             title="Reset demo data"
             className="flex w-full items-center gap-2 px-4 py-3 text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink-primary)]"
           >
@@ -130,6 +133,24 @@ export function Shell({ children }: { children: ReactNode }) {
             <p className="truncate text-sm font-semibold">FixFlow</p>
             <p className="truncate text-[10px] text-[var(--color-ink-muted)]">Appliance Service Suite</p>
           </div>
+
+          <button
+            type="button"
+            onClick={() => useCommandPaletteStore.getState().setOpen(true)}
+            className="hidden md:flex items-center gap-2 rounded-lg border bg-[var(--color-surface-2)] px-3 py-1.5 text-sm text-[var(--color-ink-muted)] hover:border-[var(--color-brand-1)]/40 transition-colors [border-color:var(--color-border)] md:w-64"
+          >
+            <Search size={14} />
+            <span className="flex-1 text-left">Search…</span>
+            <kbd className="rounded border px-1.5 py-0.5 text-[10px] font-medium [border-color:var(--color-border)]">⌘K</kbd>
+          </button>
+          <button
+            type="button"
+            aria-label="Search"
+            onClick={() => useCommandPaletteStore.getState().setOpen(true)}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--color-ink-secondary)] hover:bg-black/5 md:hidden dark:hover:bg-white/10"
+          >
+            <Search size={17} />
+          </button>
 
           <div className="order-2 flex min-w-0 items-center gap-2 md:order-none md:shrink-0">
             <span className="hidden text-xs text-[var(--color-ink-muted)] sm:inline">{t(lang, "branch")}</span>
@@ -192,6 +213,8 @@ export function Shell({ children }: { children: ReactNode }) {
 
         <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6">{children}</main>
       </div>
+      <Toaster />
+      <CommandPalette />
     </div>
   );
 }

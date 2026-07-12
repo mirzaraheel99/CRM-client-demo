@@ -22,9 +22,9 @@ export default function ApplianceDetail() {
       <button onClick={() => navigate(-1)} className="flex items-center gap-1.5 text-sm text-[var(--color-ink-muted)] hover:text-[var(--color-ink-primary)]">
         <ArrowLeft size={15} /> Back
       </button>
-      <div>
+      <div className="animate-rise-in">
         <div className="flex items-center gap-2">
-          <h1 className="text-xl font-semibold">{appliance.model}</h1>
+          <h1 className="text-xl font-semibold tracking-tight">{appliance.model}</h1>
           {appliance.isSmartConnected && <Badge tone="good" icon={<Wifi size={11} />}>Smart Connected</Badge>}
         </div>
         <p className="text-sm text-[var(--color-ink-muted)]">Owned by {customer ? <Link to={`/customers/${customer.id}`} className="text-[var(--color-brand-1)]">{customer.name}</Link> : "—"}</p>

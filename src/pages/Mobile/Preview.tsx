@@ -35,8 +35,8 @@ export default function MobilePreview() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">Mobile Apps Preview</h1>
+      <div className="animate-rise-in">
+        <h1 className="text-xl font-semibold tracking-tight">Mobile Apps Preview</h1>
         <p className="text-sm text-[var(--color-ink-muted)] mt-0.5">
           Visual blueprint of the technician and front-desk mobile experience described in the spec. This section is a UI mockup for the sales walkthrough — the production mobile apps ship separately (Flutter, per the tech stack recommendation).
         </p>
@@ -89,11 +89,11 @@ export default function MobilePreview() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
+        <Card interactive>
           <CardHeader title="Push notifications" />
           <p className="text-sm text-[var(--color-ink-secondary)] flex items-center gap-2"><Bell size={15} className="text-[var(--color-brand-1)]" /> New job assignments alert technicians instantly.</p>
         </Card>
-        <Card>
+        <Card interactive>
           <CardHeader title="Offline mode" />
           <p className="text-sm text-[var(--color-ink-secondary)] flex items-center gap-2">
             <WifiOff size={15} className="text-[var(--color-status-serious)]" /> Field updates queue locally
@@ -101,7 +101,7 @@ export default function MobilePreview() {
           </p>
           <Badge tone="warning" className="mt-2">Simulated in this demo</Badge>
         </Card>
-        <Card>
+        <Card interactive>
           <CardHeader title="Image compression" />
           <p className="text-sm text-[var(--color-ink-secondary)] flex items-center gap-2"><Camera size={15} className="text-[var(--color-brand-1)]" /> Photos are compressed client-side before upload to save bandwidth.</p>
         </Card>

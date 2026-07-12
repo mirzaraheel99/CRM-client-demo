@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useStore } from "../../lib/store";
 import { Card, CardHeader, Field, Select, Textarea, Button } from "../../components/ui";
 import { JobTypeBadge } from "../../components/StatusBadge";
+import { toast } from "../../lib/toast";
 import type { JobType } from "../../lib/types";
 
 export default function NewJobCard() {
@@ -27,13 +28,14 @@ export default function NewJobCard() {
   function submit() {
     if (!canSubmit) return;
     const job = createJobCard({ customerId, applianceId, jobType: finalJobType, problemDescription: problem, branchId });
+    toast(`Job card ${job.id} created.`);
     navigate(`/jobcards/${job.id}`);
   }
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">
-      <div>
-        <h1 className="text-xl font-semibold">New Job Card</h1>
+      <div className="animate-rise-in">
+        <h1 className="text-xl font-semibold tracking-tight">New Job Card</h1>
         <p className="text-sm text-[var(--color-ink-muted)] mt-0.5">Receive an item, auto-detect warranty status, and open the workflow.</p>
       </div>
 

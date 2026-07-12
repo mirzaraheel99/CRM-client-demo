@@ -1,7 +1,8 @@
 @import "tailwindcss";
+@import "@fontsource-variable/inter/wght.css";
 
 @theme {
-  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
 
   --color-surface-page: #f9f9f7;
   --color-surface-1: #fcfcfb;
@@ -143,5 +144,33 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .animate-rise-in {
     animation: none;
+  }
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton {
+  background-image: linear-gradient(
+    90deg,
+    var(--color-surface-2) 25%,
+    rgba(120, 120, 120, 0.12) 37%,
+    var(--color-surface-2) 63%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background-image: none;
+    background-color: var(--color-surface-2);
   }
 }

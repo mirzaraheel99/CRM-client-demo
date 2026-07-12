@@ -22,8 +22,8 @@ export default function CustomerDetail() {
       <button onClick={() => navigate(-1)} className="flex items-center gap-1.5 text-sm text-[var(--color-ink-muted)] hover:text-[var(--color-ink-primary)]">
         <ArrowLeft size={15} /> Back
       </button>
-      <div>
-        <h1 className="text-xl font-semibold">{customer.name}</h1>
+      <div className="animate-rise-in">
+        <h1 className="text-xl font-semibold tracking-tight">{customer.name}</h1>
         <p className="text-sm text-[var(--color-ink-muted)]">Customer since {formatDate(customer.createdAt)}</p>
       </div>
 

@@ -2,13 +2,15 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Search } from "lucide-react";
 import { useStore } from "../../lib/store";
-import { Card, Button, Input, Select } from "../../components/ui";
+import { Card, Button, Input, Select, SortableTh } from "../../components/ui";
 import { JobStatusBadge, JobTypeBadge } from "../../components/StatusBadge";
 import { filterByBranch } from "../../lib/selectors";
 import { formatDate } from "../../lib/utils";
-import type { JobStatus, JobType } from "../../lib/types";
+import { useSort } from "../../lib/useSort";
+import type { JobStatus, JobType, JobCard } from "../../lib/types";
 
 const STATUSES: JobStatus[] = ["Received", "In Diagnosis", "Waiting Approval", "In Repair", "QA", "Ready", "Delivered"];
+type SortKey = "id" | "customer" | "appliance" | "status" | "technician" | "created";
 
 export default function JobCardList() {
   const { jobCards, customers, appliances, brands, technicians, selectedBranchId } = useStore();
@@ -22,7 +24,7 @@ export default function JobCardList() {
   const brandMap = useMemo(() => new Map(brands.map((b) => [b.id, b])), [brands]);
   const techMap = useMemo(() => new Map(technicians.map((t) => [t.id, t])), [technicians]);
 
-  const rows = useMemo(() => {
+  const filtered = useMemo(() => {
     let list = filterByBranch(jobCards, selectedBranchId);
     if (status !== "all") list = list.filter((j) => j.status === status);
     if (jobType !== "all") list = list.filter((j) => j.jobType === jobType);
@@ -40,14 +42,24 @@ export default function JobCardList() {
         );
       });
     }
-    return list.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+    return list;
   }, [jobCards, selectedBranchId, status, jobType, techId, search, custMap, appMap]);
+
+  const getValue = (j: JobCard, key: SortKey) => {
+    if (key === "id") return j.id;
+    if (key === "customer") return custMap.get(j.customerId)?.name ?? "";
+    if (key === "appliance") return appMap.get(j.applianceId)?.model ?? "";
+    if (key === "status") return j.status;
+    if (key === "technician") return j.technicianId ? techMap.get(j.technicianId)?.name ?? "" : "";
+    return new Date(j.createdAt).getTime();
+  };
+  const { sorted: rows, sortKey, dir, toggle } = useSort<JobCard, SortKey>(filtered, getValue, "created", "desc");
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-3 animate-rise-in">
         <div>
-          <h1 className="text-xl font-semibold">Job Cards</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Job Cards</h1>
           <p className="text-sm text-[var(--color-ink-muted)] mt-0.5">{rows.length} job cards match your filters</p>
         </div>
         <Link to="/jobcards/new"><Button>+ New Job Card</Button></Link>
@@ -84,22 +96,22 @@ export default function JobCardList() {
       <Card padded={false} className="overflow-x-auto">
         <table className="w-full text-sm min-w-[900px]">
           <thead>
-            <tr className="text-left text-xs text-[var(--color-ink-muted)] border-b [border-color:var(--color-border)]">
-              <th className="px-5 py-3 font-medium">Job ID</th>
-              <th className="px-3 py-3 font-medium">Customer</th>
-              <th className="px-3 py-3 font-medium">Appliance</th>
+            <tr className="sticky top-0 z-10 bg-[var(--color-surface-1)] text-left text-xs text-[var(--color-ink-muted)] border-b [border-color:var(--color-border)]">
+              <SortableTh label="Job ID" active={sortKey === "id"} direction={dir} onClick={() => toggle("id")} className="px-5 py-3" />
+              <SortableTh label="Customer" active={sortKey === "customer"} direction={dir} onClick={() => toggle("customer")} className="px-3 py-3" />
+              <SortableTh label="Appliance" active={sortKey === "appliance"} direction={dir} onClick={() => toggle("appliance")} className="px-3 py-3" />
               <th className="px-3 py-3 font-medium">Brand</th>
               <th className="px-3 py-3 font-medium">Type</th>
-              <th className="px-3 py-3 font-medium">Status</th>
-              <th className="px-3 py-3 font-medium">Technician</th>
-              <th className="px-5 py-3 font-medium">Created</th>
+              <SortableTh label="Status" active={sortKey === "status"} direction={dir} onClick={() => toggle("status")} className="px-3 py-3" />
+              <SortableTh label="Technician" active={sortKey === "technician"} direction={dir} onClick={() => toggle("technician")} className="px-3 py-3" />
+              <SortableTh label="Created" active={sortKey === "created"} direction={dir} onClick={() => toggle("created")} className="px-5 py-3" />
             </tr>
           </thead>
           <tbody>
             {rows.map((j) => {
               const app = appMap.get(j.applianceId);
               return (
-                <tr key={j.id} className="border-b last:border-0 [border-color:var(--color-border)] hover:bg-black/[0.02] dark:hover:bg-white/[0.03]">
+                <tr key={j.id} className="border-b last:border-0 [border-color:var(--color-border)] transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.03]">
                   <td className="px-5 py-3">
                     <Link to={`/jobcards/${j.id}`} className="font-medium text-[var(--color-brand-1)]">{j.id}</Link>
                   </td>

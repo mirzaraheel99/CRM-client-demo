@@ -5,6 +5,7 @@ import { useStore } from "../lib/store";
 import { Card, CardHeader, Badge, Button, StatTile } from "../components/ui";
 import { predictiveMaintenanceCandidates } from "../lib/selectors";
 import { relativeTime } from "../lib/utils";
+import { toast } from "../lib/toast";
 
 export default function PredictiveMaintenance() {
   const { appliances, jobCards, brands, customers, maintenanceRemindersSent, sendMaintenanceReminder } = useStore();
@@ -20,10 +21,10 @@ export default function PredictiveMaintenance() {
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="animate-rise-in">
         <div className="flex items-center gap-2">
           <Sparkles size={18} className="text-[var(--color-brand-1)]" />
-          <h1 className="text-xl font-semibold">Predictive Maintenance</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Predictive Maintenance</h1>
         </div>
         <p className="text-sm text-[var(--color-ink-muted)] mt-0.5 max-w-2xl">
           Proactive service opportunities — flagged from real repair-history patterns across similar appliances,
@@ -59,7 +60,7 @@ export default function PredictiveMaintenance() {
             {candidates.map(({ appliance, ageMonths, cohortAvgMonths, cohortSize, urgencyScore }) => {
               const sent = maintenanceRemindersSent[appliance.id];
               return (
-                <tr key={appliance.id} className="border-b last:border-0 [border-color:var(--color-border)] hover:bg-black/[0.02] dark:hover:bg-white/[0.03]">
+                <tr key={appliance.id} className="border-b last:border-0 [border-color:var(--color-border)] transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.03]">
                   <td className="px-5 py-3">
                     <Link to={`/appliances/${appliance.id}`} className="font-medium text-[var(--color-brand-1)]">{appliance.model}</Link>
                     <p className="text-xs text-[var(--color-ink-muted)]">{brandMap.get(appliance.brandId)?.name} · {appliance.category}</p>
@@ -75,7 +76,7 @@ export default function PredictiveMaintenance() {
                       <span className="text-xs text-[var(--color-status-good)] flex items-center gap-1"><CheckCircle2 size={13} /> Reminded {relativeTime(sent)}</span>
                     ) : (
                       <div className="flex items-center gap-2">
-                        <Button size="sm" variant="secondary" onClick={() => sendMaintenanceReminder(appliance.id)}>Send Reminder</Button>
+                        <Button size="sm" variant="secondary" onClick={() => { sendMaintenanceReminder(appliance.id); toast(`Maintenance reminder sent for ${appliance.model}.`); }}>Send Reminder</Button>
                         <Link to={`/jobcards/new?customerId=${appliance.customerId}&applianceId=${appliance.id}`}>
                           <Button size="sm">Create Job Card</Button>
                         </Link>

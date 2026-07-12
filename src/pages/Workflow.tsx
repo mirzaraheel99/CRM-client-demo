@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ArrowRight, MessageCircle, Smartphone, Mail, ShieldCheck } from "lucide-react";
 import { useStore } from "../lib/store";
 import { Card, CardHeader, Button, Badge } from "../components/ui";
+import { toast } from "../lib/toast";
 import { cx } from "../lib/utils";
 
 export default function Workflow() {
@@ -14,8 +15,8 @@ export default function Workflow() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold">Workflow Designer</h1>
+      <div className="animate-rise-in">
+        <h1 className="text-xl font-semibold tracking-tight">Workflow Designer</h1>
         <p className="text-sm text-[var(--color-ink-muted)] mt-0.5">Configurable stage flows, per job type, with mandatory fields, approvals, and triggers.</p>
       </div>
 
@@ -78,7 +79,7 @@ export default function Workflow() {
               <p className="text-xs text-[var(--color-ink-muted)]">{step.approverRole ? `Approver: ${step.approverRole}` : "No approver assigned"}</p>
             </div>
             <button
-              onClick={() => updateWorkflowStep(workflow.id, step.stepOrder, { approvalRequired: !step.approvalRequired })}
+              onClick={() => { updateWorkflowStep(workflow.id, step.stepOrder, { approvalRequired: !step.approvalRequired }); toast(`Approval ${step.approvalRequired ? "disabled" : "enabled"} for ${step.stepName}.`); }}
               className={cx("h-6 w-11 rounded-full transition-colors relative", step.approvalRequired ? "bg-[var(--color-brand-1)]" : "bg-black/15 dark:bg-white/15")}
             >
               <span className={cx("absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform", step.approvalRequired ? "translate-x-5" : "translate-x-0.5")} />
@@ -91,7 +92,7 @@ export default function Workflow() {
               <div key={ch} className="flex items-center justify-between">
                 <span className="text-sm capitalize text-[var(--color-ink-secondary)]">{ch}</span>
                 <button
-                  onClick={() => updateWorkflowStep(workflow.id, step.stepOrder, { triggers: { ...step.triggers, [ch]: !step.triggers[ch] } })}
+                  onClick={() => { updateWorkflowStep(workflow.id, step.stepOrder, { triggers: { ...step.triggers, [ch]: !step.triggers[ch] } }); toast(`${ch.toUpperCase()} trigger ${step.triggers[ch] ? "disabled" : "enabled"} for ${step.stepName}.`); }}
                   className={cx("h-6 w-11 rounded-full transition-colors relative", step.triggers[ch] ? "bg-[var(--color-brand-1)]" : "bg-black/15 dark:bg-white/15")}
                 >
                   <span className={cx("absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform", step.triggers[ch] ? "translate-x-5" : "translate-x-0.5")} />

@@ -1,10 +1,15 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Search } from "lucide-react";
+import { Search, Users } from "lucide-react";
 import { useStore } from "../../lib/store";
-import { Card, Button, Input, Modal, Field, Badge } from "../../components/ui";
+import { Card, Button, Input, Modal, Field, Badge, EmptyState, SortableTh } from "../../components/ui";
 import { filterByBranch } from "../../lib/selectors";
 import { formatDate } from "../../lib/utils";
+import { toast } from "../../lib/toast";
+import { useSort } from "../../lib/useSort";
+import type { Customer } from "../../lib/types";
+
+type SortKey = "name" | "phone" | "appliances" | "jobs" | "since";
 
 export default function CustomerList() {
   const { customers, appliances, jobCards, selectedBranchId, addCustomer } = useStore();
@@ -12,14 +17,23 @@ export default function CustomerList() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", whatsapp: "", email: "", address: "" });
 
-  const rows = useMemo(() => {
+  const filtered = useMemo(() => {
     let list = filterByBranch(customers, selectedBranchId);
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter((c) => c.name.toLowerCase().includes(q) || c.phone.includes(q) || c.email.toLowerCase().includes(q));
     }
-    return list.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+    return list;
   }, [customers, selectedBranchId, search]);
+
+  const getValue = (c: Customer, key: SortKey) => {
+    if (key === "name") return c.name;
+    if (key === "phone") return c.phone;
+    if (key === "appliances") return appliances.filter((a) => a.customerId === c.id).length;
+    if (key === "jobs") return jobCards.filter((j) => j.customerId === c.id).length;
+    return new Date(c.createdAt).getTime();
+  };
+  const { sorted: rows, sortKey, dir, toggle } = useSort<Customer, SortKey>(filtered, getValue, "since", "desc");
 
   function submit() {
     if (!form.name.trim() || !form.phone.trim()) return;
@@ -27,13 +41,14 @@ export default function CustomerList() {
     addCustomer({ ...form, branchId });
     setForm({ name: "", phone: "", whatsapp: "", email: "", address: "" });
     setOpen(false);
+    toast(`${form.name} added to customers.`);
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-3 animate-rise-in">
         <div>
-          <h1 className="text-xl font-semibold">Customers</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Customers</h1>
           <p className="text-sm text-[var(--color-ink-muted)] mt-0.5">{rows.length} customers</p>
         </div>
         <Button onClick={() => setOpen(true)}>+ Add Customer</Button>
@@ -49,21 +64,21 @@ export default function CustomerList() {
       <Card padded={false} className="overflow-x-auto">
         <table className="w-full text-sm min-w-[720px]">
           <thead>
-            <tr className="text-left text-xs text-[var(--color-ink-muted)] border-b [border-color:var(--color-border)]">
-              <th className="px-5 py-3 font-medium">Name</th>
-              <th className="px-3 py-3 font-medium">Phone</th>
+            <tr className="sticky top-0 z-10 bg-[var(--color-surface-1)] text-left text-xs text-[var(--color-ink-muted)] border-b [border-color:var(--color-border)]">
+              <SortableTh label="Name" active={sortKey === "name"} direction={dir} onClick={() => toggle("name")} className="px-5 py-3" />
+              <SortableTh label="Phone" active={sortKey === "phone"} direction={dir} onClick={() => toggle("phone")} className="px-3 py-3" />
               <th className="px-3 py-3 font-medium">WhatsApp</th>
               <th className="px-3 py-3 font-medium">Email</th>
-              <th className="px-3 py-3 font-medium">Appliances</th>
-              <th className="px-3 py-3 font-medium">Jobs</th>
-              <th className="px-5 py-3 font-medium">Since</th>
+              <SortableTh label="Appliances" active={sortKey === "appliances"} direction={dir} onClick={() => toggle("appliances")} className="px-3 py-3" />
+              <SortableTh label="Jobs" active={sortKey === "jobs"} direction={dir} onClick={() => toggle("jobs")} className="px-3 py-3" />
+              <SortableTh label="Since" active={sortKey === "since"} direction={dir} onClick={() => toggle("since")} className="px-5 py-3" />
             </tr>
           </thead>
           <tbody>
             {rows.map((c) => (
-              <tr key={c.id} className="border-b last:border-0 [border-color:var(--color-border)] hover:bg-black/[0.02] dark:hover:bg-white/[0.03]">
+              <tr key={c.id} className="border-b last:border-0 [border-color:var(--color-border)] transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.03]">
                 <td className="px-5 py-3">
-                  <Link to={`/customers/${c.id}`} className="font-medium text-[var(--color-brand-1)]">{c.name}</Link>
+                  <Link to={`/customers/${c.id}`} className="font-medium text-[var(--color-brand-1)] hover:text-[var(--color-brand-2)] transition-colors">{c.name}</Link>
                 </td>
                 <td className="px-3 py-3 text-[var(--color-ink-secondary)]">{c.phone}</td>
                 <td className="px-3 py-3">
@@ -77,6 +92,7 @@ export default function CustomerList() {
             ))}
           </tbody>
         </table>
+        {rows.length === 0 && <EmptyState icon={<Users size={18} />} title="No customers found" subtitle="Try a different search term." />}
       </Card>
 
       <Modal open={open} onClose={() => setOpen(false)} title="Add Customer">

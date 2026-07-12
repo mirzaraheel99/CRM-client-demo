@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useStore } from "./lib/store";
 import { Shell } from "./components/Shell";
+import { PageSkeleton } from "./components/ui";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const PredictiveMaintenance = lazy(() => import("./pages/PredictiveMaintenance"));
@@ -21,36 +22,38 @@ const Reports = lazy(() => import("./pages/Reports"));
 const MobilePreview = lazy(() => import("./pages/Mobile/Preview"));
 const TrackingPage = lazy(() => import("./pages/Tracking"));
 
-function PageLoading() {
-  return (
-    <div className="flex min-h-48 items-center justify-center" role="status" aria-label="Loading page">
-      <span className="h-7 w-7 animate-spin rounded-full border-2 border-[var(--color-border)] border-t-[var(--color-brand-1)]" />
-    </div>
-  );
-}
-
 function ShellRoutes() {
   return (
     <Shell>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/predictive-maintenance" element={<PredictiveMaintenance />} />
-        <Route path="/jobcards" element={<JobCardList />} />
-        <Route path="/jobcards/new" element={<NewJobCard />} />
-        <Route path="/jobcards/:id" element={<JobCardDetail />} />
-        <Route path="/customers" element={<CustomerList />} />
-        <Route path="/customers/:id" element={<CustomerDetail />} />
-        <Route path="/appliances" element={<ApplianceList />} />
-        <Route path="/appliances/:id" element={<ApplianceDetail />} />
-        <Route path="/brands" element={<Brands />} />
-        <Route path="/inventory" element={<Inventory />} />
-        <Route path="/technicians" element={<Technicians />} />
-        <Route path="/workflow" element={<Workflow />} />
-        <Route path="/communications" element={<Communications />} />
-        <Route path="/reports" element={<Reports />} />
-        <Route path="/mobile" element={<MobilePreview />} />
-      </Routes>
+      <Suspense fallback={<PageSkeleton />}>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/predictive-maintenance" element={<PredictiveMaintenance />} />
+          <Route path="/jobcards" element={<JobCardList />} />
+          <Route path="/jobcards/new" element={<NewJobCard />} />
+          <Route path="/jobcards/:id" element={<JobCardDetail />} />
+          <Route path="/customers" element={<CustomerList />} />
+          <Route path="/customers/:id" element={<CustomerDetail />} />
+          <Route path="/appliances" element={<ApplianceList />} />
+          <Route path="/appliances/:id" element={<ApplianceDetail />} />
+          <Route path="/brands" element={<Brands />} />
+          <Route path="/inventory" element={<Inventory />} />
+          <Route path="/technicians" element={<Technicians />} />
+          <Route path="/workflow" element={<Workflow />} />
+          <Route path="/communications" element={<Communications />} />
+          <Route path="/reports" element={<Reports />} />
+          <Route path="/mobile" element={<MobilePreview />} />
+        </Routes>
+      </Suspense>
     </Shell>
+  );
+}
+
+function TrackingLoading() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[var(--color-surface-page)]" role="status" aria-label="Loading page">
+      <span className="h-7 w-7 animate-spin rounded-full border-2 border-[var(--color-border)] border-t-[var(--color-brand-1)]" />
+    </div>
   );
 }
 
@@ -68,12 +71,10 @@ export default function App() {
 
   return (
     <BrowserRouter basename={import.meta.env.BASE_URL}>
-      <Suspense fallback={<PageLoading />}>
-        <Routes>
-          <Route path="/track/:jobId" element={<TrackingPage />} />
-          <Route path="/*" element={<ShellRoutes />} />
-        </Routes>
-      </Suspense>
+      <Routes>
+        <Route path="/track/:jobId" element={<Suspense fallback={<TrackingLoading />}><TrackingPage /></Suspense>} />
+        <Route path="/*" element={<ShellRoutes />} />
+      </Routes>
     </BrowserRouter>
   );
 }

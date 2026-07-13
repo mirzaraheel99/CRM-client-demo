@@ -18,6 +18,7 @@ type ServiceOrderLineInput = {
   applianceId: string;
   jobType: JobCard["jobType"];
   problemDescription: string;
+  technicianId?: string | null;
 };
 
 interface DemoState {
@@ -297,8 +298,16 @@ export const useStore = create<DemoState>()(
         if (!lines.length) return { ...result(false, "Add at least one product to the service order.") };
         if (new Set(lines.map((line) => line.applianceId)).size !== lines.length) return { ...result(false, "Each product can appear only once in the same service order.") };
         for (const line of lines) {
-          if (!state.appliances.some((candidate) => candidate.id === line.applianceId)) return { ...result(false, "Choose a valid product for every sequence.") };
+          const appliance = state.appliances.find((candidate) => candidate.id === line.applianceId);
+          if (!appliance) return { ...result(false, "Choose a valid product for every sequence.") };
           if (line.problemDescription.trim().length < 4) return { ...result(false, "Describe the reported problem for every product.") };
+          if (line.technicianId) {
+            const technician = state.technicians.find((candidate) => candidate.id === line.technicianId);
+            if (!technician) return { ...result(false, "Choose a valid technician for every assigned sequence.") };
+            if (technician.branchId !== branchId) return { ...result(false, "Assigned technician must belong to the receiving branch.") };
+            if (!technician.skills.includes(appliance.category)) return { ...result(false, `${technician.name} is not qualified for ${appliance.category}.`) };
+            if (technician.status === "Off Duty") return { ...result(false, `${technician.name} is off duty.`) };
+          }
         }
 
         const now = new Date().toISOString();
@@ -316,7 +325,7 @@ export const useStore = create<DemoState>()(
             invoiceNo: `INV-${lineDocumentNo}`,
             customerId,
             applianceId: line.applianceId,
-            technicianId: null,
+            technicianId: line.technicianId ?? null,
             branchId,
             jobType: line.jobType,
             status: "Received",
@@ -326,7 +335,7 @@ export const useStore = create<DemoState>()(
             finalAmount: null,
             createdAt: new Date(new Date(now).getTime() + index).toISOString(),
             updatedAt: new Date(new Date(now).getTime() + index).toISOString(),
-            scheduledAt: null,
+            scheduledAt: line.technicianId ? new Date(new Date(now).setDate(new Date(now).getDate() + 1)).toISOString() : null,
             customerApproved: null,
             diagnosisNotes: null,
             repairNotes: null,
@@ -341,6 +350,7 @@ export const useStore = create<DemoState>()(
           jobCards: [...jobs, ...current.jobCards],
           stageHistory: [...history, ...current.stageHistory],
           communicationLogs: [...logs, ...current.communicationLogs],
+          technicians: syncTechnicianStatuses(current.technicians, [...jobs, ...current.jobCards]),
         }));
         scheduleCommunicationReceipts(logs);
         return { ...result(true, `Service order ${documentNo} created with ${jobs.length} product ${jobs.length === 1 ? "sequence" : "sequences"}.`), serviceOrder, jobs };

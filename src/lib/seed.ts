@@ -20,7 +20,25 @@ import type {
   StageName,
   Payment,
   ServiceOrder,
+  RemovedPart,
 } from "./types";
+
+// Kept local (not imported from ./stageRefNo) so this file has zero runtime
+// cross-file imports — scripts/validate-dataflow.mjs transpiles seed.ts in
+// isolation via a data: URI, which cannot resolve relative imports.
+const STAGE_REF_PREFIX: Partial<Record<StageName, string>> = {
+  Diagnosis: "DX",
+  Estimate: "EST",
+  "Customer Approval": "APR",
+  Repair: "RPR",
+  QA: "QA",
+};
+function nextStageRefNo(history: JobCardStageHistory[], stageName: StageName): string | undefined {
+  const prefix = STAGE_REF_PREFIX[stageName];
+  if (!prefix) return undefined;
+  const count = history.filter((h) => h.stageName === stageName && h.stageRefNo).length;
+  return `${prefix}-${String(count + 1).padStart(6, "0")}`;
+}
 
 // Deterministic PRNG so the demo dataset is stable across reloads.
 function mulberry32(seed: number) {
@@ -170,9 +188,35 @@ const partNames = [
   "LED Backlight Strip", "Timer Module", "Magnetron", "Belt Drive", "Evaporator Coil",
 ];
 
+// Arabic alias shown on customer-facing output (invoices, WhatsApp, printed job
+// card) — the internal staff UI stays English, only these labels are bilingual.
+const partNamesAr: Record<string, string> = {
+  "Compressor Relay": "مرحل الضاغط",
+  "Refrigerant Gas R410a (kg)": "غاز التبريد R410a (كجم)",
+  "PCB Control Board": "لوحة التحكم الإلكترونية",
+  "Drain Pump": "مضخة التصريف",
+  "Door Gasket": "حشية الباب",
+  "Fan Motor": "محرك المروحة",
+  Thermostat: "منظم الحرارة",
+  "Display Screen Assembly": "وحدة شاشة العرض",
+  "Battery Pack": "حزمة البطارية",
+  "Charging Port Flex": "شريط منفذ الشحن",
+  "Water Inlet Valve": "صمام دخول الماء",
+  "Heating Element": "عنصر التسخين",
+  "Remote Control": "جهاز التحكم عن بعد",
+  "Air Filter": "فلتر الهواء",
+  "Capacitor 35uF": "مكثف 35 ميكروفاراد",
+  "LED Backlight Strip": "شريط الإضاءة الخلفية LED",
+  "Timer Module": "وحدة المؤقت",
+  Magnetron: "الماغنترون",
+  "Belt Drive": "سير النقل",
+  "Evaporator Coil": "ملف المبخر",
+};
+
 export const INVENTORY_ITEMS: InventoryItem[] = partNames.map((name, i) => ({
   id: id("item", i + 1),
   name,
+  nameAr: partNamesAr[name],
   category: pick(["Electrical", "Mechanical", "Consumable", "Electronic"]),
   brand: pick(BRANDS).name,
   partNo: `PN-${int(10000, 99999)}`,
@@ -262,8 +306,9 @@ export const ATTACHMENTS: JobCardAttachment[] = [];
 export const PARTS_USED: JobCardPartUsed[] = [];
 export const PURCHASE_BILLS: PurchaseBill[] = [];
 export const COMMUNICATION_LOGS: CommunicationLog[] = [];
+export const REMOVED_PARTS: RemovedPart[] = [];
 
-let stageHistId = 1, attId = 1, partId = 1, billId = 1, commId = 1, jobTxnId = 5000, serviceOrderId = 1;
+let stageHistId = 1, attId = 1, partId = 1, billId = 1, commId = 1, jobTxnId = 5000, serviceOrderId = 1, removedPartId = 1;
 let activeOrder: ServiceOrder | null = null;
 let activeOrderCustomer: Customer | null = null;
 let activeOrderRemaining = 0;
@@ -327,6 +372,7 @@ for (let i = 0; i < 130; i++) {
       changedBy,
       timestamp: new Date(ts).toISOString(),
       notes: s === 0 ? "Item received at counter." : `Moved to ${stageName}.`,
+      stageRefNo: nextStageRefNo(STAGE_HISTORY, stageName),
     });
     if (rand() > 0.4) {
       ATTACHMENTS.push({
@@ -379,12 +425,14 @@ for (let i = 0; i < 130; i++) {
 
   if (repairIndex >= 0 && progressIdx >= repairIndex) {
     const numParts = int(1, 3);
+    let firstReplacedItem: InventoryItem | null = null;
     for (let p = 0; p < numParts; p++) {
       const branchLocationIds = new Set(INVENTORY_LOCATIONS.filter((location) => location.branchId === job.branchId).map((location) => location.id));
       const stockOptions = INVENTORY_STOCK.filter((entry) => branchLocationIds.has(entry.locationId) && entry.qty > 0);
       if (!stockOptions.length) break;
       const stockEntry = pick(stockOptions);
       const item = INVENTORY_ITEMS.find((candidate) => candidate.id === stockEntry.itemId)!;
+      if (!firstReplacedItem) firstReplacedItem = item;
       const qty = Math.min(stockEntry.qty, int(1, 2));
       stockEntry.qty -= qty;
       PARTS_USED.push({
@@ -405,6 +453,26 @@ for (let i = 0; i < 130; i++) {
         qty,
         timestamp: STAGE_HISTORY.find((history) => history.jobcardId === jobCardId && history.stageName === "Repair")?.timestamp ?? job.updatedAt,
         createdBy: technician?.name ?? "Service Team",
+      });
+    }
+    // The old/failed part physically has to be handed back to the customer
+    // even if it's junk — track that custody chain separately from billing.
+    if (firstReplacedItem && rand() > 0.25) {
+      const notified = rand() > 0.15;
+      const returned = isDelivered ? rand() > 0.1 : rand() > 0.55;
+      const notifiedAt = notified ? new Date(Math.min(ts + int(1, 6) * 3600 * 1000, now)).toISOString() : undefined;
+      const confirmedAt = returned ? new Date(Math.min(ts + int(6, 48) * 3600 * 1000, now)).toISOString() : undefined;
+      REMOVED_PARTS.push({
+        id: id("rp", removedPartId++),
+        jobcardId: jobCardId,
+        description: `${firstReplacedItem.name} (old — removed during repair)`,
+        serialNo: rand() > 0.5 ? appliance.serialNo : undefined,
+        removedAt: new Date(ts).toISOString(),
+        removedBy: technician?.name ?? "Technician",
+        customerNotifiedAt: notifiedAt,
+        returnStatus: returned ? "returned_to_customer" : "pending",
+        returnConfirmedAt: confirmedAt,
+        returnConfirmedBy: returned ? "Front Desk" : undefined,
       });
     }
   }

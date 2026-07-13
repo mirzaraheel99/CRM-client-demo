@@ -21,7 +21,7 @@ export default function Inventory() {
   const [orderedItems, setOrderedItems] = useState<Set<string>>(new Set());
 
   const [txnForm, setTxnForm] = useState({ itemId: "", locationId: "", destLocationId: "", qty: 1 });
-  const [itemForm, setItemForm] = useState({ name: "", category: "Electrical", brand: "", partNo: "", unitPrice: 0, reorderLevel: 5 });
+  const [itemForm, setItemForm] = useState({ name: "", nameAr: "", category: "Electrical", brand: "", partNo: "", unitPrice: 0, reorderLevel: 5 });
   const scopedLocations = useMemo(() => inventoryLocationsByBranch(inventoryLocations, selectedBranchId), [inventoryLocations, selectedBranchId]);
   const scopedStock = useMemo(() => inventoryStockByBranch(inventoryStock, inventoryLocations, selectedBranchId), [inventoryStock, inventoryLocations, selectedBranchId]);
   const scopedTransactions = useMemo(() => inventoryTransactionsByBranch(inventoryTransactions, inventoryLocations, selectedBranchId), [inventoryTransactions, inventoryLocations, selectedBranchId]);
@@ -73,8 +73,8 @@ export default function Inventory() {
 
   function submitItem() {
     if (!itemForm.name.trim() || !itemForm.partNo.trim()) return;
-    addInventoryItem(itemForm);
-    setItemForm({ name: "", category: "Electrical", brand: "", partNo: "", unitPrice: 0, reorderLevel: 5 });
+    addInventoryItem({ ...itemForm, nameAr: itemForm.nameAr.trim() || undefined });
+    setItemForm({ name: "", nameAr: "", category: "Electrical", brand: "", partNo: "", unitPrice: 0, reorderLevel: 5 });
     setItemModal(false);
     toast(`${itemForm.name} added to inventory.`);
   }
@@ -103,6 +103,7 @@ export default function Inventory() {
               <thead>
                 <tr className="sticky top-0 z-10 bg-[var(--color-surface-1)] text-left text-xs text-[var(--color-ink-muted)] border-b [border-color:var(--color-border)]">
                   <SortableTh label="Name" active={itemSortKey === "name"} direction={itemDir} onClick={() => toggleItemSort("name")} className="py-2" />
+                  <th className="py-2 pr-6 font-medium">Arabic Alias</th>
                   <SortableTh label="Part No." active={itemSortKey === "partNo"} direction={itemDir} onClick={() => toggleItemSort("partNo")} className="py-2" />
                   <SortableTh label="Brand" active={itemSortKey === "brand"} direction={itemDir} onClick={() => toggleItemSort("brand")} className="py-2" />
                   <SortableTh label="Unit Price" active={itemSortKey === "unitPrice"} direction={itemDir} onClick={() => toggleItemSort("unitPrice")} className="py-2" />
@@ -116,6 +117,7 @@ export default function Inventory() {
                   return (
                     <tr key={i.id} className="border-b last:border-0 [border-color:var(--color-border)] transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.03]">
                       <td className="py-2.5 font-medium">{i.name}</td>
+                      <td className="py-2.5 pr-6 text-[var(--color-ink-secondary)]" dir="rtl">{i.nameAr ?? "—"}</td>
                       <td className="py-2.5 text-[var(--color-ink-secondary)]">{i.partNo}</td>
                       <td className="py-2.5 text-[var(--color-ink-secondary)]">{i.brand}</td>
                       <td className="py-2.5 tabular-nums">{formatCurrency(i.unitPrice)}</td>
@@ -297,6 +299,7 @@ export default function Inventory() {
       <Modal open={itemModal} onClose={() => setItemModal(false)} title="Add Inventory Item">
         <div className="space-y-3">
           <Field label="Name"><Input value={itemForm.name} onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })} /></Field>
+          <Field label="Arabic Alias (shown on customer invoices/messages)"><Input dir="rtl" value={itemForm.nameAr} onChange={(e) => setItemForm({ ...itemForm, nameAr: e.target.value })} /></Field>
           <Field label="Part No."><Input value={itemForm.partNo} onChange={(e) => setItemForm({ ...itemForm, partNo: e.target.value })} /></Field>
           <Field label="Brand"><Input value={itemForm.brand} onChange={(e) => setItemForm({ ...itemForm, brand: e.target.value })} /></Field>
           <Field label="Unit price (SAR)"><Input type="number" value={itemForm.unitPrice} onChange={(e) => setItemForm({ ...itemForm, unitPrice: Number(e.target.value) })} /></Field>

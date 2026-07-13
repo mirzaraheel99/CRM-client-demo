@@ -80,6 +80,7 @@ export function PartsGrid({
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium">{item.name}</span>
+                    {item.nameAr && <span dir="rtl" className="block truncate text-[11px] text-[var(--color-ink-muted)]">{item.nameAr}</span>}
                     <span className="block truncate text-[11px] text-[var(--color-ink-muted)]">{item.partNo} · {item.brand}</span>
                     <span className="mt-2 block text-sm font-semibold tabular-nums">{formatCurrency(item.unitPrice)}</span>
                   </span>

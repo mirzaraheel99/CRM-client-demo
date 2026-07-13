@@ -52,10 +52,13 @@ export default function JobCardDetail() {
   const navigate = useNavigate();
   const {
     jobCards, serviceOrders, customers, appliances, applianceTelemetry, brands, technicians, workflows,
-    stageHistory, attachments, partsUsed, communicationLogs, inventoryItems, inventoryLocations, inventoryStock, purchaseBills, payments,
+    stageHistory, attachments, partsUsed, communicationLogs, inventoryItems, inventoryLocations, inventoryStock, purchaseBills, payments, removedParts,
     role, selectedBranchId, advanceStage, assignTechnician, setDiagnosis, setEstimate, approveCustomer, setRepairNotes, setQaApproved,
     setFinalAmount, captureCustomerSignature, savePurchaseBill, addPartUsed, removePartUsed, addAttachment, sendCommunication,
+    logRemovedPart, notifyCustomerOfRemovedPart, confirmPartReturned,
   } = useStore();
+  const [removedDesc, setRemovedDesc] = useState("");
+  const [removedSerial, setRemovedSerial] = useState("");
 
   const [tab, setTab] = useState("Timeline");
   const [techSelect, setTechSelect] = useState("");
@@ -82,6 +85,7 @@ export default function JobCardDetail() {
   const branchStock = useMemo(() => inventoryStockByBranch(inventoryStock, inventoryLocations, job?.branchId ?? "all"), [inventoryStock, inventoryLocations, job?.branchId]);
   const stockByItem = useMemo(() => totalStockByItem(branchStock), [branchStock]);
   const jobPayments = useMemo(() => payments.filter((p) => p.jobcardId === id), [payments, id]);
+  const jobRemovedParts = useMemo(() => removedParts.filter((p) => p.jobcardId === id), [removedParts, id]);
   const telemetry = useMemo(() => applianceTelemetry.find((t) => t.applianceId === job?.applianceId), [applianceTelemetry, job?.applianceId]);
   const diagnosisSuggestions = useMemo(() => {
     const base = suggestDiagnosis(job?.problemDescription ?? "");
@@ -273,6 +277,7 @@ export default function JobCardDetail() {
                         <span className="absolute -left-1.5 h-3 w-3 rounded-full bg-[var(--color-brand-1)]" />
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="text-sm font-medium">{h.stageName}</p>
+                          {h.stageRefNo && <Badge tone="brand">{h.stageRefNo}</Badge>}
                           <span className="text-xs text-[var(--color-ink-muted)]">{relativeTime(h.timestamp)}</span>
                         </div>
                         <p className="text-xs text-[var(--color-ink-secondary)]">{h.notes}</p>
@@ -438,7 +443,10 @@ export default function JobCardDetail() {
                       const item = inventoryItems.find((i) => i.id === p.itemId);
                       return (
                         <tr key={p.id} className="border-b last:border-0 [border-color:var(--color-border)]">
-                          <td className="py-2">{item?.name}</td>
+                          <td className="py-2">
+                            {item?.name}
+                            {item?.nameAr && <span dir="rtl" className="block text-[11px] text-[var(--color-ink-muted)]">{item.nameAr}</span>}
+                          </td>
                           <td className="py-2 tabular-nums">{p.qty}</td>
                           <td className="py-2 tabular-nums">{formatCurrency(p.unitPrice)}</td>
                           <td className="py-2 tabular-nums">{formatCurrency(p.totalPrice)}</td>
@@ -460,6 +468,75 @@ export default function JobCardDetail() {
                     </tfoot>
                   )}
                 </table>
+
+                <Card className="space-y-3">
+                  <CardHeader title="Removed Parts / Asset Custody" subtitle="Old or faulty parts must be handed back to the customer — track that chain here" />
+                  <div className="space-y-2">
+                    {jobRemovedParts.map((rp) => (
+                      <div key={rp.id} className="rounded-lg border p-3 text-sm [border-color:var(--color-border)]">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div>
+                            <p className="font-medium">{rp.description}</p>
+                            <p className="text-[11px] text-[var(--color-ink-muted)]">
+                              {rp.serialNo ? `Serial ${rp.serialNo} · ` : ""}Removed by {rp.removedBy} · {relativeTime(rp.removedAt)}
+                            </p>
+                          </div>
+                          <Badge tone={rp.returnStatus === "returned_to_customer" ? "good" : rp.customerNotifiedAt ? "warning" : "neutral"}>
+                            {rp.returnStatus === "returned_to_customer" ? "Returned to customer" : rp.customerNotifiedAt ? "Customer notified" : "Pending"}
+                          </Badge>
+                        </div>
+                        {rp.returnStatus === "returned_to_customer" && rp.returnConfirmedAt && (
+                          <p className="text-[11px] text-[var(--color-status-good)] mt-1">Confirmed by {rp.returnConfirmedBy} · {relativeTime(rp.returnConfirmedAt)}</p>
+                        )}
+                        {rp.returnStatus !== "returned_to_customer" && (
+                          <div className="flex gap-2 mt-2">
+                            {!rp.customerNotifiedAt && (
+                              <Button size="sm" variant="secondary" onClick={() => { notifyCustomerOfRemovedPart(rp.id); toast("Customer notified about removed part."); }}>
+                                Notify Customer
+                              </Button>
+                            )}
+                            <Button size="sm" onClick={() => { confirmPartReturned(rp.id, "You"); toast("Marked as returned to customer."); }}>
+                              <CheckCircle2 size={13} /> Confirm Returned
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {jobRemovedParts.length === 0 && <p className="text-sm text-[var(--color-ink-muted)] py-2">No removed parts logged yet.</p>}
+                  </div>
+                  <div className="border-t pt-3 [border-color:var(--color-border)] flex items-end gap-2 flex-wrap">
+                    <div className="flex-1 min-w-40">
+                      <p className="text-xs text-[var(--color-ink-muted)] mb-1">Part description</p>
+                      <input
+                        value={removedDesc}
+                        onChange={(e) => setRemovedDesc(e.target.value)}
+                        placeholder="e.g. Old compressor (faulty)"
+                        className="w-full rounded-lg border bg-[var(--color-surface-2)] px-3 py-2 text-sm outline-none [border-color:var(--color-border)]"
+                      />
+                    </div>
+                    <div className="w-32">
+                      <p className="text-xs text-[var(--color-ink-muted)] mb-1">Serial (optional)</p>
+                      <input
+                        value={removedSerial}
+                        onChange={(e) => setRemovedSerial(e.target.value)}
+                        placeholder="SN…"
+                        className="w-full rounded-lg border bg-[var(--color-surface-2)] px-3 py-2 text-sm outline-none [border-color:var(--color-border)]"
+                      />
+                    </div>
+                    <Button
+                      variant="secondary"
+                      disabled={!removedDesc.trim()}
+                      onClick={() => {
+                        logRemovedPart(job.id, removedDesc.trim(), removedSerial.trim() || undefined, "You");
+                        setRemovedDesc("");
+                        setRemovedSerial("");
+                        toast("Removed part logged.");
+                      }}
+                    >
+                      Log Removed Part
+                    </Button>
+                  </div>
+                </Card>
               </div>
             )}
 

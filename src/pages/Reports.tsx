@@ -1,15 +1,18 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { CalendarDays, CircleDollarSign, Clock3, Download, Gauge, Wrench } from "lucide-react";
 import { useStore } from "../lib/store";
-import { Card, CardHeader, Tabs, Button } from "../components/ui";
+import { Card, CardHeader, Tabs, Button, Badge, Select } from "../components/ui";
 import { DualLineChart, HorizontalBarChart, VerticalBarChart, DonutChart } from "../components/charts";
-import { formatCurrency, downloadCsv, tatHours, cx } from "../lib/utils";
+import { formatCurrency, formatDateTime, downloadCsv, tatHours, cx } from "../lib/utils";
 import { filterByBranch } from "../lib/selectors";
 import { PAYMENT_METHOD_LABELS } from "../lib/payments";
 import { toast } from "../lib/toast";
+import { stageRefPrefix } from "../lib/stageRefNo";
+import type { StageName } from "../lib/types";
 
-const TABS = ["Job TAT", "Technician Performance", "Inventory Consumption", "Warranty Claims", "Revenue"];
+const TABS = ["Job TAT", "Technician Performance", "Inventory Consumption", "Warranty Claims", "Revenue", "Workflow Stage Register"];
 const RANGE_OPTIONS = [30, 90, 365];
+const REGISTER_STAGES: StageName[] = ["Diagnosis", "Estimate", "Customer Approval", "Repair", "QA"];
 
 function ReportKpi({ label, value, detail, icon, tone }: { label: string; value: string; detail: string; icon: ReactNode; tone: string }) {
   return (
@@ -33,10 +36,11 @@ function ReportKpi({ label, value, detail, icon, tone }: { label: string; value:
 
 export default function Reports() {
   const {
-    jobCards, technicians, partsUsed, inventoryItems, customers, brands, appliances, payments, selectedBranchId,
+    jobCards, technicians, partsUsed, inventoryItems, customers, brands, appliances, payments, selectedBranchId, stageHistory,
   } = useStore();
   const [tab, setTab] = useState(TABS[0]);
   const [rangeDays, setRangeDays] = useState(90);
+  const [registerStage, setRegisterStage] = useState<StageName>("Diagnosis");
 
   const scopedJobs = useMemo(() => filterByBranch(jobCards, selectedBranchId), [jobCards, selectedBranchId]);
   const filteredJobs = useMemo(() => {
@@ -164,6 +168,14 @@ export default function Reports() {
     return Array.from(map.values()).sort((a, b) => a.sort - b.sort);
   }, [revenueJobs, paidPayments]);
 
+  const registerEntries = useMemo(
+    () =>
+      stageHistory
+        .filter((h) => h.stageName === registerStage && h.stageRefNo)
+        .sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp)),
+    [stageHistory, registerStage]
+  );
+
   const paymentsByMethod = useMemo(() => {
     const map = new Map<string, number>();
     for (const payment of paidPayments) {
@@ -179,6 +191,11 @@ export default function Reports() {
     if (tab === "Inventory Consumption") downloadCsv("inventory-consumption.csv", consumption.map((row) => ({ Item: row.item, "Qty Used": row.qty, "Consumption Value": row.cost })));
     if (tab === "Warranty Claims") downloadCsv("warranty-claims.csv", warrantyByBrand.map((row) => ({ Brand: row.brand, Claims: row.claims, "Claim Rate (%)": row.claimRate })));
     if (tab === "Revenue") downloadCsv("revenue-report.csv", revenueJobs.map((job) => ({ Job: job.documentNo, Invoice: job.invoiceNo, Customer: customerMap.get(job.customerId)?.name ?? "", Amount: job.finalAmount ?? 0 })));
+    if (tab === "Workflow Stage Register")
+      downloadCsv(
+        `${registerStage.toLowerCase().replace(/\s+/g, "-")}-register.csv`,
+        registerEntries.map((h) => ({ "Ref No.": h.stageRefNo ?? "", Job: h.jobcardId, "Changed By": h.changedBy, When: formatDateTime(h.timestamp), Notes: h.notes }))
+      );
   }
 
   return (
@@ -293,6 +310,42 @@ export default function Reports() {
                   <p className="py-16 text-center text-sm text-[var(--color-ink-muted)]">No payments recorded in this period.</p>
                 )}
               </div>
+            </div>
+          )}
+
+          {tab === "Workflow Stage Register" && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <CardHeader title="Per-stage reference register" subtitle="Each stage below carries its own sequential number, independent of the invoice number" />
+                <Select value={registerStage} onChange={(e) => setRegisterStage(e.target.value as StageName)} className="w-48">
+                  {REGISTER_STAGES.map((s) => <option key={s} value={s}>{s} ({stageRefPrefix(s)})</option>)}
+                </Select>
+              </div>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-[var(--color-ink-muted)] border-b [border-color:var(--color-border)]">
+                    <th className="py-2 font-medium">Ref No.</th>
+                    <th className="py-2 font-medium">Job Card</th>
+                    <th className="py-2 font-medium">Changed By</th>
+                    <th className="py-2 font-medium">When</th>
+                    <th className="py-2 font-medium">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {registerEntries.map((h) => (
+                    <tr key={h.id} className="border-b last:border-0 [border-color:var(--color-border)]">
+                      <td className="py-2.5"><Badge tone="brand">{h.stageRefNo}</Badge></td>
+                      <td className="py-2.5 font-medium">{h.jobcardId}</td>
+                      <td className="py-2.5 text-[var(--color-ink-secondary)]">{h.changedBy}</td>
+                      <td className="py-2.5 text-[var(--color-ink-muted)]">{formatDateTime(h.timestamp)}</td>
+                      <td className="py-2.5 text-[var(--color-ink-secondary)]">{h.notes}</td>
+                    </tr>
+                  ))}
+                  {registerEntries.length === 0 && (
+                    <tr><td colSpan={5} className="py-8 text-center text-[var(--color-ink-muted)]">No {registerStage.toLowerCase()} entries recorded yet.</td></tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

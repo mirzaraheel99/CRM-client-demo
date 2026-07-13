@@ -98,6 +98,7 @@ export interface InventoryLocation {
 export interface InventoryItem {
   id: string;
   name: string;
+  nameAr?: string;
   category: string;
   brand: string;
   partNo: string;
@@ -130,6 +131,7 @@ export interface JobCardStageHistory {
   changedBy: string;
   timestamp: string;
   notes: string;
+  stageRefNo?: string;
 }
 
 export interface JobCardAttachment {
@@ -150,6 +152,19 @@ export interface JobCardPartUsed {
   qty: number;
   unitPrice: number;
   totalPrice: number;
+}
+
+export interface RemovedPart {
+  id: string;
+  jobcardId: string;
+  description: string;
+  serialNo?: string;
+  removedAt: string;
+  removedBy: string;
+  customerNotifiedAt?: string;
+  returnStatus: "pending" | "returned_to_customer" | "customer_declined";
+  returnConfirmedAt?: string;
+  returnConfirmedBy?: string;
 }
 
 export interface PurchaseBill {

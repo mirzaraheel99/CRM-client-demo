@@ -73,7 +73,11 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
-    document.documentElement.setAttribute("dir", lang === "ar" ? "rtl" : "ltr");
+    // Only nav/dashboard labels are translated (not the full app), so we keep
+    // the layout LTR even in Arabic — flipping the whole page to RTL here
+    // would mirror the sidebar/header around content that's still English,
+    // which reads as broken rather than bilingual.
+    document.documentElement.setAttribute("dir", "ltr");
     document.documentElement.setAttribute("lang", lang);
   }, [lang]);
 

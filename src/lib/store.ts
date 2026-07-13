@@ -4,11 +4,12 @@ import * as seed from "./seed";
 import { canAdvanceCurrentStage, canPerform } from "./permissions";
 import { MESSAGE_TEMPLATES, renderTemplate } from "./templates";
 import { stageBlockers } from "./workflow";
+import { nextStageRefNo } from "./stageRefNo";
 import type {
   ActionResult, Customer, Appliance, ApplianceTelemetry, Brand, Technician, InventoryItem, InventoryLocation,
   InventoryStock, InventoryTransaction, JobCard, JobCardStageHistory,
   JobCardAttachment, JobCardPartUsed, PurchaseBill, CommunicationLog,
-  WorkflowDefinition, Role, StageName, Branch, Payment, PaymentMethod, Channel, ServiceOrder,
+  WorkflowDefinition, Role, StageName, Branch, Payment, PaymentMethod, Channel, ServiceOrder, RemovedPart,
 } from "./types";
 
 type JobResult = ActionResult & { job?: JobCard };
@@ -41,6 +42,7 @@ interface DemoState {
   communicationLogs: CommunicationLog[];
   workflows: WorkflowDefinition[];
   payments: Payment[];
+  removedParts: RemovedPart[];
 
   role: Role;
   selectedBranchId: string | "all";
@@ -94,6 +96,10 @@ interface DemoState {
   sendMaintenanceReminder: (applianceId: string) => ActionResult;
   recordPayment: (jobcardId: string, method: PaymentMethod, amount: number, installments?: number, source?: "internal" | "customer") => PaymentResult;
 
+  logRemovedPart: (jobcardId: string, description: string, serialNo: string | undefined, removedBy: string) => RemovedPart;
+  notifyCustomerOfRemovedPart: (removedPartId: string) => void;
+  confirmPartReturned: (removedPartId: string, confirmedBy: string) => void;
+
   resetDemoData: () => void;
 }
 
@@ -125,6 +131,7 @@ const initialSlice = () => ({
   communicationLogs: clone(seed.COMMUNICATION_LOGS),
   workflows: clone(seed.WORKFLOWS),
   payments: clone(seed.PAYMENTS),
+  removedParts: clone(seed.REMOVED_PARTS),
 });
 
 const STAGE_TO_STATUS: Record<StageName, JobCard["status"]> = {
@@ -378,7 +385,7 @@ export const useStore = create<DemoState>()(
 
         const now = new Date().toISOString();
         const updatedJob: JobCard = { ...job, currentStage: targetStage, status: STAGE_TO_STATUS[targetStage], updatedAt: now };
-        const history: JobCardStageHistory = { id: nextId("hist"), jobcardId, stageName: targetStage, changedBy, timestamp: now, notes };
+        const history: JobCardStageHistory = { id: nextId("hist"), jobcardId, stageName: targetStage, changedBy, timestamp: now, notes, stageRefNo: nextStageRefNo(state.stageHistory, targetStage) };
         const logs = buildTriggeredLogs(state, updatedJob, targetStage, now);
         const jobs = state.jobCards.map((candidate) => candidate.id === jobcardId ? updatedJob : candidate);
         set({
@@ -656,6 +663,38 @@ export const useStore = create<DemoState>()(
           sidebarCollapsed: false,
           maintenanceRemindersSent: {},
         });
+      },
+
+      logRemovedPart: (jobcardId, description, serialNo, removedBy) => {
+        const part: RemovedPart = {
+          id: nextId("rp"),
+          jobcardId,
+          description,
+          serialNo,
+          removedAt: new Date().toISOString(),
+          removedBy,
+          returnStatus: "pending",
+        };
+        set((s) => ({ removedParts: [part, ...s.removedParts] }));
+        return part;
+      },
+
+      notifyCustomerOfRemovedPart: (removedPartId) => {
+        set((s) => ({
+          removedParts: s.removedParts.map((p) =>
+            p.id === removedPartId ? { ...p, customerNotifiedAt: new Date().toISOString() } : p
+          ),
+        }));
+      },
+
+      confirmPartReturned: (removedPartId, confirmedBy) => {
+        set((s) => ({
+          removedParts: s.removedParts.map((p) =>
+            p.id === removedPartId
+              ? { ...p, returnStatus: "returned_to_customer", returnConfirmedAt: new Date().toISOString(), returnConfirmedBy: confirmedBy }
+              : p
+          ),
+        }));
       },
     }),
     { name: "crm-demo-store-v3", version: 3 }

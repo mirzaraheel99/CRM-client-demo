@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Search } from "lucide-react";
 import { useStore } from "../../lib/store";
+import { toast } from "../../lib/toast";
 import { Button, Card, Input, Pagination, Select, SortableTh } from "../../components/ui";
 import { JobStatusBadge, JobTypeBadge } from "../../components/StatusBadge";
 import { filterByBranch } from "../../lib/selectors";
@@ -15,7 +16,7 @@ const PAGE_SIZE = 15;
 type SortKey = "id" | "customer" | "appliance" | "status" | "technician" | "created";
 
 export default function JobCardList() {
-  const { jobCards, serviceOrders, customers, appliances, brands, technicians, selectedBranchId, role } = useStore();
+  const { jobCards, serviceOrders, customers, appliances, brands, technicians, selectedBranchId, role, assignTechnician } = useStore();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<JobStatus | "all">("all");
   const [jobType, setJobType] = useState<JobType | "all">("all");
@@ -57,6 +58,22 @@ export default function JobCardList() {
   const { sorted: rows, sortKey, dir, toggle } = useSort<JobCard, SortKey>(filtered, getValue, "created", "desc");
   const currentPage = Math.min(page, Math.max(1, Math.ceil(rows.length / PAGE_SIZE)));
   const pagedRows = rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const canAssign = canPerform(role, "assign_technician");
+
+  const eligibleTechniciansFor = (job: JobCard) => {
+    const appliance = applianceMap.get(job.applianceId);
+    return technicians.filter((technician) => (
+      technician.branchId === job.branchId &&
+      technician.status !== "Off Duty" &&
+      (!appliance || technician.skills.includes(appliance.category))
+    ));
+  };
+
+  const handleAssign = (job: JobCard, technicianId: string) => {
+    if (!technicianId || technicianId === job.technicianId) return;
+    const result = assignTechnician(job.id, technicianId);
+    toast(result.message, result.ok ? "success" : "error");
+  };
 
   return (
     <div className="space-y-4">
@@ -77,7 +94,32 @@ export default function JobCardList() {
           {pagedRows.map((job) => {
             const customer = customerMap.get(job.customerId);
             const appliance = applianceMap.get(job.applianceId);
-            return <Link key={job.id} to={`/jobcards/${job.id}`} className="block p-4 hover:bg-black/[0.02] dark:hover:bg-white/[0.03]"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-sm font-semibold text-[var(--color-brand-1)]">{job.documentNo}</p><p className="mt-0.5 text-xs text-[var(--color-ink-muted)]">Sequence {formatSequence(job.sequenceNo)} | {job.invoiceNo}</p><p className="mt-2 truncate text-sm font-medium">{customer?.name ?? "Unknown customer"}</p><p className="truncate text-xs text-[var(--color-ink-muted)]">{appliance?.model ?? "Unknown product"} | {appliance?.documentNo}</p></div><div className="flex shrink-0 flex-col items-end gap-1.5"><JobStatusBadge status={job.status} /><JobTypeBadge jobType={job.jobType} /></div></div><div className="mt-3 flex items-center justify-between gap-3 text-xs text-[var(--color-ink-muted)]"><span className="truncate">{job.technicianId ? technicianMap.get(job.technicianId)?.name : "Unassigned"}</span><span>{formatDate(job.createdAt)}</span></div></Link>;
+            const eligibleTechnicians = eligibleTechniciansFor(job);
+            return (
+              <div key={job.id} className="p-4 hover:bg-black/[0.02] dark:hover:bg-white/[0.03]">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <Link to={`/jobcards/${job.id}`} className="text-sm font-semibold text-[var(--color-brand-1)] hover:underline">{job.documentNo}</Link>
+                    <p className="mt-0.5 text-xs text-[var(--color-ink-muted)]">Sequence {formatSequence(job.sequenceNo)} | {job.invoiceNo}</p>
+                    <p className="mt-2 truncate text-sm font-medium">
+                      {customer ? <Link to={`/customers/${customer.id}`} className="hover:text-[var(--color-brand-1)] hover:underline">{customer.name}</Link> : "Unknown customer"}
+                    </p>
+                    <p className="truncate text-xs text-[var(--color-ink-muted)]">{appliance?.model ?? "Unknown product"} | {appliance?.documentNo}</p>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1.5"><JobStatusBadge status={job.status} /><JobTypeBadge jobType={job.jobType} /></div>
+                </div>
+                <div className="mt-3 flex items-center justify-between gap-3 text-xs text-[var(--color-ink-muted)]">
+                  <span>{formatDate(job.createdAt)}</span>
+                  <Link to={`/jobcards/${job.id}`} className="font-medium text-[var(--color-brand-1)] hover:underline">Open job</Link>
+                </div>
+                <div className="mt-3">
+                  <Select value={job.technicianId ?? ""} disabled={!canAssign || job.status === "Delivered"} onChange={(event) => handleAssign(job, event.target.value)}>
+                    <option value="">Assign technician...</option>
+                    {eligibleTechnicians.map((technician) => <option key={technician.id} value={technician.id}>{technician.name}</option>)}
+                  </Select>
+                </div>
+              </div>
+            );
           })}
         </div>
         <div className="hidden overflow-x-auto sm:block">
@@ -87,7 +129,27 @@ export default function JobCardList() {
               {pagedRows.map((job) => {
                 const appliance = applianceMap.get(job.applianceId);
                 const customer = customerMap.get(job.customerId);
-                return <tr key={job.id} className="border-b last:border-0 hover:bg-black/[0.02] dark:hover:bg-white/[0.03] [border-color:var(--color-border)]"><td className="px-5 py-3"><Link to={`/jobcards/${job.id}`} className="font-medium text-[var(--color-brand-1)]">{job.documentNo}</Link><p className="text-xs text-[var(--color-ink-muted)]">Sequence {formatSequence(job.sequenceNo)}</p></td><td className="px-3 py-3">{customer?.name ?? "-"}<p className="text-xs text-[var(--color-ink-muted)]">{customer?.documentNo}</p></td><td className="px-3 py-3 text-[var(--color-ink-secondary)]">{appliance?.model ?? "-"}<p className="text-xs text-[var(--color-ink-muted)]">{brandMap.get(appliance?.brandId ?? "")?.name} | {appliance?.documentNo}</p></td><td className="px-3 py-3 text-xs text-[var(--color-ink-secondary)]">{job.invoiceNo}</td><td className="px-3 py-3"><JobTypeBadge jobType={job.jobType} /></td><td className="px-3 py-3"><JobStatusBadge status={job.status} /></td><td className="px-3 py-3 text-[var(--color-ink-secondary)]">{job.technicianId ? technicianMap.get(job.technicianId)?.name : "Unassigned"}</td><td className="px-5 py-3 text-[var(--color-ink-muted)]">{formatDate(job.createdAt)}</td></tr>;
+                const eligibleTechnicians = eligibleTechniciansFor(job);
+                return (
+                  <tr key={job.id} className="border-b last:border-0 hover:bg-black/[0.02] dark:hover:bg-white/[0.03] [border-color:var(--color-border)]">
+                    <td className="px-5 py-3"><Link to={`/jobcards/${job.id}`} className="font-medium text-[var(--color-brand-1)] hover:underline">{job.documentNo}</Link><p className="text-xs text-[var(--color-ink-muted)]">Sequence {formatSequence(job.sequenceNo)}</p></td>
+                    <td className="px-3 py-3">
+                      {customer ? <Link to={`/customers/${customer.id}`} className="font-medium hover:text-[var(--color-brand-1)] hover:underline">{customer.name}</Link> : "-"}
+                      <p className="text-xs text-[var(--color-ink-muted)]">{customer?.documentNo}</p>
+                    </td>
+                    <td className="px-3 py-3 text-[var(--color-ink-secondary)]">{appliance?.model ?? "-"}<p className="text-xs text-[var(--color-ink-muted)]">{brandMap.get(appliance?.brandId ?? "")?.name} | {appliance?.documentNo}</p></td>
+                    <td className="px-3 py-3 text-xs text-[var(--color-ink-secondary)]">{job.invoiceNo}</td>
+                    <td className="px-3 py-3"><JobTypeBadge jobType={job.jobType} /></td>
+                    <td className="px-3 py-3"><JobStatusBadge status={job.status} /></td>
+                    <td className="px-3 py-3">
+                      <Select value={job.technicianId ?? ""} disabled={!canAssign || job.status === "Delivered"} onChange={(event) => handleAssign(job, event.target.value)}>
+                        <option value="">Assign technician...</option>
+                        {eligibleTechnicians.map((technician) => <option key={technician.id} value={technician.id}>{technician.name}</option>)}
+                      </Select>
+                    </td>
+                    <td className="px-5 py-3 text-[var(--color-ink-muted)]">{formatDate(job.createdAt)}</td>
+                  </tr>
+                );
               })}
             </tbody>
           </table>

@@ -108,6 +108,7 @@ interface DemoState {
   setQaApproved: (jobcardId: string, approved: boolean) => ActionResult;
   setFinalAmount: (jobcardId: string, amount: number) => ActionResult;
   captureCustomerSignature: (jobcardId: string, signature: string) => ActionResult;
+  confirmAssetHandover: (jobcardId: string, confirmedBy: string) => ActionResult;
   savePurchaseBill: (jobcardId: string, bill: Omit<PurchaseBill, "id" | "jobcardId">) => ActionResult;
   addPartUsed: (jobcardId: string, itemId: string, qty: number) => ActionResult;
   removePartUsed: (partUsedId: string) => ActionResult;
@@ -398,6 +399,7 @@ export const useStore = create<DemoState>()(
             repairNotes: null,
             qaApproved: false,
             customerSignature: null,
+            assetHandedOver: false,
           };
         });
         const history = jobs.reduce<JobCardStageHistory[]>((acc, job) => {
@@ -461,6 +463,7 @@ export const useStore = create<DemoState>()(
           repairNotes: null,
           qaApproved: false,
           customerSignature: null,
+          assetHandedOver: false,
         };
         const history: JobCardStageHistory = { id: nextId("hist"), jobcardId: job.id, stageName: "Received", changedBy: "Front Desk", timestamp: now, notes: `Product sequence ${String(sequenceNo).padStart(2, "0")} received at counter.`, stageRefNo: nextStageRefNo(state.stageHistory, "Received") };
         const logs = buildTriggeredLogs(state, job, "Received", now);
@@ -693,6 +696,17 @@ export const useStore = create<DemoState>()(
         if (job.currentStage !== "Ready for Handover") return result(false, "Customer signature is captured at Ready for Handover.");
         set({ jobCards: state.jobCards.map((job) => job.id === jobcardId ? { ...job, customerSignature: signature.trim(), updatedAt: new Date().toISOString() } : job) });
         return result(true, "Customer signature captured.");
+      },
+      confirmAssetHandover: (jobcardId, confirmedBy) => {
+        const state = get();
+        if (!canPerform(state.role, "capture_signature")) return result(false, "Your role cannot confirm asset handover.");
+        if (!confirmedBy.trim()) return result(false, "Confirming staff member is required.");
+        const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
+        if (!job) return result(false, "Job card not found.");
+        if (job.currentStage !== "Ready for Handover") return result(false, "Asset handover is confirmed at Ready for Handover.");
+        const now = new Date().toISOString();
+        set({ jobCards: state.jobCards.map((candidate) => candidate.id === jobcardId ? { ...candidate, assetHandedOver: true, assetHandedOverAt: now, assetHandedOverBy: confirmedBy.trim(), updatedAt: now } : candidate) });
+        return result(true, "Asset handover confirmed.");
       },
       savePurchaseBill: (jobcardId, input) => {
         const state = get();

@@ -38,7 +38,10 @@ export function stageRequirements(job: JobCard, context: JobFlowContext): StageR
     return [{ label: "QA approved by a supervisor", met: job.qaApproved }];
   }
   if (job.currentStage === "Ready for Handover") {
-    const requirements: StageRequirement[] = [{ label: "Customer signature captured", met: Boolean(job.customerSignature?.trim()) }];
+    const requirements: StageRequirement[] = [
+      { label: "Customer signature captured", met: Boolean(job.customerSignature?.trim()) },
+      { label: "Asset handover confirmed", met: job.assetHandedOver === true },
+    ];
     if (job.jobType === "non_warranty") {
       requirements.unshift(
         { label: "Final amount confirmed", met: (job.finalAmount ?? 0) > 0 },

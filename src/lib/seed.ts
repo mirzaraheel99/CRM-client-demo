@@ -502,6 +502,9 @@ for (let i = 0; i < 130; i++) {
     qaApproved: qaIndex >= 0 && progressIdx > qaIndex,
     customerSignature: isDelivered ? customer.name : null,
     oemClaimNo: jobType === "warranty" && progressIdx >= 1 && rand() > 0.5 ? `OEM-${int(100000, 999999)}` : undefined,
+    assetHandedOver: isDelivered,
+    assetHandedOverAt: isDelivered ? new Date(ts).toISOString() : undefined,
+    assetHandedOverBy: isDelivered ? "Front Desk" : undefined,
   };
   JOB_CARDS.push(job);
   activeOrder.createdAt = new Date(activeOrder.createdAt) < new Date(job.createdAt) ? activeOrder.createdAt : job.createdAt;

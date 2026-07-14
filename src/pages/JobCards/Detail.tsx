@@ -85,7 +85,7 @@ export default function JobCardDetail() {
     jobCards, serviceOrders, customers, appliances, applianceTelemetry, brands, technicians, workflows,
     stageHistory, attachments, partsUsed, estimateLineItems, communicationLogs, inventoryItems, inventoryLocations, inventoryStock, purchaseBills, payments, removedParts,
     role, selectedBranchId, advanceStage, assignTechnician, setDiagnosis, addEstimateLine, updateEstimateLine, removeEstimateLine, setEstimateValidUntil, approveCustomer, setRepairNotes, setQaApproved,
-    setFinalAmount, captureCustomerSignature, savePurchaseBill, addPartUsed, removePartUsed, addAttachment, sendCommunication,
+    setFinalAmount, captureCustomerSignature, confirmAssetHandover, savePurchaseBill, addPartUsed, removePartUsed, addAttachment, sendCommunication,
     logRemovedPart, notifyCustomerOfRemovedPart, confirmPartReturned, addAppliance, addProductToOrder,
   } = useStore();
   const [removedDesc, setRemovedDesc] = useState("");
@@ -989,6 +989,31 @@ export default function JobCardDetail() {
                     <div className="space-y-2">
                       <Field label={bi("Customer signature / name", "توقيع / اسم العميل")}><Input value={signatureInput} onChange={(event) => setSignatureInput(event.target.value)} /></Field>
                       <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(captureCustomerSignature(job.id, signatureInput))}>{bi("Capture Signature", "تسجيل التوقيع")}</Button>
+                    </div>
+                  )}
+                  {canPerform(role, "capture_signature") && (
+                    <div className="space-y-2 rounded-lg border p-3 [border-color:var(--color-border)]">
+                      <p className="text-xs font-medium text-[var(--color-ink-secondary)]">{bi("Asset handover", "تسليم الجهاز")}</p>
+                      <p className="text-[11px] text-[var(--color-ink-muted)]">
+                        {bi("Confirm the repaired unit was physically returned to the customer.", "تأكيد إعادة الجهاز المصلح فعليًا إلى العميل.")}
+                      </p>
+                      {appliance && (
+                        <p className="text-[11px] text-[var(--color-ink-muted)]">
+                          {bi("Model", "الموديل")}: <span className="font-medium text-[var(--color-ink-secondary)]">{appliance.model}</span>
+                          {" · "}
+                          {bi("Serial No.", "الرقم التسلسلي")}: <span className="font-medium text-[var(--color-ink-secondary)]">{appliance.serialNo}</span>
+                        </p>
+                      )}
+                      {job.assetHandedOver ? (
+                        <p className="flex items-center gap-1.5 text-[11px] text-[var(--color-status-good,#16a34a)]">
+                          <CheckCircle2 size={12} />
+                          {bi("Handed over", "تم التسليم")} · {job.assetHandedOverBy} · {job.assetHandedOverAt && formatDateTime(job.assetHandedOverAt)}
+                        </p>
+                      ) : (
+                        <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(confirmAssetHandover(job.id, "You"))}>
+                          {bi("Confirm Asset Given to Customer", "تأكيد تسليم الجهاز للعميل")}
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>

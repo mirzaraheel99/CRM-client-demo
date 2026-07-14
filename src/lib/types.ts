@@ -295,6 +295,9 @@ export interface JobCard {
   customerSignature: string | null;
   oemClaimNo?: string;
   estimateValidUntil?: string;
+  assetHandedOver: boolean;
+  assetHandedOverAt?: string;
+  assetHandedOverBy?: string;
 }
 
 export interface ActionResult {

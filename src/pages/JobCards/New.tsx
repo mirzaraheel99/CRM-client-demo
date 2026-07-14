@@ -7,6 +7,7 @@ import { JobTypeBadge } from "../../components/StatusBadge";
 import { toast } from "../../lib/toast";
 import { filterByBranch } from "../../lib/selectors";
 import { formatDate, formatSequence } from "../../lib/utils";
+import { APPLIANCE_CATEGORY_AR, JOB_TYPE_AR, bi } from "../../lib/domainAr";
 import type { ApplianceCategory, JobType } from "../../lib/types";
 
 const CATEGORIES: ApplianceCategory[] = ["AC", "Refrigerator", "Washer", "Mobile", "TV", "Microwave"];
@@ -143,21 +144,21 @@ export default function NewJobCard() {
   return (
     <div className="mx-auto max-w-4xl space-y-5">
       <div className="animate-rise-in">
-        <h1 className="text-xl font-semibold tracking-tight">New Service Order</h1>
+        <h1 className="text-xl font-semibold tracking-tight">{bi("New Service Order", "أمر خدمة جديد")}</h1>
         <p className="mt-0.5 text-sm text-[var(--color-ink-muted)]">One customer order with a separate numbered workflow for every product received.</p>
       </div>
 
       <Card className="space-y-4">
-        <CardHeader title="Customer and receiving branch" subtitle="The phone number identifies the customer; products are associated through this service order." />
+        <CardHeader title={bi("Customer and receiving branch", "العميل والفرع المستقبل")} subtitle="The phone number identifies the customer; products are associated through this service order." />
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Customer">
+          <Field label={bi("Customer", "العميل")}>
             <Select value={customerId} onChange={(event) => selectCustomer(event.target.value)}>
-              <option value="">Choose by name or phone...</option>
-              <option value={NEW_CUSTOMER}>+ Add new customer</option>
+              <option value="">{bi("Choose by name or phone...", "اختر بالاسم أو الهاتف...")}</option>
+              <option value={NEW_CUSTOMER}>+ {bi("Add new customer", "إضافة عميل جديد")}</option>
               {scopedCustomers.map((customer) => <option key={customer.id} value={customer.id}>{customer.documentNo} - {customer.name} - {customer.phone}</option>)}
             </Select>
           </Field>
-          <Field label="Receiving branch">
+          <Field label={bi("Receiving branch", "الفرع المستقبل")}>
             <Select value={branchId} disabled={Boolean(customerId && customerId !== NEW_CUSTOMER)} onChange={(event) => setBranchId(event.target.value)}>
               {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
             </Select>
@@ -165,20 +166,20 @@ export default function NewJobCard() {
         </div>
         {customerId === NEW_CUSTOMER && (
           <div className="grid gap-4 rounded-md bg-black/[0.03] p-3 dark:bg-white/[0.05] sm:grid-cols-2">
-            <Field label="Customer name"><Input value={newCustomer.name} onChange={(event) => setNewCustomer({ ...newCustomer, name: event.target.value })} /></Field>
-            <Field label="Phone"><Input value={newCustomer.phone} onChange={(event) => setNewCustomer({ ...newCustomer, phone: event.target.value })} placeholder="+966..." /></Field>
-            <Field label="WhatsApp"><Input value={newCustomer.whatsapp} onChange={(event) => setNewCustomer({ ...newCustomer, whatsapp: event.target.value })} placeholder="Defaults to phone" /></Field>
-            <Field label="Email"><Input value={newCustomer.email} onChange={(event) => setNewCustomer({ ...newCustomer, email: event.target.value })} /></Field>
-            <div className="sm:col-span-2"><Field label="Address"><Input value={newCustomer.address} onChange={(event) => setNewCustomer({ ...newCustomer, address: event.target.value })} /></Field></div>
+            <Field label={bi("Customer name", "اسم العميل")}><Input value={newCustomer.name} onChange={(event) => setNewCustomer({ ...newCustomer, name: event.target.value })} /></Field>
+            <Field label={bi("Phone", "الهاتف")}><Input value={newCustomer.phone} onChange={(event) => setNewCustomer({ ...newCustomer, phone: event.target.value })} placeholder="+966..." /></Field>
+            <Field label={bi("WhatsApp", "واتساب")}><Input value={newCustomer.whatsapp} onChange={(event) => setNewCustomer({ ...newCustomer, whatsapp: event.target.value })} placeholder="Defaults to phone" /></Field>
+            <Field label={bi("Email", "البريد الإلكتروني")}><Input value={newCustomer.email} onChange={(event) => setNewCustomer({ ...newCustomer, email: event.target.value })} /></Field>
+            <div className="sm:col-span-2"><Field label={bi("Address", "العنوان")}><Input value={newCustomer.address} onChange={(event) => setNewCustomer({ ...newCustomer, address: event.target.value })} /></Field></div>
           </div>
         )}
       </Card>
 
       <Card className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <CardHeader title="Product sequences" subtitle="Each sequence keeps its own dates, warranty, diagnosis, estimate, invoice, technician, and status." />
+          <CardHeader title={bi("Product sequences", "تسلسل المنتجات")} subtitle="Each sequence keeps its own dates, warranty, diagnosis, estimate, invoice, technician, and status." />
           <Button variant="secondary" size="sm" onClick={() => setLines((current) => [...current, emptyLine()])}>
-            <Plus size={14} /> Add product
+            <Plus size={14} /> {bi("Add product", "إضافة منتج")}
           </Button>
         </div>
 
@@ -191,7 +192,7 @@ export default function NewJobCard() {
               <section key={line.key} className="py-5 first:pt-1 last:pb-1">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <Badge tone="brand">Sequence {formatSequence(index + 1)}</Badge>
+                    <Badge tone="brand">{bi("Sequence", "التسلسل")} {formatSequence(index + 1)}</Badge>
                     {appliance && <span className="text-xs text-[var(--color-ink-muted)]">{appliance.documentNo}</span>}
                   </div>
                   {lines.length > 1 && (
@@ -208,10 +209,10 @@ export default function NewJobCard() {
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Product / equipment">
+                  <Field label={bi("Product / equipment", "المنتج / الجهاز")}>
                     <Select value={line.applianceId} onChange={(event) => patchLine(line.key, { applianceId: event.target.value })}>
-                      <option value="">Choose a registered product...</option>
-                      <option value={NEW_PRODUCT}>+ Register new product unit</option>
+                      <option value="">{bi("Choose a registered product...", "اختر منتجاً مسجلاً...")}</option>
+                      <option value={NEW_PRODUCT}>+ {bi("Register new product unit", "تسجيل وحدة منتج جديدة")}</option>
                       {appliances.map((candidate) => (
                         <option key={candidate.id} value={candidate.id} disabled={selectedIds.has(candidate.id) && candidate.id !== line.applianceId}>
                           {candidate.documentNo} - {candidate.model} - SN {candidate.serialNo}
@@ -219,11 +220,11 @@ export default function NewJobCard() {
                       ))}
                     </Select>
                   </Field>
-                  <Field label="Warranty handling">
+                  <Field label={bi("Warranty handling", "معالجة الضمان")}>
                     <Select value={line.jobTypeOverride} onChange={(event) => patchLine(line.key, { jobTypeOverride: event.target.value as JobType | "auto" })}>
-                      <option value="auto">Auto-detect ({detectedJobType === "warranty" ? "Warranty" : "Non-Warranty"})</option>
-                      <option value="warranty">Force Warranty</option>
-                      <option value="non_warranty">Force Non-Warranty</option>
+                      <option value="auto">{bi(`Auto-detect (${detectedJobType === "warranty" ? "Warranty" : "Non-Warranty"})`, `كشف تلقائي (${JOB_TYPE_AR[detectedJobType]})`)}</option>
+                      <option value="warranty">{bi("Force Warranty", "فرض الضمان")}</option>
+                      <option value="non_warranty">{bi("Force Non-Warranty", "فرض بدون ضمان")}</option>
                     </Select>
                   </Field>
                 </div>
@@ -231,25 +232,25 @@ export default function NewJobCard() {
                 {line.applianceId === NEW_PRODUCT && (
                   <div className="mt-3 rounded-md bg-black/[0.03] p-3 dark:bg-white/[0.05]">
                     <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-sm font-medium">Register exact product unit</p>
-                      <Badge tone="brand">New Product No. after save</Badge>
+                      <p className="text-sm font-medium">{bi("Register exact product unit", "تسجيل وحدة المنتج بالتحديد")}</p>
+                      <Badge tone="brand">{bi("New Product No. after save", "رقم منتج جديد بعد الحفظ")}</Badge>
                     </div>
                     <div className="grid gap-4 sm:grid-cols-2">
-                      <Field label="Brand">
+                      <Field label={bi("Brand", "العلامة التجارية")}>
                         <Select value={line.newProduct.brandId} onChange={(event) => patchNewProduct(line.key, { brandId: event.target.value })}>
-                          <option value="">Choose brand...</option>
+                          <option value="">{bi("Choose brand...", "اختر العلامة التجارية...")}</option>
                           {brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
                         </Select>
                       </Field>
-                      <Field label="Category">
+                      <Field label={bi("Category", "الفئة")}>
                         <Select value={line.newProduct.category} onChange={(event) => patchNewProduct(line.key, { category: event.target.value as ApplianceCategory })}>
-                          {CATEGORIES.map((item) => <option key={item} value={item}>{item}</option>)}
+                          {CATEGORIES.map((item) => <option key={item} value={item}>{bi(item, APPLIANCE_CATEGORY_AR[item])}</option>)}
                         </Select>
                       </Field>
-                      <Field label="Model"><Input value={line.newProduct.model} onChange={(event) => patchNewProduct(line.key, { model: event.target.value })} /></Field>
-                      <Field label="Serial number / unit number"><Input value={line.newProduct.serialNo} onChange={(event) => patchNewProduct(line.key, { serialNo: event.target.value })} /></Field>
-                      {line.newProduct.category === "Mobile" && <Field label="IMEI"><Input value={line.newProduct.imeiNo} onChange={(event) => patchNewProduct(line.key, { imeiNo: event.target.value })} /></Field>}
-                      <Field label="Purchase date"><Input value={line.newProduct.purchaseDate} onChange={(event) => patchNewProduct(line.key, { purchaseDate: event.target.value })} placeholder="YYYY-MM-DD" /></Field>
+                      <Field label={bi("Model", "الطراز")}><Input value={line.newProduct.model} onChange={(event) => patchNewProduct(line.key, { model: event.target.value })} /></Field>
+                      <Field label={bi("Serial number / unit number", "الرقم التسلسلي / رقم الوحدة")}><Input value={line.newProduct.serialNo} onChange={(event) => patchNewProduct(line.key, { serialNo: event.target.value })} /></Field>
+                      {line.newProduct.category === "Mobile" && <Field label={bi("IMEI", "الآيمي")}><Input value={line.newProduct.imeiNo} onChange={(event) => patchNewProduct(line.key, { imeiNo: event.target.value })} /></Field>}
+                      <Field label={bi("Purchase date", "تاريخ الشراء")}><Input value={line.newProduct.purchaseDate} onChange={(event) => patchNewProduct(line.key, { purchaseDate: event.target.value })} placeholder="YYYY-MM-DD" /></Field>
                     </div>
                     <p className="mt-3 text-xs text-[var(--color-ink-muted)]">For five identical purchased units, register each physical unit separately with its own serial/unit number. The demo will assign an `AST-xxxxx` product number, then this service order will assign the affected unit its own sequence.</p>
                   </div>
@@ -266,9 +267,9 @@ export default function NewJobCard() {
                 )}
 
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                  <Field label="Assign technician">
+                  <Field label={bi("Assign technician", "إسناد فني")}>
                     <Select value={line.technicianId} onChange={(event) => patchLine(line.key, { technicianId: event.target.value })}>
-                      <option value="">Assign later</option>
+                      <option value="">{bi("Assign later", "الإسناد لاحقاً")}</option>
                       {branchTechnicians
                         .filter((technician) => {
                           const category = line.applianceId === NEW_PRODUCT ? line.newProduct.category : appliance?.category;
@@ -278,14 +279,14 @@ export default function NewJobCard() {
                     </Select>
                   </Field>
                   <div className="rounded-md bg-black/[0.03] p-3 text-xs text-[var(--color-ink-muted)] dark:bg-white/[0.05]">
-                    <p className="font-medium text-[var(--color-ink-secondary)]">IDs created on submit</p>
+                    <p className="font-medium text-[var(--color-ink-secondary)]">{bi("IDs created on submit", "المعرّفات التي تُنشأ عند الإرسال")}</p>
                     <p>Product unit: existing `AST` or a new `AST` number.</p>
                     <p>Service line: service order sequence {formatSequence(index + 1)}.</p>
                   </div>
                 </div>
 
                 <div className="mt-4">
-                  <Field label="Reported problem / requested service">
+                  <Field label={bi("Reported problem / requested service", "المشكلة المُبلّغ عنها / الخدمة المطلوبة")}>
                     <Textarea rows={3} value={line.problem} onChange={(event) => patchLine(line.key, { problem: event.target.value })} placeholder="Describe the issue for this product sequence..." />
                   </Field>
                 </div>
@@ -297,14 +298,14 @@ export default function NewJobCard() {
         {lines.length === 0 && (
           <div className="flex flex-col items-center gap-2 py-10 text-center text-[var(--color-ink-muted)]">
             <PackagePlus size={22} />
-            <p className="text-sm">Add at least one product to this service order.</p>
+            <p className="text-sm">{bi("Add at least one product to this service order.", "أضف منتجاً واحداً على الأقل لهذا أمر الخدمة.")}</p>
           </div>
         )}
       </Card>
 
       <div className="flex justify-end gap-2">
-        <Button variant="secondary" onClick={() => navigate(-1)}>Cancel</Button>
-        <Button onClick={submit} disabled={!canSubmit}>Create service order ({lines.length} {lines.length === 1 ? "sequence" : "sequences"})</Button>
+        <Button variant="secondary" onClick={() => navigate(-1)}>{bi("Cancel", "إلغاء")}</Button>
+        <Button onClick={submit} disabled={!canSubmit}>{bi(`Create service order (${lines.length} ${lines.length === 1 ? "sequence" : "sequences"})`, `إنشاء أمر خدمة (${lines.length})`)}</Button>
       </div>
     </div>
   );

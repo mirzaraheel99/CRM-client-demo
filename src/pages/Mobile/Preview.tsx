@@ -2,6 +2,7 @@ import { Wifi, WifiOff, Bell, Camera, MapPin, PenTool, ScanLine, CheckCircle2 } 
 import { useStore } from "../../lib/store";
 import { Card, CardHeader, Badge } from "../../components/ui";
 import { JobStatusBadge } from "../../components/StatusBadge";
+import { bi } from "../../lib/domainAr";
 
 function PhoneFrame({ children, label }: { children: React.ReactNode; label: string }) {
   return (
@@ -36,7 +37,7 @@ export default function MobilePreview() {
   return (
     <div className="space-y-6">
       <div className="animate-rise-in">
-        <h1 className="text-xl font-semibold tracking-tight">Mobile Apps Preview</h1>
+        <h1 className="text-xl font-semibold tracking-tight">{bi("Mobile Apps Preview", "معاينة تطبيقات الجوال")}</h1>
         <p className="text-sm text-[var(--color-ink-muted)] mt-0.5">
           Visual blueprint of the technician and front-desk mobile experience described in the spec. This section is a UI mockup for the sales walkthrough — the production mobile apps ship separately (Flutter, per the tech stack recommendation).
         </p>
@@ -44,10 +45,10 @@ export default function MobilePreview() {
 
       <div className="flex flex-wrap gap-10 justify-center py-4">
         <PhoneFrame label="Front Desk App — Job List">
-          <MobileHeader title="Front Desk" />
+          <MobileHeader title={bi("Front Desk", "الاستقبال")} />
           <div className="p-3 space-y-2">
             <div className="rounded-lg border [border-color:var(--color-border)] px-3 py-2 flex items-center gap-2 text-xs text-[var(--color-ink-muted)]">
-              <ScanLine size={14} /> Scan serial / IMEI to receive item
+              <ScanLine size={14} /> {bi("Scan serial / IMEI to receive item", "امسح الرقم التسلسلي / الآيمي لاستلام الجهاز")}
             </div>
             {sample.map((j) => (
               <div key={j.id} className="rounded-lg border [border-color:var(--color-border)] p-3">
@@ -63,7 +64,7 @@ export default function MobilePreview() {
         </PhoneFrame>
 
         <PhoneFrame label="Technician App — Job Detail">
-          <MobileHeader title="My Jobs" />
+          <MobileHeader title={bi("My Jobs", "مهامي")} />
           <div className="p-3 space-y-3">
             <div className="rounded-lg border [border-color:var(--color-border)] p-3 space-y-2">
               <div className="flex items-center justify-between">
@@ -76,14 +77,14 @@ export default function MobilePreview() {
               </div>
               <p className="text-xs text-[var(--color-ink-secondary)]">{appMap.get(sample[0]?.applianceId)?.model}</p>
               <div className="grid grid-cols-2 gap-2 pt-1">
-                <button className="rounded-lg bg-[var(--color-brand-1)]/10 text-[var(--color-brand-2)] text-xs font-medium py-2 flex items-center justify-center gap-1"><Camera size={13} /> Upload Photo</button>
-                <button className="rounded-lg bg-[var(--color-brand-1)]/10 text-[var(--color-brand-2)] text-xs font-medium py-2 flex items-center justify-center gap-1"><PenTool size={13} /> Add Parts</button>
-                <button className="rounded-lg bg-[var(--color-brand-1)]/10 text-[var(--color-brand-2)] text-xs font-medium py-2 flex items-center justify-center gap-1"><CheckCircle2 size={13} /> Mark Complete</button>
-                <button className="rounded-lg bg-[var(--color-brand-1)]/10 text-[var(--color-brand-2)] text-xs font-medium py-2 flex items-center justify-center gap-1"><PenTool size={13} /> Signature</button>
+                <button className="rounded-lg bg-[var(--color-brand-1)]/10 text-[var(--color-brand-2)] text-xs font-medium py-2 flex items-center justify-center gap-1"><Camera size={13} /> {bi("Upload Photo", "رفع صورة")}</button>
+                <button className="rounded-lg bg-[var(--color-brand-1)]/10 text-[var(--color-brand-2)] text-xs font-medium py-2 flex items-center justify-center gap-1"><PenTool size={13} /> {bi("Add Parts", "إضافة قطع")}</button>
+                <button className="rounded-lg bg-[var(--color-brand-1)]/10 text-[var(--color-brand-2)] text-xs font-medium py-2 flex items-center justify-center gap-1"><CheckCircle2 size={13} /> {bi("Mark Complete", "وضع علامة مكتمل")}</button>
+                <button className="rounded-lg bg-[var(--color-brand-1)]/10 text-[var(--color-brand-2)] text-xs font-medium py-2 flex items-center justify-center gap-1"><PenTool size={13} /> {bi("Signature", "التوقيع")}</button>
               </div>
             </div>
             <div className="rounded-lg border [border-color:var(--color-border)] p-3">
-              <p className="text-xs font-medium mb-1">Van Stock</p>
+              <p className="text-xs font-medium mb-1">{bi("Van Stock", "مخزون الشاحنة")}</p>
               <p className="text-xs text-[var(--color-ink-muted)]">{tech?.name.split(" ")[0]}'s van — 14 parts available</p>
             </div>
           </div>
@@ -92,19 +93,19 @@ export default function MobilePreview() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card interactive>
-          <CardHeader title="Push notifications" />
+          <CardHeader title={bi("Push notifications", "الإشعارات الفورية")} />
           <p className="text-sm text-[var(--color-ink-secondary)] flex items-center gap-2"><Bell size={15} className="text-[var(--color-brand-1)]" /> New job assignments alert technicians instantly.</p>
         </Card>
         <Card interactive>
-          <CardHeader title="Offline mode" />
+          <CardHeader title={bi("Offline mode", "وضع عدم الاتصال")} />
           <p className="text-sm text-[var(--color-ink-secondary)] flex items-center gap-2">
             <WifiOff size={15} className="text-[var(--color-status-serious)]" /> Field updates queue locally
             <Wifi size={15} className="text-[var(--color-status-good)]" /> and sync on reconnect.
           </p>
-          <Badge tone="warning" className="mt-2">Simulated in this demo</Badge>
+          <Badge tone="warning" className="mt-2">{bi("Simulated in this demo", "محاكاة في هذا العرض التجريبي")}</Badge>
         </Card>
         <Card interactive>
-          <CardHeader title="Image compression" />
+          <CardHeader title={bi("Image compression", "ضغط الصور")} />
           <p className="text-sm text-[var(--color-ink-secondary)] flex items-center gap-2"><Camera size={15} className="text-[var(--color-brand-1)]" /> Photos are compressed client-side before upload to save bandwidth.</p>
         </Card>
       </div>

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { Copy, Check } from "lucide-react";
 import { Button } from "./ui";
+import { bi } from "../lib/domainAr";
 
 export function TrackingShare({ jobId }: { jobId: string }) {
   const [qr, setQr] = useState<string | null>(null);
@@ -30,9 +31,9 @@ export function TrackingShare({ jobId }: { jobId: string }) {
       <div className="flex items-center gap-3">
         {qr && <img src={qr} alt="Tracking QR code" className="h-20 w-20 rounded-lg border [border-color:var(--color-border)] bg-white p-1" />}
         <div className="flex-1 min-w-0">
-          <p className="text-xs text-[var(--color-ink-muted)] mb-1.5">Customers can scan or click this link — no login needed.</p>
+          <p className="text-xs text-[var(--color-ink-muted)] mb-1.5">{bi("Customers can scan or click this link — no login needed.", "يمكن للعملاء مسح أو النقر على هذا الرابط — بدون تسجيل دخول.")}</p>
           <Button size="sm" variant="secondary" onClick={copyLink} className="w-full justify-center">
-            {copied ? <><Check size={13} /> Copied</> : <><Copy size={13} /> Copy tracking link</>}
+            {copied ? <><Check size={13} /> {bi("Copied", "تم النسخ")}</> : <><Copy size={13} /> {bi("Copy tracking link", "نسخ رابط التتبع")}</>}
           </Button>
         </div>
       </div>

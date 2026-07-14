@@ -8,6 +8,7 @@ import { toast } from "../../lib/toast";
 import { useSort } from "../../lib/useSort";
 import { appliancesByBranch } from "../../lib/selectors";
 import { canPerform } from "../../lib/permissions";
+import { APPLIANCE_CATEGORY_AR, WARRANTY_STATUS_AR, bi } from "../../lib/domainAr";
 import type { Appliance, ApplianceCategory } from "../../lib/types";
 
 const CATEGORIES: ApplianceCategory[] = ["AC", "Refrigerator", "Washer", "Mobile", "TV", "Microwave"];
@@ -70,10 +71,10 @@ export default function ApplianceList() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 animate-rise-in">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Product Registry</h1>
+          <h1 className="text-xl font-semibold tracking-tight">{bi("Product Registry", "سجل المنتجات")}</h1>
           <p className="mt-0.5 text-sm text-[var(--color-ink-muted)]">{rows.length} independent product records; customer association is created on each service order.</p>
         </div>
-        {canPerform(role, "create_appliance") && <Button onClick={() => setOpen(true)}>+ Add Product</Button>}
+        {canPerform(role, "create_appliance") && <Button onClick={() => setOpen(true)}>+ {bi("Add Product", "إضافة منتج")}</Button>}
       </div>
 
       <Card className="flex flex-wrap gap-3">
@@ -83,8 +84,8 @@ export default function ApplianceList() {
         </div>
         <div className="w-44">
           <Select value={category} onChange={(event) => { setCategory(event.target.value as ApplianceCategory | "all"); setPage(1); }}>
-            <option value="all">All categories</option>
-            {CATEGORIES.map((item) => <option key={item} value={item}>{item}</option>)}
+            <option value="all">{bi("All categories", "جميع الفئات")}</option>
+            {CATEGORIES.map((item) => <option key={item} value={item}>{bi(item, APPLIANCE_CATEGORY_AR[item])}</option>)}
           </Select>
         </div>
       </Card>
@@ -99,7 +100,7 @@ export default function ApplianceList() {
                   <p className="truncate text-sm font-semibold text-[var(--color-brand-1)]">{appliance.model}{appliance.isSmartConnected && <Wifi size={12} className="ml-1.5 inline text-[var(--color-status-good)]" />}</p>
                   <p className="mt-1 truncate text-xs text-[var(--color-ink-secondary)]">{brandMap.get(appliance.brandId)?.name ?? "Unknown brand"} | {appliance.category} | SN {appliance.serialNo}</p>
                 </div>
-                <Badge tone={appliance.warrantyStatus === "In Warranty" ? "good" : "neutral"}>{appliance.warrantyStatus}</Badge>
+                <Badge tone={appliance.warrantyStatus === "In Warranty" ? "good" : "neutral"}>{bi(appliance.warrantyStatus, WARRANTY_STATUS_AR[appliance.warrantyStatus])}</Badge>
               </div>
               <p className="mt-3 text-right text-xs text-[var(--color-ink-muted)]">Purchased {formatDate(appliance.purchaseDate)}</p>
             </Link>
@@ -109,13 +110,13 @@ export default function ApplianceList() {
           <table className="w-full min-w-[900px] text-sm">
             <thead>
               <tr className="sticky top-0 z-10 border-b bg-[var(--color-surface-1)] text-left text-xs text-[var(--color-ink-muted)] [border-color:var(--color-border)]">
-                <SortableTh label="Product No." active={sortKey === "document"} direction={dir} onClick={() => toggle("document")} className="px-5 py-3" />
-                <SortableTh label="Model" active={sortKey === "model"} direction={dir} onClick={() => toggle("model")} className="px-3 py-3" />
-                <SortableTh label="Category" active={sortKey === "category"} direction={dir} onClick={() => toggle("category")} className="px-3 py-3" />
-                <SortableTh label="Brand" active={sortKey === "brand"} direction={dir} onClick={() => toggle("brand")} className="px-3 py-3" />
-                <SortableTh label="Serial No." active={sortKey === "serial"} direction={dir} onClick={() => toggle("serial")} className="px-3 py-3" />
-                <SortableTh label="Purchased" active={sortKey === "purchased"} direction={dir} onClick={() => toggle("purchased")} className="px-3 py-3" />
-                <th className="px-5 py-3 font-medium">Warranty</th>
+                <SortableTh label={bi("Product No.", "رقم المنتج")} active={sortKey === "document"} direction={dir} onClick={() => toggle("document")} className="px-5 py-3" />
+                <SortableTh label={bi("Model", "الطراز")} active={sortKey === "model"} direction={dir} onClick={() => toggle("model")} className="px-3 py-3" />
+                <SortableTh label={bi("Category", "الفئة")} active={sortKey === "category"} direction={dir} onClick={() => toggle("category")} className="px-3 py-3" />
+                <SortableTh label={bi("Brand", "العلامة التجارية")} active={sortKey === "brand"} direction={dir} onClick={() => toggle("brand")} className="px-3 py-3" />
+                <SortableTh label={bi("Serial No.", "الرقم التسلسلي")} active={sortKey === "serial"} direction={dir} onClick={() => toggle("serial")} className="px-3 py-3" />
+                <SortableTh label={bi("Purchased", "تاريخ الشراء")} active={sortKey === "purchased"} direction={dir} onClick={() => toggle("purchased")} className="px-3 py-3" />
+                <th className="px-5 py-3 font-medium">{bi("Warranty", "الضمان")}</th>
               </tr>
             </thead>
             <tbody>
@@ -123,30 +124,30 @@ export default function ApplianceList() {
                 <tr key={appliance.id} className="border-b last:border-0 hover:bg-black/[0.02] dark:hover:bg-white/[0.03] [border-color:var(--color-border)]">
                   <td className="px-5 py-3 font-medium tabular-nums text-[var(--color-ink-secondary)]">{appliance.documentNo}</td>
                   <td className="px-3 py-3"><Link to={`/appliances/${appliance.id}`} className="font-medium text-[var(--color-brand-1)]">{appliance.model}</Link>{appliance.isSmartConnected && <Wifi size={12} className="ml-1.5 inline text-[var(--color-status-good)]" />}</td>
-                  <td className="px-3 py-3 text-[var(--color-ink-secondary)]">{appliance.category}</td>
+                  <td className="px-3 py-3 text-[var(--color-ink-secondary)]">{bi(appliance.category, APPLIANCE_CATEGORY_AR[appliance.category])}</td>
                   <td className="px-3 py-3 text-[var(--color-ink-secondary)]">{brandMap.get(appliance.brandId)?.name ?? "-"}</td>
                   <td className="px-3 py-3 text-[var(--color-ink-secondary)]">{appliance.serialNo}</td>
                   <td className="px-3 py-3 text-[var(--color-ink-muted)]">{formatDate(appliance.purchaseDate)}</td>
-                  <td className="px-5 py-3"><Badge tone={appliance.warrantyStatus === "In Warranty" ? "good" : "neutral"}>{appliance.warrantyStatus}</Badge></td>
+                  <td className="px-5 py-3"><Badge tone={appliance.warrantyStatus === "In Warranty" ? "good" : "neutral"}>{bi(appliance.warrantyStatus, WARRANTY_STATUS_AR[appliance.warrantyStatus])}</Badge></td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        {rows.length === 0 && <EmptyState icon={<PackageSearch size={18} />} title="No products found" subtitle="Try a different search or category filter." />}
+        {rows.length === 0 && <EmptyState icon={<PackageSearch size={18} />} title={bi("No products found", "لم يتم العثور على منتجات")} subtitle="Try a different search or category filter." />}
         <Pagination page={currentPage} pageSize={PAGE_SIZE} total={rows.length} onPageChange={setPage} />
       </Card>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Add Product">
+      <Modal open={open} onClose={() => setOpen(false)} title={bi("Add Product", "إضافة منتج")}>
         <div className="space-y-3">
           <p className="text-xs text-[var(--color-ink-muted)]">Products are registered independently. Select the customer when creating the service order.</p>
-          <Field label="Brand"><Select value={form.brandId} onChange={(event) => setForm({ ...form, brandId: event.target.value })}><option value="">Choose brand...</option>{brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}</Select></Field>
-          <Field label="Category"><Select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value as ApplianceCategory })}>{CATEGORIES.map((item) => <option key={item} value={item}>{item}</option>)}</Select></Field>
-          <Field label="Model"><Input value={form.model} onChange={(event) => setForm({ ...form, model: event.target.value })} /></Field>
-          <Field label="Serial number"><Input value={form.serialNo} onChange={(event) => setForm({ ...form, serialNo: event.target.value })} /></Field>
-          {form.category === "Mobile" && <Field label="IMEI"><Input value={form.imeiNo} onChange={(event) => setForm({ ...form, imeiNo: event.target.value })} /></Field>}
-          <Field label="Purchase date"><Input type="date" value={form.purchaseDate} onChange={(event) => setForm({ ...form, purchaseDate: event.target.value })} /></Field>
-          <Button className="w-full justify-center" onClick={submit}>Save Product</Button>
+          <Field label={bi("Brand", "العلامة التجارية")}><Select value={form.brandId} onChange={(event) => setForm({ ...form, brandId: event.target.value })}><option value="">{bi("Choose brand...", "اختر العلامة التجارية...")}</option>{brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}</Select></Field>
+          <Field label={bi("Category", "الفئة")}><Select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value as ApplianceCategory })}>{CATEGORIES.map((item) => <option key={item} value={item}>{bi(item, APPLIANCE_CATEGORY_AR[item])}</option>)}</Select></Field>
+          <Field label={bi("Model", "الطراز")}><Input value={form.model} onChange={(event) => setForm({ ...form, model: event.target.value })} /></Field>
+          <Field label={bi("Serial number", "الرقم التسلسلي")}><Input value={form.serialNo} onChange={(event) => setForm({ ...form, serialNo: event.target.value })} /></Field>
+          {form.category === "Mobile" && <Field label={bi("IMEI", "الآيمي")}><Input value={form.imeiNo} onChange={(event) => setForm({ ...form, imeiNo: event.target.value })} /></Field>}
+          <Field label={bi("Purchase date", "تاريخ الشراء")}><Input type="date" value={form.purchaseDate} onChange={(event) => setForm({ ...form, purchaseDate: event.target.value })} /></Field>
+          <Button className="w-full justify-center" onClick={submit}>{bi("Save Product", "حفظ المنتج")}</Button>
         </div>
       </Modal>
     </div>

@@ -5,9 +5,14 @@ import { toast } from "../lib/toast";
 import type { ApplianceCategory } from "../lib/types";
 import { filterByBranch } from "../lib/selectors";
 import { fallbackDocumentNo } from "../lib/utils";
+import { APPLIANCE_CATEGORY_AR, TECHNICIAN_STATUS_AR, bi } from "../lib/domainAr";
 
 const CATEGORIES: ApplianceCategory[] = ["AC", "Refrigerator", "Washer", "Mobile", "TV", "Microwave"];
 const TABS = ["Technician List", "Allocation Calendar"];
+const TAB_LABELS: Record<string, string> = {
+  "Technician List": bi("Technician List", "قائمة الفنيين"),
+  "Allocation Calendar": bi("Allocation Calendar", "تقويم التوزيع"),
+};
 
 export default function Technicians() {
   const { technicians, jobCards, customers, branches, selectedBranchId, addTechnician } = useStore();
@@ -42,14 +47,14 @@ export default function Technicians() {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3 animate-rise-in">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Technicians</h1>
+          <h1 className="text-xl font-semibold tracking-tight">{bi("Technicians", "الفنيون")}</h1>
           <p className="text-sm text-[var(--color-ink-muted)] mt-0.5">{scopedTechnicians.length} technicians in the selected branch scope</p>
         </div>
-        <Button onClick={() => { setForm((current) => ({ ...current, branchId: defaultBranchId })); setOpen(true); }}>+ Add Technician</Button>
+        <Button onClick={() => { setForm((current) => ({ ...current, branchId: defaultBranchId })); setOpen(true); }}>+ {bi("Add Technician", "إضافة فني")}</Button>
       </div>
 
       <Card padded={false}>
-        <div className="px-5 pt-3"><Tabs tabs={TABS} active={tab} onChange={setTab} /></div>
+        <div className="px-5 pt-3"><Tabs tabs={TABS} active={tab} onChange={setTab} labels={TAB_LABELS} /></div>
         <div className="p-5">
           {tab === "Technician List" && (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -64,10 +69,10 @@ export default function Technicians() {
                         <p className="text-[11px] text-[var(--color-ink-muted)]">{fallbackDocumentNo("TECH", t.id)}</p>
                         <p className="text-xs text-[var(--color-ink-muted)]">{t.zone}</p>
                       </div>
-                      <Badge tone={t.status === "Available" ? "good" : t.status === "On Job" ? "warning" : "neutral"} >{t.status}</Badge>
+                      <Badge tone={t.status === "Available" ? "good" : t.status === "On Job" ? "warning" : "neutral"} >{bi(t.status, TECHNICIAN_STATUS_AR[t.status])}</Badge>
                     </div>
                     <div className="flex flex-wrap gap-1">
-                      {t.skills.map((s) => <Badge key={s} tone="brand">{s}</Badge>)}
+                      {t.skills.map((s) => <Badge key={s} tone="brand">{bi(s, APPLIANCE_CATEGORY_AR[s])}</Badge>)}
                     </div>
                     <p className="text-xs text-[var(--color-ink-muted)]">{activeJobs} active jobs · {t.phone}</p>
                   </Card>
@@ -81,7 +86,7 @@ export default function Technicians() {
               <table className="w-full text-xs min-w-[820px] border-collapse">
                 <thead>
                   <tr>
-                    <th className="text-left py-2 pr-3 font-medium text-[var(--color-ink-muted)] sticky left-0 bg-[var(--color-surface-1)]">Technician</th>
+                    <th className="text-left py-2 pr-3 font-medium text-[var(--color-ink-muted)] sticky left-0 bg-[var(--color-surface-1)]">{bi("Technician", "الفني")}</th>
                     {days.map((d) => (
                       <th key={d.toISOString()} className="py-2 px-2 font-medium text-[var(--color-ink-muted)] text-center min-w-[100px]">
                         {d.toLocaleDateString("en-GB", { weekday: "short", day: "2-digit" })}
@@ -118,21 +123,21 @@ export default function Technicians() {
         </div>
       </Card>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Add Technician">
+      <Modal open={open} onClose={() => setOpen(false)} title={bi("Add Technician", "إضافة فني")}>
         <div className="space-y-3">
-          <Field label="Name"><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
-          <Field label="Phone"><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>
-          <Field label="Zone">
+          <Field label={bi("Name", "الاسم")}><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
+          <Field label={bi("Phone", "الهاتف")}><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>
+          <Field label={bi("Zone", "المنطقة")}>
             <Select value={form.zone} onChange={(e) => setForm({ ...form, zone: e.target.value })}>
               <option>Zone A</option><option>Zone B</option><option>Zone C</option>
             </Select>
           </Field>
-          <Field label="Branch">
+          <Field label={bi("Branch", "الفرع")}>
             <Select value={form.branchId} onChange={(e) => setForm({ ...form, branchId: e.target.value })}>
               {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
             </Select>
           </Field>
-          <Field label="Skills">
+          <Field label={bi("Skills", "المهارات")}>
             <div className="flex flex-wrap gap-2">
               {CATEGORIES.map((c) => (
                 <button
@@ -141,12 +146,12 @@ export default function Technicians() {
                   onClick={() => toggleSkill(c)}
                   className={`rounded-full px-2.5 py-1 text-xs font-medium border transition-colors [border-color:var(--color-border)] ${form.skills.includes(c) ? "bg-[var(--color-brand-1)] text-white border-transparent" : "text-[var(--color-ink-secondary)]"}`}
                 >
-                  {c}
+                  {bi(c, APPLIANCE_CATEGORY_AR[c])}
                 </button>
               ))}
             </div>
           </Field>
-          <Button className="w-full justify-center" onClick={submit}>Save Technician</Button>
+          <Button className="w-full justify-center" onClick={submit}>{bi("Save Technician", "حفظ الفني")}</Button>
         </div>
       </Modal>
     </div>

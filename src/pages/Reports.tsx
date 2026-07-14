@@ -8,9 +8,18 @@ import { filterByBranch } from "../lib/selectors";
 import { PAYMENT_METHOD_LABELS } from "../lib/payments";
 import { toast } from "../lib/toast";
 import { stageRefPrefix } from "../lib/stageRefNo";
+import { STAGE_NAME_AR, bi } from "../lib/domainAr";
 import type { StageName } from "../lib/types";
 
 const TABS = ["Job TAT", "Technician Performance", "Inventory Consumption", "Warranty Claims", "Revenue", "Workflow Stage Register"];
+const TAB_LABELS: Record<string, string> = {
+  "Job TAT": bi("Job TAT", "وقت إنجاز المهام"),
+  "Technician Performance": bi("Technician Performance", "أداء الفنيين"),
+  "Inventory Consumption": bi("Inventory Consumption", "استهلاك المخزون"),
+  "Warranty Claims": bi("Warranty Claims", "مطالبات الضمان"),
+  Revenue: bi("Revenue", "الإيرادات"),
+  "Workflow Stage Register": bi("Workflow Stage Register", "سجل مراحل سير العمل"),
+};
 const RANGE_OPTIONS = [30, 90, 365];
 const REGISTER_STAGES: StageName[] = ["Diagnosis", "Estimate", "Customer Approval", "Repair", "QA"];
 
@@ -202,7 +211,7 @@ export default function Reports() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap animate-rise-in">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Reports</h1>
+          <h1 className="text-xl font-semibold tracking-tight">{bi("Reports", "التقارير")}</h1>
           <p className="mt-0.5 text-sm text-[var(--color-ink-muted)]">Operational and financial reporting across the selected branch scope</p>
         </div>
         <div className="flex items-center gap-2">
@@ -222,23 +231,23 @@ export default function Reports() {
               </button>
             ))}
           </div>
-          <Button variant="secondary" onClick={() => { exportCsv(); toast(`${tab} report exported.`); }}><Download size={14} /> Export CSV</Button>
+          <Button variant="secondary" onClick={() => { exportCsv(); toast(`${tab} report exported.`); }}><Download size={14} /> {bi("Export CSV", "تصدير CSV")}</Button>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <ReportKpi label="Completed jobs" value={String(deliveredJobs.length)} detail={`${filteredJobs.length} jobs in selected period`} icon={<Wrench size={16} />} tone="var(--color-series-1)" />
-        <ReportKpi label="SLA compliance" value={`${slaRate}%`} detail={`${slaMet} delivered within 48 hours`} icon={<Clock3 size={16} />} tone="var(--color-series-2)" />
-        <ReportKpi label="Invoiced revenue" value={formatCurrency(totalInvoiced)} detail={`${revenueJobs.length} non-warranty invoices`} icon={<CircleDollarSign size={16} />} tone="var(--color-series-3)" />
-        <ReportKpi label="Collection rate" value={`${collectionRate}%`} detail={`${formatCurrency(outstanding)} outstanding`} icon={<Gauge size={16} />} tone="var(--color-series-5)" />
+        <ReportKpi label={bi("Completed jobs", "المهام المكتملة")} value={String(deliveredJobs.length)} detail={`${filteredJobs.length} jobs in selected period`} icon={<Wrench size={16} />} tone="var(--color-series-1)" />
+        <ReportKpi label={bi("SLA compliance", "الالتزام بمستوى الخدمة")} value={`${slaRate}%`} detail={`${slaMet} delivered within 48 hours`} icon={<Clock3 size={16} />} tone="var(--color-series-2)" />
+        <ReportKpi label={bi("Invoiced revenue", "الإيرادات المفوترة")} value={formatCurrency(totalInvoiced)} detail={`${revenueJobs.length} non-warranty invoices`} icon={<CircleDollarSign size={16} />} tone="var(--color-series-3)" />
+        <ReportKpi label={bi("Collection rate", "معدل التحصيل")} value={`${collectionRate}%`} detail={`${formatCurrency(outstanding)} outstanding`} icon={<Gauge size={16} />} tone="var(--color-series-5)" />
       </div>
 
       <Card padded={false}>
-        <div className="px-4 pt-2"><Tabs tabs={TABS} active={tab} onChange={setTab} /></div>
+        <div className="px-4 pt-2"><Tabs tabs={TABS} active={tab} onChange={setTab} labels={TAB_LABELS} /></div>
         <div className="p-4">
           {tab === "Job TAT" && (
             <>
-              <CardHeader title="Average turnaround time by brand" subtitle="Delivered jobs only; lower is better" />
+              <CardHeader title={bi("Average turnaround time by brand", "متوسط وقت الإنجاز حسب العلامة التجارية")} subtitle="Delivered jobs only; lower is better" />
               <HorizontalBarChart data={tatByBrand} dataKey="avgHours" categoryKey="brand" color="var(--color-series-1)" referenceValue={48} referenceLabel="48h SLA target" />
             </>
           )}
@@ -246,11 +255,11 @@ export default function Reports() {
           {tab === "Technician Performance" && (
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
               <div>
-                <CardHeader title="Jobs handled" subtitle="Throughput by assigned technician" />
+                <CardHeader title={bi("Jobs handled", "المهام المنجزة")} subtitle="Throughput by assigned technician" />
                 <VerticalBarChart data={techPerf} dataKey="jobs" categoryKey="name" color="var(--color-series-5)" />
               </div>
               <div className="border-t pt-5 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0 [border-color:var(--color-border)]">
-                <CardHeader title="Average turnaround time" subtitle="Delivered jobs; lower is better" />
+                <CardHeader title={bi("Average turnaround time", "متوسط وقت الإنجاز")} subtitle="Delivered jobs; lower is better" />
                 <HorizontalBarChart data={techPerf.filter((row) => row.avgHours > 0)} dataKey="avgHours" categoryKey="name" color="var(--color-series-1)" referenceValue={48} referenceLabel="48h SLA" />
               </div>
             </div>
@@ -259,11 +268,11 @@ export default function Reports() {
           {tab === "Inventory Consumption" && (
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
               <div>
-                <CardHeader title="Top parts by units consumed" subtitle="Issued against jobs in the selected period" />
+                <CardHeader title={bi("Top parts by units consumed", "أكثر القطع استهلاكاً")} subtitle="Issued against jobs in the selected period" />
                 <HorizontalBarChart data={consumption} dataKey="qty" categoryKey="item" color="var(--color-series-8)" height={300} />
               </div>
               <div className="border-t pt-5 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0 [border-color:var(--color-border)]">
-                <CardHeader title="Consumption value" subtitle="Quantity used multiplied by current unit price" />
+                <CardHeader title={bi("Consumption value", "قيمة الاستهلاك")} subtitle="Quantity used multiplied by current unit price" />
                 <HorizontalBarChart data={[...consumption].sort((a, b) => b.cost - a.cost)} dataKey="cost" categoryKey="item" color="var(--color-series-3)" height={300} />
               </div>
             </div>
@@ -272,11 +281,11 @@ export default function Reports() {
           {tab === "Warranty Claims" && (
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
               <div>
-                <CardHeader title="Warranty jobs by brand" subtitle={`${warrantyJobs.length} warranty jobs in the selected period`} />
+                <CardHeader title={bi("Warranty jobs by brand", "مهام الضمان حسب العلامة التجارية")} subtitle={`${warrantyJobs.length} warranty jobs in the selected period`} />
                 <HorizontalBarChart data={warrantyByBrand} dataKey="claims" categoryKey="brand" color="var(--color-series-2)" />
               </div>
               <div className="border-t pt-5 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0 [border-color:var(--color-border)]">
-                <CardHeader title="Claim rate vs. installed base" subtitle="Warranty jobs per registered appliance" />
+                <CardHeader title={bi("Claim rate vs. installed base", "معدل المطالبات مقابل القاعدة المركبة")} subtitle="Warranty jobs per registered appliance" />
                 <HorizontalBarChart data={warrantyByBrand} dataKey="claimRate" categoryKey="brand" color="var(--color-series-6)" />
               </div>
             </div>
@@ -285,7 +294,7 @@ export default function Reports() {
           {tab === "Revenue" && (
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.7fr_1fr]">
               <div>
-                <CardHeader title="Invoiced vs. collected revenue" subtitle={`${formatCurrency(totalInvoiced)} invoiced · ${formatCurrency(totalCollected)} collected · ${formatCurrency(outstanding)} outstanding`} />
+                <CardHeader title={bi("Invoiced vs. collected revenue", "الإيرادات المفوترة مقابل المحصلة")} subtitle={`${formatCurrency(totalInvoiced)} invoiced · ${formatCurrency(totalCollected)} collected · ${formatCurrency(outstanding)} outstanding`} />
                 {revenueTrend.length > 0 ? (
                   <DualLineChart
                     data={revenueTrend}
@@ -299,15 +308,15 @@ export default function Reports() {
                     height={280}
                   />
                 ) : (
-                  <p className="py-16 text-center text-sm text-[var(--color-ink-muted)]">No revenue activity in this period.</p>
+                  <p className="py-16 text-center text-sm text-[var(--color-ink-muted)]">{bi("No revenue activity in this period.", "لا يوجد نشاط إيرادات في هذه الفترة.")}</p>
                 )}
               </div>
               <div className="border-t pt-5 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0 [border-color:var(--color-border)]">
-                <CardHeader title="Collections by method" subtitle="Paid transactions only" />
+                <CardHeader title={bi("Collections by method", "التحصيلات حسب طريقة الدفع")} subtitle="Paid transactions only" />
                 {paymentsByMethod.length > 0 ? (
                   <DonutChart data={paymentsByMethod} height={250} centerValue={formatCurrency(totalCollected)} centerLabel="Collected" />
                 ) : (
-                  <p className="py-16 text-center text-sm text-[var(--color-ink-muted)]">No payments recorded in this period.</p>
+                  <p className="py-16 text-center text-sm text-[var(--color-ink-muted)]">{bi("No payments recorded in this period.", "لا توجد مدفوعات مسجلة في هذه الفترة.")}</p>
                 )}
               </div>
             </div>
@@ -316,19 +325,19 @@ export default function Reports() {
           {tab === "Workflow Stage Register" && (
             <div className="space-y-4">
               <div className="flex items-center justify-between flex-wrap gap-3">
-                <CardHeader title="Per-stage reference register" subtitle="Each stage below carries its own sequential number, independent of the invoice number" />
+                <CardHeader title={bi("Per-stage reference register", "سجل المراجع لكل مرحلة")} subtitle="Each stage below carries its own sequential number, independent of the invoice number" />
                 <Select value={registerStage} onChange={(e) => setRegisterStage(e.target.value as StageName)} className="w-48">
-                  {REGISTER_STAGES.map((s) => <option key={s} value={s}>{s} ({stageRefPrefix(s)})</option>)}
+                  {REGISTER_STAGES.map((s) => <option key={s} value={s}>{bi(s, STAGE_NAME_AR[s])} ({stageRefPrefix(s)})</option>)}
                 </Select>
               </div>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-xs text-[var(--color-ink-muted)] border-b [border-color:var(--color-border)]">
-                    <th className="py-2 font-medium">Ref No.</th>
-                    <th className="py-2 font-medium">Job Card</th>
-                    <th className="py-2 font-medium">Changed By</th>
-                    <th className="py-2 font-medium">When</th>
-                    <th className="py-2 font-medium">Notes</th>
+                    <th className="py-2 font-medium">{bi("Ref No.", "الرقم المرجعي")}</th>
+                    <th className="py-2 font-medium">{bi("Job Card", "بطاقة العمل")}</th>
+                    <th className="py-2 font-medium">{bi("Changed By", "تم التغيير بواسطة")}</th>
+                    <th className="py-2 font-medium">{bi("When", "الوقت")}</th>
+                    <th className="py-2 font-medium">{bi("Notes", "ملاحظات")}</th>
                   </tr>
                 </thead>
                 <tbody>

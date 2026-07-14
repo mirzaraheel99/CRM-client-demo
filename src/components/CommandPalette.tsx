@@ -8,6 +8,7 @@ import { useStore } from "../lib/store";
 import { canAccessPath } from "../lib/permissions";
 import { appliancesByBranch, filterByBranch } from "../lib/selectors";
 import { useCommandPaletteStore } from "../lib/commandPaletteStore";
+import { bi } from "../lib/domainAr";
 
 interface Command {
   id: string;
@@ -19,19 +20,19 @@ interface Command {
 }
 
 const STATIC_DESTINATIONS = [
-  { to: "/", label: "Dashboard", icon: <LayoutDashboard size={15} /> },
-  { to: "/predictive-maintenance", label: "Predictive Maintenance", icon: <Radar size={15} /> },
-  { to: "/jobcards", label: "Job Cards", icon: <ClipboardList size={15} /> },
-  { to: "/jobcards/new", label: "New Job Card", icon: <ClipboardPlus size={15} /> },
-  { to: "/customers", label: "Customers", icon: <Users size={15} /> },
-  { to: "/appliances", label: "Appliances", icon: <PackageSearch size={15} /> },
-  { to: "/brands", label: "Brands", icon: <Tag size={15} /> },
-  { to: "/inventory", label: "Inventory", icon: <Boxes size={15} /> },
-  { to: "/technicians", label: "Technicians", icon: <UserCog size={15} /> },
-  { to: "/workflow", label: "Workflow Designer", icon: <GitBranch size={15} /> },
-  { to: "/communications", label: "Communications", icon: <MessageSquare size={15} /> },
-  { to: "/reports", label: "Reports", icon: <BarChart3 size={15} /> },
-  { to: "/mobile", label: "Mobile Apps", icon: <Smartphone size={15} /> },
+  { to: "/", label: bi("Dashboard", "لوحة التحكم"), icon: <LayoutDashboard size={15} /> },
+  { to: "/predictive-maintenance", label: bi("Predictive Maintenance", "الصيانة التنبؤية"), icon: <Radar size={15} /> },
+  { to: "/jobcards", label: bi("Job Cards", "بطاقات العمل"), icon: <ClipboardList size={15} /> },
+  { to: "/jobcards/new", label: bi("New Job Card", "بطاقة عمل جديدة"), icon: <ClipboardPlus size={15} /> },
+  { to: "/customers", label: bi("Customers", "العملاء"), icon: <Users size={15} /> },
+  { to: "/appliances", label: bi("Appliances", "الأجهزة"), icon: <PackageSearch size={15} /> },
+  { to: "/brands", label: bi("Brands", "العلامات التجارية"), icon: <Tag size={15} /> },
+  { to: "/inventory", label: bi("Inventory", "المخزون"), icon: <Boxes size={15} /> },
+  { to: "/technicians", label: bi("Technicians", "الفنيون"), icon: <UserCog size={15} /> },
+  { to: "/workflow", label: bi("Workflow Designer", "مصمم سير العمل"), icon: <GitBranch size={15} /> },
+  { to: "/communications", label: bi("Communications", "الاتصالات"), icon: <MessageSquare size={15} /> },
+  { to: "/reports", label: bi("Reports", "التقارير"), icon: <BarChart3 size={15} /> },
+  { to: "/mobile", label: bi("Mobile Apps", "تطبيقات الجوال"), icon: <Smartphone size={15} /> },
 ];
 
 export function CommandPalette() {
@@ -72,7 +73,7 @@ export function CommandPalette() {
     const nav: Command[] = STATIC_DESTINATIONS.filter((destination) => canAccessPath(role, destination.to)).map((d) => ({
       id: `nav-${d.to}`,
       label: d.label,
-      hint: "Go to page",
+      hint: bi("Go to page", "الانتقال للصفحة"),
       icon: d.icon,
       action: () => navigate(d.to),
     }));
@@ -150,7 +151,7 @@ export function CommandPalette() {
         </div>
         <div className="max-h-[50vh] overflow-y-auto p-1.5">
           {filtered.length === 0 && (
-            <p className="py-8 text-center text-sm text-[var(--color-ink-muted)]">No matches.</p>
+            <p className="py-8 text-center text-sm text-[var(--color-ink-muted)]">{bi("No matches.", "لا توجد نتائج.")}</p>
           )}
           {filtered.map((cmd, i) => (
             <button

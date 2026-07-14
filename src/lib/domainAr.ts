@@ -63,6 +63,37 @@ export const COMM_STATUS_AR: Record<"sent" | "delivered" | "read" | "failed", st
   failed: "فشل الإرسال",
 };
 
+export const INVENTORY_TXN_TYPE_AR: Record<"receive" | "issue" | "return" | "transfer" | "adjust", string> = {
+  receive: "استلام",
+  issue: "صرف",
+  return: "إرجاع",
+  transfer: "نقل",
+  adjust: "تسوية",
+};
+
+export const LOCATION_TYPE_AR: Record<"store" | "van" | "branch", string> = {
+  store: "مخزن رئيسي",
+  van: "شاحنة الفني",
+  branch: "مخزن الفرع",
+};
+
+export const TECHNICIAN_STATUS_AR: Record<"Available" | "On Job" | "Off Duty", string> = {
+  Available: "متاح",
+  "On Job": "في مهمة",
+  "Off Duty": "خارج الدوام",
+};
+
+export const WARRANTY_STATUS_AR: Record<"In Warranty" | "Out of Warranty" | "Unknown", string> = {
+  "In Warranty": "ساري الضمان",
+  "Out of Warranty": "خارج الضمان",
+  Unknown: "غير معروف",
+};
+
+export const PAYMENT_STATUS_AR: Record<"paid" | "failed", string> = {
+  paid: "مدفوع",
+  failed: "فشل",
+};
+
 /** "English · Arabic" — the compact inline form used in badges, headers, and buttons. */
 export function bi(en: string, ar: string): string {
   return `${en} · ${ar}`;

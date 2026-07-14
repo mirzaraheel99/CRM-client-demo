@@ -3,6 +3,7 @@ import { MessageCircle, ShieldCheck } from "lucide-react";
 import { Badge, Button, Input } from "./ui";
 import { useStore } from "../lib/store";
 import { toast } from "../lib/toast";
+import { bi } from "../lib/domainAr";
 
 export function WhatsappVerify({ customerId, verified }: { customerId: string; verified: boolean }) {
   const verifyWhatsapp = useStore((s) => s.verifyWhatsapp);
@@ -12,15 +13,15 @@ export function WhatsappVerify({ customerId, verified }: { customerId: string; v
   const [error, setError] = useState(false);
 
   if (verified) {
-    return <Badge tone="good" icon={<ShieldCheck size={11} />}>WhatsApp Verified</Badge>;
+    return <Badge tone="good" icon={<ShieldCheck size={11} />}>{bi("WhatsApp Verified", "واتساب موثّق")}</Badge>;
   }
 
   if (!otpSent) {
     return (
       <div className="flex items-center gap-2 flex-wrap">
-        <Badge tone="warning">WhatsApp Unverified</Badge>
+        <Badge tone="warning">{bi("WhatsApp Unverified", "واتساب غير موثّق")}</Badge>
         <Button size="sm" variant="secondary" onClick={() => setOtpSent(true)}>
-          <MessageCircle size={12} /> Send verification code
+          <MessageCircle size={12} /> {bi("Send verification code", "إرسال رمز التحقق")}
         </Button>
       </div>
     );
@@ -29,7 +30,7 @@ export function WhatsappVerify({ customerId, verified }: { customerId: string; v
   return (
     <div className="space-y-2">
       <p className="text-xs text-[var(--color-ink-muted)]">
-        Demo OTP sent via WhatsApp: <span className="font-mono font-semibold text-[var(--color-ink-primary)]">{demoCode}</span>
+        {bi("Demo OTP sent via WhatsApp:", "تم إرسال رمز تجريبي عبر واتساب:")} <span className="font-mono font-semibold text-[var(--color-ink-primary)]">{demoCode}</span>
         <span className="italic"> (simulated — a real gateway would text this to the customer)</span>
       </p>
       <div className="flex items-center gap-2">
@@ -46,10 +47,10 @@ export function WhatsappVerify({ customerId, verified }: { customerId: string; v
             else setError(true);
           }}
         >
-          Confirm
+          {bi("Confirm", "تأكيد")}
         </Button>
       </div>
-      {error && <p className="text-xs text-[var(--color-status-critical)]">Code doesn't match — check and try again.</p>}
+      {error && <p className="text-xs text-[var(--color-status-critical)]">{bi("Code doesn't match — check and try again.", "الرمز غير مطابق — تحقق وحاول مرة أخرى.")}</p>}
     </div>
   );
 }

@@ -8,9 +8,17 @@ import { inventoryLocationsByBranch, inventoryStockByBranch, inventoryTransactio
 import { toast } from "../lib/toast";
 import { canPerform } from "../lib/permissions";
 import { useSort } from "../lib/useSort";
+import { INVENTORY_TXN_TYPE_AR, LOCATION_TYPE_AR, bi } from "../lib/domainAr";
 import type { InventoryTransaction, InventoryItem } from "../lib/types";
 
 const TABS = ["Item Master", "Stock Ledger", "Locations & Van Stock", "Stock by Branch", "Smart Reorder"];
+const TAB_LABELS: Record<string, string> = {
+  "Item Master": bi("Item Master", "سجل الأصناف"),
+  "Stock Ledger": bi("Stock Ledger", "دفتر حركة المخزون"),
+  "Locations & Van Stock": bi("Locations & Van Stock", "المواقع ومخزون الشاحنات"),
+  "Stock by Branch": bi("Stock by Branch", "المخزون حسب الفرع"),
+  "Smart Reorder": bi("Smart Reorder", "إعادة الطلب الذكي"),
+};
 type ItemSortKey = "name" | "partNo" | "brand" | "unitPrice" | "reorderLevel" | "totalStock";
 
 export default function Inventory() {
@@ -83,32 +91,32 @@ export default function Inventory() {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3 animate-rise-in">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Inventory & Spare Parts</h1>
+          <h1 className="text-xl font-semibold tracking-tight">{bi("Inventory & Spare Parts", "المخزون وقطع الغيار")}</h1>
           <p className="text-sm text-[var(--color-ink-muted)] mt-0.5">Stores, technician vans, and branch stock</p>
         </div>
         {canPerform(role, "manage_inventory") && <div className="flex gap-2 flex-wrap">
-          <Button variant="secondary" onClick={() => setTxnModal("receive")}><PackagePlus size={14} /> Receive</Button>
-          <Button variant="secondary" onClick={() => setTxnModal("issue")}><PackageMinus size={14} /> Issue</Button>
-          <Button variant="secondary" onClick={() => setTxnModal("return")}><Undo2 size={14} /> Return</Button>
-          <Button variant="secondary" onClick={() => setTxnModal("transfer")}><ArrowLeftRight size={14} /> Transfer</Button>
-          <Button onClick={() => setItemModal(true)}>+ Add Item</Button>
+          <Button variant="secondary" onClick={() => setTxnModal("receive")}><PackagePlus size={14} /> {bi("Receive", "استلام")}</Button>
+          <Button variant="secondary" onClick={() => setTxnModal("issue")}><PackageMinus size={14} /> {bi("Issue", "صرف")}</Button>
+          <Button variant="secondary" onClick={() => setTxnModal("return")}><Undo2 size={14} /> {bi("Return", "إرجاع")}</Button>
+          <Button variant="secondary" onClick={() => setTxnModal("transfer")}><ArrowLeftRight size={14} /> {bi("Transfer", "نقل")}</Button>
+          <Button onClick={() => setItemModal(true)}>+ {bi("Add Item", "إضافة صنف")}</Button>
         </div>}
       </div>
 
       <Card padded={false}>
-        <div className="px-5 pt-3"><Tabs tabs={TABS} active={tab} onChange={setTab} /></div>
+        <div className="px-5 pt-3"><Tabs tabs={TABS} active={tab} onChange={setTab} labels={TAB_LABELS} /></div>
         <div className="p-5">
           {tab === "Item Master" && (
             <table className="w-full text-sm">
               <thead>
                 <tr className="sticky top-0 z-10 bg-[var(--color-surface-1)] text-left text-xs text-[var(--color-ink-muted)] border-b [border-color:var(--color-border)]">
-                  <SortableTh label="Name" active={itemSortKey === "name"} direction={itemDir} onClick={() => toggleItemSort("name")} className="py-2" />
-                  <th className="py-2 pr-6 font-medium">Arabic Alias</th>
-                  <SortableTh label="Part No." active={itemSortKey === "partNo"} direction={itemDir} onClick={() => toggleItemSort("partNo")} className="py-2" />
-                  <SortableTh label="Brand" active={itemSortKey === "brand"} direction={itemDir} onClick={() => toggleItemSort("brand")} className="py-2" />
-                  <SortableTh label="Unit Price" active={itemSortKey === "unitPrice"} direction={itemDir} onClick={() => toggleItemSort("unitPrice")} className="py-2" />
-                  <SortableTh label="Reorder Level" active={itemSortKey === "reorderLevel"} direction={itemDir} onClick={() => toggleItemSort("reorderLevel")} className="py-2" />
-                  <SortableTh label="Total Stock" active={itemSortKey === "totalStock"} direction={itemDir} onClick={() => toggleItemSort("totalStock")} className="py-2" />
+                  <SortableTh label={bi("Name", "الاسم")} active={itemSortKey === "name"} direction={itemDir} onClick={() => toggleItemSort("name")} className="py-2" />
+                  <th className="py-2 pr-6 font-medium">{bi("Arabic Alias", "الاسم بالعربية")}</th>
+                  <SortableTh label={bi("Part No.", "رقم القطعة")} active={itemSortKey === "partNo"} direction={itemDir} onClick={() => toggleItemSort("partNo")} className="py-2" />
+                  <SortableTh label={bi("Brand", "العلامة التجارية")} active={itemSortKey === "brand"} direction={itemDir} onClick={() => toggleItemSort("brand")} className="py-2" />
+                  <SortableTh label={bi("Unit Price", "سعر الوحدة")} active={itemSortKey === "unitPrice"} direction={itemDir} onClick={() => toggleItemSort("unitPrice")} className="py-2" />
+                  <SortableTh label={bi("Reorder Level", "حد إعادة الطلب")} active={itemSortKey === "reorderLevel"} direction={itemDir} onClick={() => toggleItemSort("reorderLevel")} className="py-2" />
+                  <SortableTh label={bi("Total Stock", "إجمالي المخزون")} active={itemSortKey === "totalStock"} direction={itemDir} onClick={() => toggleItemSort("totalStock")} className="py-2" />
                 </tr>
               </thead>
               <tbody>
@@ -136,12 +144,12 @@ export default function Inventory() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-xs text-[var(--color-ink-muted)] border-b [border-color:var(--color-border)]">
-                  <th className="py-2 font-medium">Item</th>
-                  <th className="py-2 font-medium">Type</th>
-                  <th className="py-2 font-medium">Location</th>
-                  <th className="py-2 font-medium">Qty</th>
-                  <th className="py-2 font-medium">By</th>
-                  <th className="py-2 font-medium">When</th>
+                  <th className="py-2 font-medium">{bi("Item", "الصنف")}</th>
+                  <th className="py-2 font-medium">{bi("Type", "النوع")}</th>
+                  <th className="py-2 font-medium">{bi("Location", "الموقع")}</th>
+                  <th className="py-2 font-medium">{bi("Qty", "الكمية")}</th>
+                  <th className="py-2 font-medium">{bi("By", "بواسطة")}</th>
+                  <th className="py-2 font-medium">{bi("When", "الوقت")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -151,7 +159,7 @@ export default function Inventory() {
                   return (
                     <tr key={txn.id} className="border-b last:border-0 [border-color:var(--color-border)]">
                       <td className="py-2.5">{item?.name}</td>
-                      <td className="py-2.5 capitalize">{txn.type}</td>
+                      <td className="py-2.5 capitalize">{bi(txn.type, INVENTORY_TXN_TYPE_AR[txn.type])}</td>
                       <td className="py-2.5 text-[var(--color-ink-secondary)]">{loc?.name}</td>
                       <td className="py-2.5 tabular-nums">{txn.qty}</td>
                       <td className="py-2.5 text-[var(--color-ink-secondary)]">{txn.createdBy}</td>
@@ -169,7 +177,7 @@ export default function Inventory() {
                 const items = scopedStock.filter((s) => s.locationId === loc.id && s.qty > 0);
                 return (
                   <Card key={loc.id}>
-                    <CardHeader title={loc.name} subtitle={loc.type === "van" ? "Technician van" : loc.type === "store" ? "Main store" : "Branch store"} />
+                    <CardHeader title={loc.name} subtitle={bi(loc.type === "van" ? "Technician van" : loc.type === "store" ? "Main store" : "Branch store", LOCATION_TYPE_AR[loc.type])} />
                     <div className="space-y-1.5 max-h-40 overflow-y-auto">
                       {items.slice(0, 8).map((s) => {
                         const item = inventoryItems.find((i) => i.id === s.itemId);
@@ -180,7 +188,7 @@ export default function Inventory() {
                           </div>
                         );
                       })}
-                      {items.length === 0 && <p className="text-xs text-[var(--color-ink-muted)]">No stock recorded.</p>}
+                      {items.length === 0 && <p className="text-xs text-[var(--color-ink-muted)]">{bi("No stock recorded.", "لا يوجد مخزون مسجل.")}</p>}
                     </div>
                   </Card>
                 );
@@ -191,7 +199,7 @@ export default function Inventory() {
           {tab === "Stock by Branch" && (
             <div className="space-y-5">
               <div>
-                <CardHeader title="Inventory value by branch" subtitle="Total stock value (unit price × qty on hand) across all locations in each branch" />
+                <CardHeader title={bi("Inventory value by branch", "قيمة المخزون حسب الفرع")} subtitle="Total stock value (unit price × qty on hand) across all locations in each branch" />
                 <HorizontalBarChart data={branchValueChart} dataKey="value" categoryKey="branch" color="var(--color-series-5)" height={Math.max(120, branchStock.length * 60)} />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -199,10 +207,10 @@ export default function Inventory() {
                   <Card key={branch.id}>
                     <CardHeader title={branch.name} />
                     <div className="space-y-2 text-sm">
-                      <div className="flex justify-between"><span className="text-[var(--color-ink-muted)]">Units on hand</span><span className="font-medium tabular-nums">{totalUnits}</span></div>
-                      <div className="flex justify-between"><span className="text-[var(--color-ink-muted)]">Stock value</span><span className="font-medium tabular-nums">{formatCurrency(totalValue)}</span></div>
+                      <div className="flex justify-between"><span className="text-[var(--color-ink-muted)]">{bi("Units on hand", "الوحدات المتوفرة")}</span><span className="font-medium tabular-nums">{totalUnits}</span></div>
+                      <div className="flex justify-between"><span className="text-[var(--color-ink-muted)]">{bi("Stock value", "قيمة المخزون")}</span><span className="font-medium tabular-nums">{formatCurrency(totalValue)}</span></div>
                       <div className="flex justify-between items-center">
-                        <span className="text-[var(--color-ink-muted)]">Low-stock items</span>
+                        <span className="text-[var(--color-ink-muted)]">{bi("Low-stock items", "أصناف منخفضة المخزون")}</span>
                         <Badge tone={lowStockCount > 0 ? "critical" : "good"}>{lowStockCount}</Badge>
                       </div>
                     </div>
@@ -223,12 +231,12 @@ export default function Inventory() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-xs text-[var(--color-ink-muted)] border-b [border-color:var(--color-border)]">
-                    <th className="py-2 font-medium">Part</th>
-                    <th className="py-2 font-medium">Current Stock</th>
-                    <th className="py-2 font-medium">Weekly Usage</th>
-                    <th className="py-2 font-medium">Weeks of Cover</th>
-                    <th className="py-2 font-medium">Suggested Reorder</th>
-                    <th className="py-2 font-medium">Action</th>
+                    <th className="py-2 font-medium">{bi("Part", "القطعة")}</th>
+                    <th className="py-2 font-medium">{bi("Current Stock", "المخزون الحالي")}</th>
+                    <th className="py-2 font-medium">{bi("Weekly Usage", "الاستهلاك الأسبوعي")}</th>
+                    <th className="py-2 font-medium">{bi("Weeks of Cover", "أسابيع التغطية")}</th>
+                    <th className="py-2 font-medium">{bi("Suggested Reorder", "الطلب المقترح")}</th>
+                    <th className="py-2 font-medium">{bi("Action", "الإجراء")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -242,23 +250,23 @@ export default function Inventory() {
                       <td className="py-2.5 tabular-nums">{s.weeklyVelocity}/wk</td>
                       <td className="py-2.5">
                         <Badge tone={s.weeksOfCover == null ? "neutral" : s.weeksOfCover < 1.5 ? "critical" : "warning"}>
-                          {s.weeksOfCover == null ? "No recent usage" : `${s.weeksOfCover} wks`}
+                          {s.weeksOfCover == null ? bi("No recent usage", "لا يوجد استهلاك حديث") : `${s.weeksOfCover} wks`}
                         </Badge>
                       </td>
                       <td className="py-2.5 tabular-nums font-medium">{s.suggestedQty} units</td>
                       <td className="py-2.5">
                         {orderedItems.has(s.item.id) ? (
-                          <Badge tone="good">Order placed</Badge>
+                          <Badge tone="good">{bi("Order placed", "تم تقديم الطلب")}</Badge>
                         ) : (
                           <Button size="sm" variant="secondary" onClick={() => { setOrderedItems((prev) => new Set(prev).add(s.item.id)); toast(`Purchase order created for ${s.item.name}.`); }}>
-                            Create Purchase Order
+                            {bi("Create Purchase Order", "إنشاء أمر شراء")}
                           </Button>
                         )}
                       </td>
                     </tr>
                   ))}
                   {reorderSuggestions.length === 0 && (
-                    <tr><td colSpan={6} className="py-8 text-center text-[var(--color-ink-muted)]">Stock levels are healthy across all tracked parts.</td></tr>
+                    <tr><td colSpan={6} className="py-8 text-center text-[var(--color-ink-muted)]">{bi("Stock levels are healthy across all tracked parts.", "مستويات المخزون جيدة لجميع القطع المتابعة.")}</td></tr>
                   )}
                 </tbody>
               </table>
@@ -267,44 +275,44 @@ export default function Inventory() {
         </div>
       </Card>
 
-      <Modal open={!!txnModal} onClose={() => setTxnModal(null)} title={`${txnModal ?? ""} stock`.replace(/^\w/, (c) => c.toUpperCase())}>
+      <Modal open={!!txnModal} onClose={() => setTxnModal(null)} title={txnModal ? bi(`${txnModal} stock`.replace(/^\w/, (c) => c.toUpperCase()), `${INVENTORY_TXN_TYPE_AR[txnModal]} المخزون`) : ""}>
         <div className="space-y-3">
-          <Field label="Item">
+          <Field label={bi("Item", "الصنف")}>
             <Select value={txnForm.itemId} onChange={(e) => setTxnForm({ ...txnForm, itemId: e.target.value })}>
-              <option value="">Choose item…</option>
+              <option value="">{bi("Choose item…", "اختر صنفاً…")}</option>
               {inventoryItems.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
             </Select>
           </Field>
-          <Field label={txnModal === "transfer" ? "From location" : "Location"}>
+          <Field label={txnModal === "transfer" ? bi("From location", "من موقع") : bi("Location", "الموقع")}>
             <Select value={txnForm.locationId} onChange={(e) => setTxnForm({ ...txnForm, locationId: e.target.value })}>
-              <option value="">Choose location…</option>
+              <option value="">{bi("Choose location…", "اختر موقعاً…")}</option>
               {scopedLocations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
             </Select>
           </Field>
           {txnModal === "transfer" && (
-            <Field label="To location">
+            <Field label={bi("To location", "إلى موقع")}>
               <Select value={txnForm.destLocationId} onChange={(e) => setTxnForm({ ...txnForm, destLocationId: e.target.value })}>
-                <option value="">Choose destination…</option>
+                <option value="">{bi("Choose destination…", "اختر الوجهة…")}</option>
                 {scopedLocations.filter((l) => l.id !== txnForm.locationId).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
               </Select>
             </Field>
           )}
-          <Field label="Quantity">
+          <Field label={bi("Quantity", "الكمية")}>
             <Input type="number" min={1} value={txnForm.qty} onChange={(e) => setTxnForm({ ...txnForm, qty: Number(e.target.value) })} />
           </Field>
-          <Button className="w-full justify-center" onClick={submitTxn}>Confirm</Button>
+          <Button className="w-full justify-center" onClick={submitTxn}>{bi("Confirm", "تأكيد")}</Button>
         </div>
       </Modal>
 
-      <Modal open={itemModal} onClose={() => setItemModal(false)} title="Add Inventory Item">
+      <Modal open={itemModal} onClose={() => setItemModal(false)} title={bi("Add Inventory Item", "إضافة صنف للمخزون")}>
         <div className="space-y-3">
-          <Field label="Name"><Input value={itemForm.name} onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })} /></Field>
-          <Field label="Arabic Alias (shown on customer invoices/messages)"><Input dir="rtl" value={itemForm.nameAr} onChange={(e) => setItemForm({ ...itemForm, nameAr: e.target.value })} /></Field>
-          <Field label="Part No."><Input value={itemForm.partNo} onChange={(e) => setItemForm({ ...itemForm, partNo: e.target.value })} /></Field>
-          <Field label="Brand"><Input value={itemForm.brand} onChange={(e) => setItemForm({ ...itemForm, brand: e.target.value })} /></Field>
-          <Field label="Unit price (SAR)"><Input type="number" value={itemForm.unitPrice} onChange={(e) => setItemForm({ ...itemForm, unitPrice: Number(e.target.value) })} /></Field>
-          <Field label="Reorder level"><Input type="number" value={itemForm.reorderLevel} onChange={(e) => setItemForm({ ...itemForm, reorderLevel: Number(e.target.value) })} /></Field>
-          <Button className="w-full justify-center" onClick={submitItem}>Save Item</Button>
+          <Field label={bi("Name", "الاسم")}><Input value={itemForm.name} onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })} /></Field>
+          <Field label={bi("Arabic Alias (shown on customer invoices/messages)", "الاسم بالعربية (يظهر في فواتير ورسائل العميل)")}><Input dir="rtl" value={itemForm.nameAr} onChange={(e) => setItemForm({ ...itemForm, nameAr: e.target.value })} /></Field>
+          <Field label={bi("Part No.", "رقم القطعة")}><Input value={itemForm.partNo} onChange={(e) => setItemForm({ ...itemForm, partNo: e.target.value })} /></Field>
+          <Field label={bi("Brand", "العلامة التجارية")}><Input value={itemForm.brand} onChange={(e) => setItemForm({ ...itemForm, brand: e.target.value })} /></Field>
+          <Field label={bi("Unit price (SAR)", "سعر الوحدة (ريال)")}><Input type="number" value={itemForm.unitPrice} onChange={(e) => setItemForm({ ...itemForm, unitPrice: Number(e.target.value) })} /></Field>
+          <Field label={bi("Reorder level", "حد إعادة الطلب")}><Input type="number" value={itemForm.reorderLevel} onChange={(e) => setItemForm({ ...itemForm, reorderLevel: Number(e.target.value) })} /></Field>
+          <Button className="w-full justify-center" onClick={submitItem}>{bi("Save Item", "حفظ الصنف")}</Button>
         </div>
       </Modal>
     </div>

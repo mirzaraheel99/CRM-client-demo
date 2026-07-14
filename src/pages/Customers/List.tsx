@@ -27,6 +27,7 @@ function emptyCustomerForm(branchId: string) {
     fatherName: "",
     grandfatherName: "",
     familyName: "",
+    nameAr: "",
     customerType: "individual" as CustomerType,
     companyName: "",
     crNumber: "",
@@ -46,7 +47,7 @@ function emptyCustomerForm(branchId: string) {
 }
 
 export default function CustomerList() {
-  const { customers, jobCards, serviceOrders, branches, selectedBranchId, role, addCustomer } = useStore();
+  const { customers, jobCards, serviceOrders, branches, selectedBranchId, role, addCustomer, aliasFieldsEnabled } = useStore();
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const defaultBranchId = selectedBranchId === "all" ? branches[0]?.id ?? "" : selectedBranchId;
@@ -100,6 +101,7 @@ export default function CustomerList() {
     const saved = addCustomer({
       ...form,
       grandfatherName: form.grandfatherName || undefined,
+      nameAr: form.nameAr.trim() || undefined,
       homePhone: form.homePhone || undefined,
       whatsapp: form.whatsapp.trim() || form.phone,
       nationalId: form.nationalId || undefined,
@@ -130,7 +132,7 @@ export default function CustomerList() {
         <div className="divide-y [border-color:var(--color-border)] sm:hidden">
           {pagedRows.map((customer) => (
             <Link key={customer.id} to={`/customers/${customer.id}`} className="block p-4 hover:bg-black/[0.02] dark:hover:bg-white/[0.03]">
-              <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs font-medium text-[var(--color-ink-muted)]">{customer.documentNo}</p><p className="truncate text-sm font-semibold text-[var(--color-brand-1)]">{customer.name}</p><p className="mt-1 text-xs text-[var(--color-ink-secondary)]">{customer.phone}</p></div><Badge tone={customer.whatsappVerified ? "good" : "warning"}>{customer.whatsappVerified ? bi("Verified", "موثّق") : bi("Unverified", "غير موثّق")}</Badge></div>
+              <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs font-medium text-[var(--color-ink-muted)]">{customer.documentNo}</p><p className="truncate text-sm font-semibold text-[var(--color-brand-1)]">{customer.name}</p>{customer.nameAr && <p dir="rtl" className="truncate text-xs text-[var(--color-ink-muted)]">{customer.nameAr}</p>}<p className="mt-1 text-xs text-[var(--color-ink-secondary)]">{customer.phone}</p></div><Badge tone={customer.whatsappVerified ? "good" : "warning"}>{customer.whatsappVerified ? bi("Verified", "موثّق") : bi("Unverified", "غير موثّق")}</Badge></div>
               <div className="mt-3 flex items-center justify-between text-xs text-[var(--color-ink-muted)]"><span>{orderCounts.get(customer.id) ?? 0} orders | {productCounts.get(customer.id) ?? 0} products | {jobCounts.get(customer.id) ?? 0} lines</span><span>Since {formatDate(customer.createdAt)}</span></div>
             </Link>
           ))}
@@ -139,7 +141,7 @@ export default function CustomerList() {
           <table className="w-full min-w-[980px] text-sm">
             <thead><tr className="sticky top-0 z-10 border-b bg-[var(--color-surface-1)] text-left text-xs text-[var(--color-ink-muted)] [border-color:var(--color-border)]"><SortableTh label={bi("Customer No.", "رقم العميل")} active={sortKey === "document"} direction={dir} onClick={() => toggle("document")} className="px-5 py-3" /><SortableTh label={bi("Name", "الاسم")} active={sortKey === "name"} direction={dir} onClick={() => toggle("name")} className="px-3 py-3" /><SortableTh label={bi("Mobile Phone", "الجوال")} active={sortKey === "phone"} direction={dir} onClick={() => toggle("phone")} className="px-3 py-3" /><th className="px-3 py-3 font-medium">{bi("WhatsApp", "واتساب")}</th><th className="px-3 py-3 font-medium">{bi("Email", "البريد الإلكتروني")}</th><SortableTh label={bi("Orders", "الطلبات")} active={sortKey === "orders"} direction={dir} onClick={() => toggle("orders")} className="px-3 py-3" /><th className="px-3 py-3 font-medium">{bi("Products", "المنتجات")}</th><SortableTh label={bi("Job lines", "بنود المهام")} active={sortKey === "jobs"} direction={dir} onClick={() => toggle("jobs")} className="px-3 py-3" /><SortableTh label={bi("Since", "منذ")} active={sortKey === "since"} direction={dir} onClick={() => toggle("since")} className="px-5 py-3" /></tr></thead>
             <tbody>
-              {pagedRows.map((customer) => <tr key={customer.id} className="border-b last:border-0 hover:bg-black/[0.02] dark:hover:bg-white/[0.03] [border-color:var(--color-border)]"><td className="px-5 py-3 text-[var(--color-ink-secondary)]">{customer.documentNo}</td><td className="px-3 py-3"><Link to={`/customers/${customer.id}`} className="font-medium text-[var(--color-brand-1)]">{customer.name}</Link></td><td className="px-3 py-3 text-[var(--color-ink-secondary)]">{customer.phone}</td><td className="px-3 py-3"><Badge tone={customer.whatsappVerified ? "good" : "warning"}>{customer.whatsappVerified ? bi("Verified", "موثّق") : bi("Unverified", "غير موثّق")}</Badge></td><td className="px-3 py-3 text-[var(--color-ink-secondary)]">{customer.email}</td><td className="px-3 py-3 tabular-nums">{orderCounts.get(customer.id) ?? 0}</td><td className="px-3 py-3 tabular-nums">{productCounts.get(customer.id) ?? 0}</td><td className="px-3 py-3 tabular-nums">{jobCounts.get(customer.id) ?? 0}</td><td className="px-5 py-3 text-[var(--color-ink-muted)]">{formatDate(customer.createdAt)}</td></tr>)}
+              {pagedRows.map((customer) => <tr key={customer.id} className="border-b last:border-0 hover:bg-black/[0.02] dark:hover:bg-white/[0.03] [border-color:var(--color-border)]"><td className="px-5 py-3 text-[var(--color-ink-secondary)]">{customer.documentNo}</td><td className="px-3 py-3"><Link to={`/customers/${customer.id}`} className="font-medium text-[var(--color-brand-1)]">{customer.name}</Link>{customer.nameAr && <p dir="rtl" className="text-xs text-[var(--color-ink-muted)]">{customer.nameAr}</p>}</td><td className="px-3 py-3 text-[var(--color-ink-secondary)]">{customer.phone}</td><td className="px-3 py-3"><Badge tone={customer.whatsappVerified ? "good" : "warning"}>{customer.whatsappVerified ? bi("Verified", "موثّق") : bi("Unverified", "غير موثّق")}</Badge></td><td className="px-3 py-3 text-[var(--color-ink-secondary)]">{customer.email}</td><td className="px-3 py-3 tabular-nums">{orderCounts.get(customer.id) ?? 0}</td><td className="px-3 py-3 tabular-nums">{productCounts.get(customer.id) ?? 0}</td><td className="px-3 py-3 tabular-nums">{jobCounts.get(customer.id) ?? 0}</td><td className="px-5 py-3 text-[var(--color-ink-muted)]">{formatDate(customer.createdAt)}</td></tr>)}
             </tbody>
           </table>
         </div>
@@ -166,6 +168,11 @@ export default function CustomerList() {
                 <Field label={bi("Grandfather's name (optional)", "اسم الجد (اختياري)")}><Input value={form.grandfatherName} onChange={(event) => setForm({ ...form, grandfatherName: event.target.value })} /></Field>
                 <Field label={bi("Family name", "اسم العائلة")}><Input value={form.familyName} onChange={(event) => setForm({ ...form, familyName: event.target.value })} /></Field>
               </div>
+              {aliasFieldsEnabled && (
+                <Field label={bi("Arabic alias (optional)", "الاسم البديل بالعربية (اختياري)")}>
+                  <Input dir="rtl" value={form.nameAr} onChange={(event) => setForm({ ...form, nameAr: event.target.value })} placeholder="الاسم بالعربية" />
+                </Field>
+              )}
               {form.customerType === "corporate" && (
                 <div className="grid gap-3 rounded-md bg-black/[0.03] p-3 dark:bg-white/[0.05] sm:grid-cols-2">
                   <Field label={bi("Company name", "اسم الشركة")}><Input value={form.companyName} onChange={(event) => setForm({ ...form, companyName: event.target.value })} /></Field>

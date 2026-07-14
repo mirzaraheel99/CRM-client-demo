@@ -25,6 +25,7 @@ export default function ApplianceDetail() {
           <h1 className="text-xl font-semibold tracking-tight">{appliance.model}</h1>
           {appliance.isSmartConnected && <Badge tone="good" icon={<Wifi size={11} />}>{bi("Smart Connected", "متصل ذكي")}</Badge>}
         </div>
+        {appliance.modelAr && <p dir="rtl" className="text-sm text-[var(--color-ink-secondary)]">{appliance.modelAr}</p>}
         <p className="text-sm text-[var(--color-ink-muted)]">Product No. {appliance.documentNo} | Customer association is recorded per service order.</p>
       </div>
 

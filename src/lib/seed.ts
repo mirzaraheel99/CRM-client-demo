@@ -27,6 +27,7 @@ import type {
   EnergyRating,
   RequestSource,
   JobCardEstimateLine,
+  DemoUser,
 } from "./types";
 
 // Kept local (not imported from ./stageRefNo) so this file has zero runtime
@@ -84,6 +85,16 @@ export const BRANCHES: Branch[] = [
   { id: "br-1", name: "Riyadh Service Center", city: "Riyadh" },
   { id: "br-2", name: "Jeddah Branch", city: "Jeddah" },
   { id: "br-3", name: "Dammam Branch", city: "Dammam" },
+];
+
+// Demo credentials only — this app has no backend, so these accounts exist to
+// demonstrate role-gated login/UI, not to provide real authentication security.
+export const USERS: DemoUser[] = [
+  { id: "user-admin", name: "Abdullah Al-Faisal", username: "admin", password: "demo123", role: "admin", branchId: "br-1" },
+  { id: "user-manager", name: "Sara Al-Qahtani", username: "manager", password: "demo123", role: "manager", branchId: "br-1" },
+  { id: "user-supervisor", name: "Khalid Al-Harbi", username: "supervisor", password: "demo123", role: "supervisor", branchId: "br-2" },
+  { id: "user-technician", name: "Tariq Al-Dosari", username: "technician", password: "demo123", role: "technician", branchId: "br-3" },
+  { id: "user-frontdesk", name: "Noura Al-Shehri", username: "frontdesk", password: "demo123", role: "front_desk", branchId: "br-1" },
 ];
 
 const firstNames = ["Ahmed", "Fatima", "Omar", "Sara", "Yusuf", "Layla", "Hamdan", "Mariam", "Khalid", "Noura", "Rashid", "Aisha", "Tariq", "Huda", "Salem", "Amina", "Faisal", "Reem", "Bilal", "Dana"];

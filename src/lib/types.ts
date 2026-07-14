@@ -47,6 +47,7 @@ export interface Customer {
   grandfatherName?: string;
   familyName: string;
   name: string;
+  nameAr?: string;
   phone: string;
   homePhone?: string;
   whatsapp: string;
@@ -69,6 +70,7 @@ export interface Customer {
 export interface Brand {
   id: string;
   name: string;
+  nameAr?: string;
   warrantyMonths: number;
   rules: string;
 }
@@ -84,6 +86,7 @@ export interface Appliance {
   brandId: string;
   category: ApplianceCategory;
   model: string;
+  modelAr?: string;
   serialNo: string;
   imeiNo?: string;
   purchaseDate: string;
@@ -121,6 +124,7 @@ export interface ApplianceTelemetry {
 export interface Technician {
   id: string;
   name: string;
+  nameAr?: string;
   phone: string;
   skills: ApplianceCategory[];
   zone: string;
@@ -204,7 +208,9 @@ export interface JobCardEstimateLine {
   id: string;
   jobcardId: string;
   kind: EstimateLineKind;
+  catNo?: string;
   label: string;
+  descriptionAr?: string;
   notes?: string;
   itemId?: string;
   qty: number;
@@ -295,6 +301,10 @@ export interface JobCard {
   customerSignature: string | null;
   oemClaimNo?: string;
   estimateValidUntil?: string;
+  estimatePreparedBy?: string;
+  estimateTermsOfPayment?: string;
+  estimatePoNumber?: string;
+  estimateNotes?: string;
   assetHandedOver: boolean;
   assetHandedOverAt?: string;
   assetHandedOverBy?: string;
@@ -321,6 +331,17 @@ export interface WorkflowDefinition {
   active: boolean;
   description: string;
   steps: WorkflowStep[];
+}
+
+// Client-side-only demo credentials — this app has no backend, so authentication
+// is simulated for the purpose of demonstrating role-gated UI, not real security.
+export interface DemoUser {
+  id: string;
+  name: string;
+  username: string;
+  password: string;
+  role: Role;
+  branchId: string;
 }
 
 export type PaymentMethod = "mada" | "apple_pay" | "stc_pay" | "tabby" | "tamara" | "cash";

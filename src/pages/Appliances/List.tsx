@@ -25,7 +25,7 @@ const FORM_TAB_LABELS: Record<string, string> = {
 };
 
 export default function ApplianceList() {
-  const { appliances, brands, jobCards, selectedBranchId, role, addAppliance } = useStore();
+  const { appliances, brands, jobCards, selectedBranchId, role, addAppliance, aliasFieldsEnabled } = useStore();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<ApplianceCategory | "all">("all");
   const [open, setOpen] = useState(false);
@@ -107,6 +107,7 @@ export default function ApplianceList() {
                 <div className="min-w-0">
                   <p className="text-xs font-medium text-[var(--color-ink-muted)]">{appliance.documentNo}</p>
                   <p className="truncate text-sm font-semibold text-[var(--color-brand-1)]">{appliance.model}{appliance.isSmartConnected && <Wifi size={12} className="ml-1.5 inline text-[var(--color-status-good)]" />}</p>
+                  {appliance.modelAr && <p dir="rtl" className="truncate text-xs text-[var(--color-ink-muted)]">{appliance.modelAr}</p>}
                   <p className="mt-1 truncate text-xs text-[var(--color-ink-secondary)]">{brandMap.get(appliance.brandId)?.name ?? "Unknown brand"} | {appliance.category} | SN {appliance.serialNo}</p>
                 </div>
                 <Badge tone={appliance.warrantyStatus === "In Warranty" ? "good" : "neutral"}>{bi(appliance.warrantyStatus, WARRANTY_STATUS_AR[appliance.warrantyStatus])}</Badge>
@@ -132,7 +133,7 @@ export default function ApplianceList() {
               {pagedRows.map((appliance) => (
                 <tr key={appliance.id} className="border-b last:border-0 hover:bg-black/[0.02] dark:hover:bg-white/[0.03] [border-color:var(--color-border)]">
                   <td className="px-5 py-3 font-medium tabular-nums text-[var(--color-ink-secondary)]">{appliance.documentNo}</td>
-                  <td className="px-3 py-3"><Link to={`/appliances/${appliance.id}`} className="font-medium text-[var(--color-brand-1)]">{appliance.model}</Link>{appliance.isSmartConnected && <Wifi size={12} className="ml-1.5 inline text-[var(--color-status-good)]" />}</td>
+                  <td className="px-3 py-3"><Link to={`/appliances/${appliance.id}`} className="font-medium text-[var(--color-brand-1)]">{appliance.model}</Link>{appliance.isSmartConnected && <Wifi size={12} className="ml-1.5 inline text-[var(--color-status-good)]" />}{appliance.modelAr && <p dir="rtl" className="text-xs text-[var(--color-ink-muted)]">{appliance.modelAr}</p>}</td>
                   <td className="px-3 py-3 text-[var(--color-ink-secondary)]">{bi(appliance.category, APPLIANCE_CATEGORY_AR[appliance.category])}</td>
                   <td className="px-3 py-3 text-[var(--color-ink-secondary)]">{brandMap.get(appliance.brandId)?.name ?? "-"}</td>
                   <td className="px-3 py-3 text-[var(--color-ink-secondary)]">{appliance.serialNo}</td>
@@ -151,7 +152,7 @@ export default function ApplianceList() {
         <div className="space-y-4">
           <p className="text-xs text-[var(--color-ink-muted)]">Products are registered independently. Select the customer when creating the service order.</p>
           <Tabs tabs={FORM_TABS} active={formTab} onChange={setFormTab} labels={FORM_TAB_LABELS} />
-          {formTab === "Basic" && <ApplianceBasicFields value={form} onChange={(patch) => setForm({ ...form, ...patch })} brands={brands} />}
+          {formTab === "Basic" && <ApplianceBasicFields value={form} onChange={(patch) => setForm({ ...form, ...patch })} brands={brands} showAlias={aliasFieldsEnabled} />}
           {formTab === "Purchase" && <AppliancePurchaseFields value={form} onChange={(patch) => setForm({ ...form, ...patch })} />}
           {formTab === "Compliance" && <ApplianceComplianceFields value={form} onChange={(patch) => setForm({ ...form, ...patch })} />}
           {formTab === "Site" && <ApplianceSiteFields value={form} onChange={(patch) => setForm({ ...form, ...patch })} />}

@@ -15,11 +15,11 @@ const TAB_LABELS: Record<string, string> = {
 };
 
 export default function Technicians() {
-  const { technicians, jobCards, customers, branches, selectedBranchId, addTechnician } = useStore();
+  const { technicians, jobCards, customers, branches, selectedBranchId, addTechnician, aliasFieldsEnabled } = useStore();
   const [tab, setTab] = useState(TABS[0]);
   const [open, setOpen] = useState(false);
   const defaultBranchId = selectedBranchId === "all" ? branches[0]?.id ?? "" : selectedBranchId;
-  const [form, setForm] = useState({ name: "", phone: "", zone: "Zone A", skills: [] as ApplianceCategory[], branchId: defaultBranchId, status: "Available" as const, avatarColor: "#2a78d6" });
+  const [form, setForm] = useState({ name: "", nameAr: "", phone: "", zone: "Zone A", skills: [] as ApplianceCategory[], branchId: defaultBranchId, status: "Available" as const, avatarColor: "#2a78d6" });
   const scopedTechnicians = filterByBranch(technicians, selectedBranchId);
   const scopedJobs = filterByBranch(jobCards, selectedBranchId);
 
@@ -29,8 +29,8 @@ export default function Technicians() {
 
   function submit() {
     if (!form.name.trim() || !form.phone.trim() || !form.branchId || form.skills.length === 0) return;
-    addTechnician(form);
-    setForm({ name: "", phone: "", zone: "Zone A", skills: [], branchId: defaultBranchId, status: "Available", avatarColor: "#2a78d6" });
+    addTechnician({ ...form, nameAr: form.nameAr.trim() || undefined });
+    setForm({ name: "", nameAr: "", phone: "", zone: "Zone A", skills: [], branchId: defaultBranchId, status: "Available", avatarColor: "#2a78d6" });
     setOpen(false);
     toast(`${form.name} added to technicians.`);
   }
@@ -66,6 +66,7 @@ export default function Technicians() {
                       <Avatar name={t.name} color={t.avatarColor} />
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate">{t.name}</p>
+                        {t.nameAr && <p dir="rtl" className="truncate text-xs text-[var(--color-ink-muted)]">{t.nameAr}</p>}
                         <p className="text-[11px] text-[var(--color-ink-muted)]">{fallbackDocumentNo("TECH", t.id)}</p>
                         <p className="text-xs text-[var(--color-ink-muted)]">{t.zone}</p>
                       </div>
@@ -126,6 +127,11 @@ export default function Technicians() {
       <Modal open={open} onClose={() => setOpen(false)} title={bi("Add Technician", "إضافة فني")}>
         <div className="space-y-3">
           <Field label={bi("Name", "الاسم")}><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
+          {aliasFieldsEnabled && (
+            <Field label={bi("Arabic alias (optional)", "الاسم البديل بالعربية (اختياري)")}>
+              <Input dir="rtl" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} placeholder="الاسم بالعربية" />
+            </Field>
+          )}
           <Field label={bi("Phone", "الهاتف")}><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>
           <Field label={bi("Zone", "المنطقة")}>
             <Select value={form.zone} onChange={(e) => setForm({ ...form, zone: e.target.value })}>

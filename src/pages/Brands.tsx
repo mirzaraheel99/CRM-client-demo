@@ -5,14 +5,14 @@ import { toast } from "../lib/toast";
 import { bi } from "../lib/domainAr";
 
 export default function Brands() {
-  const { brands, appliances, addBrand } = useStore();
+  const { brands, appliances, addBrand, aliasFieldsEnabled } = useStore();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name: "", warrantyMonths: 12, rules: "" });
+  const [form, setForm] = useState({ name: "", nameAr: "", warrantyMonths: 12, rules: "" });
 
   function submit() {
     if (!form.name.trim()) return;
-    addBrand(form);
-    setForm({ name: "", warrantyMonths: 12, rules: "" });
+    addBrand({ ...form, nameAr: form.nameAr.trim() || undefined });
+    setForm({ name: "", nameAr: "", warrantyMonths: 12, rules: "" });
     setOpen(false);
     toast(`${form.name} added to brands.`);
   }
@@ -31,6 +31,7 @@ export default function Brands() {
         {brands.map((b) => (
           <Card key={b.id} interactive>
             <CardHeader title={b.name} subtitle={`${b.warrantyMonths} month warranty`} />
+            {b.nameAr && <p dir="rtl" className="-mt-3 mb-3 text-xs text-[var(--color-ink-muted)]">{b.nameAr}</p>}
             <p className="text-sm text-[var(--color-ink-secondary)]">{b.rules}</p>
             <p className="text-xs text-[var(--color-ink-muted)] mt-3">{appliances.filter((a) => a.brandId === b.id).length} appliances registered</p>
           </Card>
@@ -40,6 +41,11 @@ export default function Brands() {
       <Modal open={open} onClose={() => setOpen(false)} title={bi("Add Brand", "إضافة علامة تجارية")}>
         <div className="space-y-3">
           <Field label={bi("Brand name", "اسم العلامة التجارية")}><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
+          {aliasFieldsEnabled && (
+            <Field label={bi("Arabic alias (optional)", "الاسم البديل بالعربية (اختياري)")}>
+              <Input dir="rtl" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} placeholder="الاسم بالعربية" />
+            </Field>
+          )}
           <Field label={bi("Warranty (months)", "الضمان (بالأشهر)")}>
             <Input type="number" value={form.warrantyMonths} onChange={(e) => setForm({ ...form, warrantyMonths: Number(e.target.value) })} />
           </Field>

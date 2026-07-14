@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import * as seed from "./seed";
-import { canAdvanceCurrentStage, canPerform } from "./permissions";
+import { canAdvanceCurrentStage, canPerform, setActionRole, resetActionRoles, type DemoAction } from "./permissions";
 import { MESSAGE_TEMPLATES, renderTemplate } from "./templates";
 import { stageBlockers } from "./workflow";
 import { formatDate } from "./utils";
@@ -10,7 +10,7 @@ import type {
   ActionResult, Customer, Appliance, ApplianceTelemetry, Brand, Technician, InventoryItem, InventoryLocation,
   InventoryStock, InventoryTransaction, JobCard, JobCardStageHistory,
   JobCardAttachment, JobCardPartUsed, JobCardEstimateLine, EstimateLineKind, PurchaseBill, CommunicationLog,
-  WorkflowDefinition, Role, StageName, Branch, Payment, PaymentMethod, Channel, ServiceOrder, RemovedPart, RequestSource,
+  WorkflowDefinition, Role, StageName, Branch, Payment, PaymentMethod, Channel, ServiceOrder, RemovedPart, RequestSource, DemoUser,
 } from "./types";
 
 type JobResult = ActionResult & { job?: JobCard };
@@ -46,18 +46,27 @@ interface DemoState {
   payments: Payment[];
   removedParts: RemovedPart[];
 
+  users: DemoUser[];
+  currentUser: DemoUser | null;
   role: Role;
   selectedBranchId: string | "all";
   theme: "light" | "dark";
   lang: "en" | "ar";
   sidebarCollapsed: boolean;
   maintenanceRemindersSent: Record<string, string>;
+  aliasFieldsEnabled: boolean;
+  permissionsVersion: number;
 
   setRole: (role: Role) => void;
   setBranch: (branchId: string | "all") => void;
   setTheme: (theme: "light" | "dark") => void;
   setLang: (lang: "en" | "ar") => void;
   toggleSidebar: () => void;
+  setAliasFieldsEnabled: (enabled: boolean) => ActionResult;
+  login: (username: string, password: string) => ActionResult;
+  logout: () => void;
+  updateRolePermission: (action: DemoAction, targetRole: Role, allowed: boolean) => ActionResult;
+  resetRolePermissions: () => ActionResult;
 
   addCustomer: (customer: Omit<Customer, "id" | "documentNo" | "createdAt" | "whatsappVerified" | "name">) => Customer;
   verifyWhatsapp: (customerId: string) => void;
@@ -99,10 +108,11 @@ interface DemoState {
   advanceStage: (jobcardId: string, stage: StageName, notes: string, changedBy: string) => ActionResult;
   assignTechnician: (jobcardId: string, technicianId: string) => ActionResult;
   setDiagnosis: (jobcardId: string, notes: string) => ActionResult;
-  addEstimateLine: (jobcardId: string, input: { kind: EstimateLineKind; label: string; notes?: string; itemId?: string; qty: number; unitPrice: number }) => ActionResult;
-  updateEstimateLine: (lineId: string, patch: { qty?: number; unitPrice?: number; label?: string; notes?: string }) => ActionResult;
+  addEstimateLine: (jobcardId: string, input: { kind: EstimateLineKind; label: string; descriptionAr?: string; catNo?: string; notes?: string; itemId?: string; qty: number; unitPrice: number }) => ActionResult;
+  updateEstimateLine: (lineId: string, patch: { qty?: number; unitPrice?: number; label?: string; descriptionAr?: string; catNo?: string; notes?: string }) => ActionResult;
   removeEstimateLine: (lineId: string) => ActionResult;
   setEstimateValidUntil: (jobcardId: string, date: string) => ActionResult;
+  setEstimateHeader: (jobcardId: string, patch: { preparedBy?: string; termsOfPayment?: string; poNumber?: string; notes?: string }) => ActionResult;
   approveCustomer: (jobcardId: string, approved: boolean, source?: "internal" | "customer") => ActionResult;
   setRepairNotes: (jobcardId: string, notes: string) => ActionResult;
   setQaApproved: (jobcardId: string, approved: boolean) => ActionResult;
@@ -254,18 +264,51 @@ export const useStore = create<DemoState>()(
   persist(
     (set, get) => ({
       ...initialSlice(),
+      users: clone(seed.USERS),
+      currentUser: null,
       role: "admin",
       selectedBranchId: "all",
       theme: "light",
       lang: "en",
       sidebarCollapsed: false,
       maintenanceRemindersSent: {},
+      aliasFieldsEnabled: true,
+      permissionsVersion: 0,
 
       setRole: (role) => set({ role }),
       setBranch: (selectedBranchId) => set({ selectedBranchId }),
       setTheme: (theme) => set({ theme }),
       setLang: (lang) => set({ lang }),
+      login: (username, password) => {
+        const state = get();
+        const user = state.users.find((candidate) => candidate.username.trim().toLowerCase() === username.trim().toLowerCase());
+        if (!user || user.password !== password) return result(false, "Incorrect username or password.");
+        set({ currentUser: user, role: user.role, selectedBranchId: user.branchId });
+        return result(true, `Welcome back, ${user.name}.`);
+      },
+      logout: () => set({ currentUser: null }),
       toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
+      setAliasFieldsEnabled: (enabled) => {
+        const state = get();
+        if (!canPerform(state.role, "manage_settings")) return result(false, "Your role cannot change system settings.");
+        set({ aliasFieldsEnabled: enabled });
+        return result(true, enabled ? "Arabic alias fields enabled." : "Arabic alias fields disabled.");
+      },
+      updateRolePermission: (action, targetRole, allowed) => {
+        const state = get();
+        if (!canPerform(state.role, "manage_settings")) return result(false, "Your role cannot change role permissions.");
+        if (targetRole === "admin" && !allowed) return result(false, "Admin must always retain access — remove other roles instead.");
+        setActionRole(action, targetRole, allowed);
+        set({ permissionsVersion: state.permissionsVersion + 1 });
+        return result(true, "Role permissions updated.");
+      },
+      resetRolePermissions: () => {
+        const state = get();
+        if (!canPerform(state.role, "manage_settings")) return result(false, "Your role cannot change role permissions.");
+        resetActionRoles();
+        set({ permissionsVersion: state.permissionsVersion + 1 });
+        return result(true, "Role permissions reset to defaults.");
+      },
 
       addCustomer: (input) => {
         const existing = get().customers.find((customer) => customer.phone.replace(/\D/g, "") === input.phone.replace(/\D/g, ""));
@@ -554,7 +597,7 @@ export const useStore = create<DemoState>()(
         if (input.kind === "discount" && input.unitPrice > 0) return result(false, "Discount amount must be zero or negative.");
         if (input.kind !== "discount" && input.unitPrice < 0) return result(false, "Unit price must be zero or more.");
         const line: JobCardEstimateLine = {
-          id: nextId("estl"), jobcardId, kind: input.kind, label: input.label.trim(), notes: input.notes?.trim() || undefined, itemId: input.itemId,
+          id: nextId("estl"), jobcardId, kind: input.kind, label: input.label.trim(), descriptionAr: input.descriptionAr?.trim() || undefined, catNo: input.catNo?.trim() || undefined, notes: input.notes?.trim() || undefined, itemId: input.itemId,
           qty: input.qty, unitPrice: input.unitPrice, totalPrice: input.qty * input.unitPrice,
         };
         const lines = [...state.estimateLineItems, line];
@@ -587,6 +630,8 @@ export const useStore = create<DemoState>()(
         const updatedLine: JobCardEstimateLine = {
           ...line,
           label: patch.label !== undefined ? (patch.label.trim() || line.label) : line.label,
+          descriptionAr: patch.descriptionAr !== undefined ? (patch.descriptionAr.trim() || undefined) : line.descriptionAr,
+          catNo: patch.catNo !== undefined ? (patch.catNo.trim() || undefined) : line.catNo,
           notes: patch.notes !== undefined ? (patch.notes.trim() || undefined) : line.notes,
           qty, unitPrice, totalPrice: qty * unitPrice,
         };
@@ -627,6 +672,23 @@ export const useStore = create<DemoState>()(
         if (!job) return result(false, "Job card not found.");
         set({ jobCards: state.jobCards.map((candidate) => candidate.id === jobcardId ? { ...candidate, estimateValidUntil: date || undefined } : candidate) });
         return result(true, "Estimate validity updated.");
+      },
+      setEstimateHeader: (jobcardId, patch) => {
+        const state = get();
+        if (!canPerform(state.role, "set_estimate")) return result(false, "Your role cannot edit estimates.");
+        const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
+        if (!job) return result(false, "Job card not found.");
+        set({
+          jobCards: state.jobCards.map((candidate) => candidate.id === jobcardId ? {
+            ...candidate,
+            estimatePreparedBy: patch.preparedBy !== undefined ? (patch.preparedBy.trim() || undefined) : candidate.estimatePreparedBy,
+            estimateTermsOfPayment: patch.termsOfPayment !== undefined ? (patch.termsOfPayment.trim() || undefined) : candidate.estimateTermsOfPayment,
+            estimatePoNumber: patch.poNumber !== undefined ? (patch.poNumber.trim() || undefined) : candidate.estimatePoNumber,
+            estimateNotes: patch.notes !== undefined ? (patch.notes.trim() || undefined) : candidate.estimateNotes,
+            updatedAt: new Date().toISOString(),
+          } : candidate),
+        });
+        return result(true, "Estimate details updated.");
       },
       approveCustomer: (jobcardId, approved, source = "internal") => {
         const state = get();
@@ -866,6 +928,7 @@ export const useStore = create<DemoState>()(
           lang: "en",
           sidebarCollapsed: false,
           maintenanceRemindersSent: {},
+          aliasFieldsEnabled: true,
         });
       },
 

@@ -17,12 +17,14 @@ export function printEstimate({
   const lineRows = estimateLines
     .map((line) => {
       const item = line.itemId ? inventoryItems.find((i) => i.id === line.itemId) : undefined;
-      const nameCell = item?.nameAr
-        ? `${line.label}<div class="ar" dir="rtl">${item.nameAr}</div>`
+      const arabicDescription = line.descriptionAr ?? item?.nameAr;
+      const nameCell = arabicDescription
+        ? `${line.label}<div class="ar" dir="rtl">${arabicDescription}</div>`
         : line.label;
       const kindTag = KIND_LABEL[line.kind] ? `<span class="tag">${KIND_LABEL[line.kind]}</span>` : "";
       const notesRow = line.notes ? `<div class="line-note">${line.notes}</div>` : "";
-      return `<tr><td>${nameCell}${kindTag}${notesRow}</td><td class="num">${line.qty}</td><td class="num">${formatCurrency(line.unitPrice)}</td><td class="num">${formatCurrency(line.totalPrice)}</td></tr>`;
+      const taxCell = line.kind === "discount" ? "—" : "VAT 15%";
+      return `<tr><td>${line.catNo ?? item?.partNo ?? ""}</td><td>${nameCell}${kindTag}${notesRow}</td><td>${taxCell}</td><td class="num">${line.qty}</td><td class="num">${formatCurrency(line.unitPrice)}</td><td class="num">${formatCurrency(line.totalPrice)}</td></tr>`;
     })
     .join("");
   const total = job.estimateAmount ?? 0;
@@ -42,7 +44,7 @@ export function printEstimate({
   h1 { font-size: 16px; margin: 0 0 4px; }
   .muted { color: #666; font-size: 12px; }
   .badge { display: inline-block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; border-radius: 999px; padding: 3px 8px; margin-bottom: 4px; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 20px 0; }
   .box { border: 1px solid #e1e0d9; border-radius: 8px; padding: 12px; }
   .box h3 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: #898781; }
   .diagnosis { border: 1px solid #e1e0d9; border-left: 3px solid #c2410c; border-radius: 8px; padding: 12px; margin: 16px 0; background: #fafaf8; }
@@ -90,17 +92,24 @@ export function printEstimate({
       <p class="muted">${appliance?.documentNo ?? ""} | Sequence ${String(job.sequenceNo).padStart(2, "0")}</p>
       <p class="muted">${job.jobType === "warranty" ? "Warranty job" : "Non-warranty job"}</p>
     </div>
+    <div class="box">
+      <h3>Estimate Details</h3>
+      <p class="muted">Prepared by: ${job.estimatePreparedBy ?? "—"}</p>
+      <p class="muted">Terms of payment: ${job.estimateTermsOfPayment ?? "—"}</p>
+      <p class="muted">Customer PO / reference: ${job.estimatePoNumber ?? "—"}</p>
+    </div>
   </div>
   ${job.diagnosisNotes ? `<div class="diagnosis"><h3>Diagnosis & Recommended Work</h3><p>${job.diagnosisNotes}</p></div>` : ""}
   <table>
-    <thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Unit Price</th><th class="num">Total</th></tr></thead>
-    <tbody>${lineRows || '<tr><td colspan="4" class="muted">No estimate items recorded yet</td></tr>'}</tbody>
+    <thead><tr><th>Cat No</th><th>Item</th><th>Tax</th><th class="num">Qty</th><th class="num">Unit Price</th><th class="num">Total</th></tr></thead>
+    <tbody>${lineRows || '<tr><td colspan="6" class="muted">No estimate items recorded yet</td></tr>'}</tbody>
     <tfoot>
-      <tr><td colspan="3">Subtotal (excl. VAT)</td><td class="num">${formatCurrency(subtotal)}</td></tr>
-      <tr><td colspan="3">VAT (15%)</td><td class="num">${formatCurrency(vatTotal)}</td></tr>
-      <tr><td colspan="3">Estimated Total (incl. VAT)</td><td class="num">${formatCurrency(total)}</td></tr>
+      <tr><td colspan="5">Subtotal (excl. VAT)</td><td class="num">${formatCurrency(subtotal)}</td></tr>
+      <tr><td colspan="5">VAT (15%)</td><td class="num">${formatCurrency(vatTotal)}</td></tr>
+      <tr><td colspan="5">Estimated Total (incl. VAT)</td><td class="num">${formatCurrency(total)}</td></tr>
     </tfoot>
   </table>
+  ${job.estimateNotes ? `<div class="terms"><h3 style="margin:0 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;color:#898781;">Notes</h3><p>${job.estimateNotes}</p></div>` : ""}
   ${showDecision ? `
   <div class="decision">
     <p style="margin:0 0 10px;font-size:13px;font-weight:600;">Please approve or decline this estimate to proceed</p>

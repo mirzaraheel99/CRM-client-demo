@@ -8,6 +8,7 @@ export type ApplianceFormState = {
   brandId: string;
   category: ApplianceCategory;
   model: string;
+  modelAr: string;
   serialNo: string;
   imeiNo: string;
   purchaseDate: string;
@@ -33,6 +34,7 @@ export function emptyApplianceForm(category: ApplianceCategory = "AC"): Applianc
     brandId: "",
     category,
     model: "",
+    modelAr: "",
     serialNo: "",
     imeiNo: "",
     purchaseDate: "",
@@ -57,6 +59,7 @@ export function applianceFormToInput(form: ApplianceFormState): Omit<Appliance, 
     brandId: form.brandId,
     category: form.category,
     model: form.model.trim(),
+    modelAr: form.modelAr.trim() || undefined,
     serialNo: form.serialNo.trim(),
     imeiNo: form.imeiNo.trim() || undefined,
     purchaseDate: form.purchaseDate,

@@ -10,6 +10,7 @@ const PredictiveMaintenance = lazy(() => import("./pages/PredictiveMaintenance")
 const JobCardList = lazy(() => import("./pages/JobCards/List"));
 const NewJobCard = lazy(() => import("./pages/JobCards/New"));
 const JobCardDetail = lazy(() => import("./pages/JobCards/Detail"));
+const JobCardEstimate = lazy(() => import("./pages/JobCards/Estimate"));
 const CustomerList = lazy(() => import("./pages/Customers/List"));
 const CustomerDetail = lazy(() => import("./pages/Customers/Detail"));
 const ApplianceList = lazy(() => import("./pages/Appliances/List"));
@@ -20,12 +21,19 @@ const Technicians = lazy(() => import("./pages/Technicians"));
 const Workflow = lazy(() => import("./pages/Workflow"));
 const Communications = lazy(() => import("./pages/Communications"));
 const Reports = lazy(() => import("./pages/Reports"));
+const Settings = lazy(() => import("./pages/Settings"));
 const MobilePreview = lazy(() => import("./pages/Mobile/Preview"));
 const TrackingPage = lazy(() => import("./pages/Tracking"));
+const Login = lazy(() => import("./pages/Login"));
 
 function ShellRoutes() {
   const role = useStore((state) => state.role);
+  const currentUser = useStore((state) => state.currentUser);
   const location = useLocation();
+
+  if (!currentUser) {
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  }
 
   if (!canAccessPath(role, location.pathname)) {
     return <Navigate to="/" replace />;
@@ -40,6 +48,7 @@ function ShellRoutes() {
           <Route path="/jobcards" element={<JobCardList />} />
           <Route path="/jobcards/new" element={<NewJobCard />} />
           <Route path="/jobcards/:id" element={<JobCardDetail />} />
+          <Route path="/jobcards/:id/estimate" element={<JobCardEstimate />} />
           <Route path="/customers" element={<CustomerList />} />
           <Route path="/customers/:id" element={<CustomerDetail />} />
           <Route path="/appliances" element={<ApplianceList />} />
@@ -50,6 +59,7 @@ function ShellRoutes() {
           <Route path="/workflow" element={<Workflow />} />
           <Route path="/communications" element={<Communications />} />
           <Route path="/reports" element={<Reports />} />
+          <Route path="/settings" element={<Settings />} />
           <Route path="/mobile" element={<MobilePreview />} />
         </Routes>
       </Suspense>
@@ -85,6 +95,7 @@ export default function App() {
     <BrowserRouter basename={import.meta.env.BASE_URL}>
       <Routes>
         <Route path="/track/:jobId" element={<Suspense fallback={<TrackingLoading />}><TrackingPage /></Suspense>} />
+        <Route path="/login" element={<Suspense fallback={<TrackingLoading />}><Login /></Suspense>} />
         <Route path="/*" element={<ShellRoutes />} />
       </Routes>
     </BrowserRouter>

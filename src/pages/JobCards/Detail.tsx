@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, MessageCircle, Smartphone, Mail, CheckCircle2, Circle, XCircle, ImagePlus, Printer, Sparkles, Trash2, AlertTriangle, Plus } from "lucide-react";
+import { ArrowLeft, MessageCircle, Smartphone, Mail, CheckCircle2, Circle, XCircle, ImagePlus, Printer, Sparkles, Trash2, AlertTriangle, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { useStore } from "../../lib/store";
 import { Card, CardHeader, Tabs, Button, Select, Textarea, Input, Field, Badge, Avatar, Modal, WorkflowStepper } from "../../components/ui";
 import { JobStatusBadge, JobTypeBadge } from "../../components/StatusBadge";
@@ -11,7 +11,6 @@ import { emptyApplianceForm, applianceFormToInput, type ApplianceFormState } fro
 import { formatCurrency, formatDate, formatDateTime, formatSequence, relativeTime } from "../../lib/utils";
 import { inventoryStockByBranch, totalStockByItem } from "../../lib/selectors";
 import { MESSAGE_TEMPLATES, renderTemplate } from "../../lib/templates";
-import { printEstimate } from "../../lib/print";
 import { printTaxInvoice } from "../../lib/zatca";
 import { suggestDiagnosis, suggestFromTelemetry } from "../../lib/diagnosisAI";
 import { PaymentPanel } from "../../components/PaymentPanel";
@@ -21,22 +20,9 @@ import { Wifi } from "lucide-react";
 import { canPerform } from "../../lib/permissions";
 import { stageAccessBlocker, stageRequirements } from "../../lib/workflow";
 import { STAGE_NAME_AR, CHANNEL_AR, COMM_STATUS_AR, REQUEST_SOURCE_AR, bi } from "../../lib/domainAr";
-import type { StageName, Channel, ActionResult, JobType, EstimateLineKind } from "../../lib/types";
+import type { StageName, Channel, ActionResult, JobType } from "../../lib/types";
 
 const NEW_PRODUCT_OPTION = "__new_product__";
-const ESTIMATE_LINE_KINDS: EstimateLineKind[] = ["labor", "part", "other", "discount"];
-const ESTIMATE_KIND_LABEL: Record<EstimateLineKind, string> = {
-  labor: bi("Labor", "عمالة"),
-  part: bi("Part", "قطعة"),
-  other: bi("Other charge", "رسوم أخرى"),
-  discount: bi("Discount", "خصم"),
-};
-const ESTIMATE_KIND_TONE: Record<EstimateLineKind, "neutral" | "brand" | "warning" | "good"> = {
-  labor: "neutral",
-  part: "brand",
-  other: "warning",
-  discount: "good",
-};
 const ADD_PRODUCT_TABS = ["Basic", "Purchase", "Compliance", "Site"];
 const ADD_PRODUCT_TAB_LABELS: Record<string, string> = {
   Basic: bi("Basic", "أساسي"),
@@ -82,9 +68,9 @@ export default function JobCardDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const {
-    jobCards, serviceOrders, customers, appliances, applianceTelemetry, brands, technicians, workflows,
+    jobCards, serviceOrders, customers, appliances, applianceTelemetry, brands, technicians, workflows, aliasFieldsEnabled,
     stageHistory, attachments, partsUsed, estimateLineItems, communicationLogs, inventoryItems, inventoryLocations, inventoryStock, purchaseBills, payments, removedParts,
-    role, selectedBranchId, advanceStage, assignTechnician, setDiagnosis, addEstimateLine, updateEstimateLine, removeEstimateLine, setEstimateValidUntil, approveCustomer, setRepairNotes, setQaApproved,
+    role, selectedBranchId, advanceStage, assignTechnician, setDiagnosis, approveCustomer, setRepairNotes, setQaApproved,
     setFinalAmount, captureCustomerSignature, confirmAssetHandover, savePurchaseBill, addPartUsed, removePartUsed, addAttachment, sendCommunication,
     logRemovedPart, notifyCustomerOfRemovedPart, confirmPartReturned, addAppliance, addProductToOrder,
   } = useStore();
@@ -96,18 +82,12 @@ export default function JobCardDetail() {
   const [channel, setChannel] = useState<Channel>("whatsapp");
   const [templateId, setTemplateId] = useState("received");
   const [message, setMessage] = useState("");
-  const [newLineKind, setNewLineKind] = useState<EstimateLineKind>("labor");
-  const [newLineLabel, setNewLineLabel] = useState("");
-  const [newLineItemId, setNewLineItemId] = useState("");
-  const [newLineQty, setNewLineQty] = useState("1");
-  const [newLineUnitPrice, setNewLineUnitPrice] = useState("");
-  const [newLineNotes, setNewLineNotes] = useState("");
-  const [estimateValidUntilInput, setEstimateValidUntilInput] = useState("");
   const [diagnosisInput, setDiagnosisInput] = useState("");
   const [repairInput, setRepairInput] = useState("");
   const [finalAmountInput, setFinalAmountInput] = useState("");
   const [signatureInput, setSignatureInput] = useState("");
   const [billForm, setBillForm] = useState({ billNo: "", billDate: new Date().toISOString().slice(0, 10), vendorName: "" });
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
 
   const job = jobCards.find((candidate) => candidate.id === id && (selectedBranchId === "all" || candidate.branchId === selectedBranchId));
   const serviceOrder = serviceOrders.find((candidate) => candidate.id === job?.serviceOrderId);
@@ -143,13 +123,12 @@ export default function JobCardDetail() {
     setRepairInput(job?.repairNotes ?? "");
     setFinalAmountInput(job?.finalAmount?.toString() ?? "");
     setSignatureInput(job?.customerSignature ?? "");
-    setEstimateValidUntilInput(job?.estimateValidUntil ?? "");
     setBillForm({
       billNo: bill?.billNo ?? "",
       billDate: bill?.billDate.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
       vendorName: bill?.vendorName ?? "",
     });
-  }, [job?.id, job?.diagnosisNotes, job?.repairNotes, job?.finalAmount, job?.customerSignature, job?.estimateValidUntil, bill?.id, bill?.billNo, bill?.billDate, bill?.vendorName]);
+  }, [job?.id, job?.diagnosisNotes, job?.repairNotes, job?.finalAmount, job?.customerSignature, bill?.id, bill?.billNo, bill?.billDate, bill?.vendorName]);
 
   const timelineEntries = useMemo(() => {
     const stageEntries = jobHistory.map((h) => ({ kind: "stage" as const, id: h.id, timestamp: h.timestamp, data: h }));
@@ -260,22 +239,6 @@ export default function JobCardDetail() {
     showResult(sendCommunication(job!.id, channel, message.trim()), () => setMessage(""));
   }
 
-  function sendEstimateWhatsapp(): ActionResult {
-    if (!job || !customer) return { ok: false, message: "Customer not found." };
-    const template = MESSAGE_TEMPLATES.find((t) => t.id === "estimate_document")!;
-    const trackingLink = `${window.location.origin}${import.meta.env.BASE_URL}track/${job.id}`;
-    const text = renderTemplate(template.body, {
-      customer: customer.name.split(" ")[0],
-      appliance: appliance?.model ?? "",
-      jobId: job.documentNo,
-      estimateNo: `EST-${job.documentNo}`,
-      amount: job.estimateAmount == null ? "pending" : `SAR ${job.estimateAmount.toLocaleString()}`,
-      validUntil: job.estimateValidUntil ? formatDate(job.estimateValidUntil) : "further notice",
-      link: trackingLink,
-    });
-    return sendCommunication(job.id, "whatsapp", text);
-  }
-
   function sendInvoiceWhatsapp(): ActionResult {
     if (!job || !customer) return { ok: false, message: "Customer not found." };
     const template = MESSAGE_TEMPLATES.find((t) => t.id === "invoice_document")!;
@@ -365,7 +328,7 @@ export default function JobCardDetail() {
           {addProductForm.applianceId === NEW_PRODUCT_OPTION && (
             <div className="space-y-4 rounded-md bg-black/[0.03] p-3 dark:bg-white/[0.05]">
               <Tabs tabs={ADD_PRODUCT_TABS} active={addProductTab} onChange={setAddProductTab} labels={ADD_PRODUCT_TAB_LABELS} />
-              {addProductTab === "Basic" && <ApplianceBasicFields value={newProductForm} onChange={(patch) => setNewProductForm({ ...newProductForm, ...patch })} brands={brands} />}
+              {addProductTab === "Basic" && <ApplianceBasicFields value={newProductForm} onChange={(patch) => setNewProductForm({ ...newProductForm, ...patch })} brands={brands} showAlias={aliasFieldsEnabled} />}
               {addProductTab === "Purchase" && <AppliancePurchaseFields value={newProductForm} onChange={(patch) => setNewProductForm({ ...newProductForm, ...patch })} />}
               {addProductTab === "Compliance" && <ApplianceComplianceFields value={newProductForm} onChange={(patch) => setNewProductForm({ ...newProductForm, ...patch })} />}
               {addProductTab === "Site" && <ApplianceSiteFields value={newProductForm} onChange={(patch) => setNewProductForm({ ...newProductForm, ...patch })} />}
@@ -392,7 +355,7 @@ export default function JobCardDetail() {
         </div>
       </Modal>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[260px_minmax(0,1fr)_280px] gap-5 items-start animate-rise-in" style={{ animationDelay: "40ms" }}>
+      <div className={`grid grid-cols-1 ${rightPanelCollapsed ? "xl:grid-cols-[260px_minmax(0,1fr)_48px]" : "xl:grid-cols-[260px_minmax(0,1fr)_280px]"} gap-5 items-start animate-rise-in`} style={{ animationDelay: "40ms" }}>
         {/* Left panel */}
         <Card className="space-y-4 xl:sticky xl:top-4 xl:max-h-[85vh] xl:overflow-y-auto xl:overscroll-contain">
           <div>
@@ -528,140 +491,18 @@ export default function JobCardDetail() {
                       </div>
                     </div>
 
-                    <div className="border-t pt-4 [border-color:var(--color-border)] space-y-4">
+                    <div className="border-t pt-4 [border-color:var(--color-border)] space-y-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="text-sm font-semibold">{bi("Estimate builder", "منشئ التقدير")}</p>
+                        <p className="text-sm font-semibold">{bi("Estimate", "التقدير")}</p>
                         {job.estimateValidUntil && <Badge tone="neutral">{bi("Valid until", "صالح حتى")} {formatDate(job.estimateValidUntil)}</Badge>}
                       </div>
-
-                      {jobEstimateLines.length > 0 && (
-                        <div className="overflow-x-auto rounded-lg border [border-color:var(--color-border)]">
-                          <table className="w-full min-w-[560px] text-sm">
-                            <thead>
-                              <tr className="text-left text-xs text-[var(--color-ink-muted)]">
-                                <th className="px-3 py-2 font-medium">{bi("Item", "البند")}</th>
-                                <th className="px-3 py-2 text-right font-medium">{bi("Qty", "الكمية")}</th>
-                                <th className="px-3 py-2 text-right font-medium">{bi("Unit price", "سعر الوحدة")}</th>
-                                <th className="px-3 py-2 text-right font-medium">{bi("Total", "الإجمالي")}</th>
-                                {canPerform(role, "set_estimate") && <th className="px-3 py-2" />}
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {jobEstimateLines.map((line) => {
-                                const editable = canPerform(role, "set_estimate");
-                                return (
-                                  <tr key={line.id} className="border-t transition-colors [border-color:var(--color-border)] hover:bg-black/[0.015] dark:hover:bg-white/[0.02]">
-                                    <td className="px-3 py-2">
-                                      <div className="flex items-center gap-1.5">
-                                        <Badge tone={ESTIMATE_KIND_TONE[line.kind]}>{ESTIMATE_KIND_LABEL[line.kind]}</Badge>
-                                        {editable ? (
-                                          <input
-                                            defaultValue={line.label}
-                                            onBlur={(event) => { const value = event.target.value.trim(); if (value && value !== line.label) showResult(updateEstimateLine(line.id, { label: value })); }}
-                                            className="min-w-0 flex-1 rounded px-1 py-0.5 text-sm outline-none focus:bg-black/[0.04] dark:focus:bg-white/[0.06]"
-                                          />
-                                        ) : <span>{line.label}</span>}
-                                      </div>
-                                      {editable ? (
-                                        <input
-                                          defaultValue={line.notes ?? ""}
-                                          placeholder={bi("Add a note...", "أضف ملاحظة...")}
-                                          onBlur={(event) => { const value = event.target.value.trim(); if (value !== (line.notes ?? "")) showResult(updateEstimateLine(line.id, { notes: value })); }}
-                                          className="mt-0.5 w-full rounded px-1 py-0.5 text-xs text-[var(--color-ink-muted)] outline-none focus:bg-black/[0.04] dark:focus:bg-white/[0.06]"
-                                        />
-                                      ) : (line.notes && <p className="mt-0.5 text-xs text-[var(--color-ink-muted)]">{line.notes}</p>)}
-                                    </td>
-                                    <td className="px-3 py-2 text-right">
-                                      {editable ? (
-                                        <input
-                                          type="number"
-                                          defaultValue={line.qty}
-                                          onBlur={(event) => { const qty = Number(event.target.value); if (Number.isFinite(qty) && qty > 0 && qty !== line.qty) showResult(updateEstimateLine(line.id, { qty })); }}
-                                          className="w-16 rounded px-1 py-0.5 text-right tabular-nums outline-none focus:bg-black/[0.04] dark:focus:bg-white/[0.06]"
-                                        />
-                                      ) : <span className="tabular-nums">{line.qty}</span>}
-                                    </td>
-                                    <td className="px-3 py-2 text-right">
-                                      {editable ? (
-                                        <input
-                                          type="number"
-                                          defaultValue={line.unitPrice}
-                                          onBlur={(event) => { const unitPrice = Number(event.target.value); if (Number.isFinite(unitPrice) && unitPrice !== line.unitPrice) showResult(updateEstimateLine(line.id, { unitPrice })); }}
-                                          className="w-24 rounded px-1 py-0.5 text-right tabular-nums outline-none focus:bg-black/[0.04] dark:focus:bg-white/[0.06]"
-                                        />
-                                      ) : <span className="tabular-nums">{formatCurrency(line.unitPrice)}</span>}
-                                    </td>
-                                    <td className="px-3 py-2 text-right font-medium tabular-nums">{formatCurrency(line.totalPrice)}</td>
-                                    {editable && (
-                                      <td className="px-3 py-2 text-right">
-                                        <button onClick={() => showResult(removeEstimateLine(line.id))} className="text-[var(--color-ink-muted)] hover:text-[var(--color-status-critical)]" title="Remove line item" aria-label="Remove line item">
-                                          <Trash2 size={14} />
-                                        </button>
-                                      </td>
-                                    )}
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                            <tfoot>
-                              <tr className="border-t [border-color:var(--color-border)]"><td colSpan={3} className="px-3 py-2 text-right text-[var(--color-ink-muted)]">{bi("Subtotal (excl. VAT)", "الإجمالي (غير شامل الضريبة)")}</td><td className="px-3 py-2 text-right tabular-nums">{formatCurrency((job.estimateAmount ?? 0) / 1.15)}</td></tr>
-                              <tr className="border-t [border-color:var(--color-border)]"><td colSpan={3} className="px-3 py-2 text-right text-[var(--color-ink-muted)]">{bi("VAT (15%)", "ضريبة القيمة المضافة (15%)")}</td><td className="px-3 py-2 text-right tabular-nums">{formatCurrency((job.estimateAmount ?? 0) - (job.estimateAmount ?? 0) / 1.15)}</td></tr>
-                              <tr className="border-t font-semibold [border-color:var(--color-border)]"><td colSpan={3} className="px-3 py-2 text-right">{bi("Estimated total (incl. VAT)", "الإجمالي المقدر (شامل الضريبة)")}</td><td className="px-3 py-2 text-right tabular-nums">{formatCurrency(job.estimateAmount)}</td></tr>
-                            </tfoot>
-                          </table>
-                        </div>
-                      )}
-
-                      {canPerform(role, "set_estimate") && (job.currentStage === "Estimate" || job.currentStage === "Customer Approval" || (job.currentStage === "Diagnosis" && job.diagnosisNotes)) && (
-                        <div className="space-y-3 rounded-lg border [border-color:var(--color-border)] bg-[var(--color-surface-1)] p-3">
-                          <p className="text-xs font-semibold text-[var(--color-ink-secondary)]">{bi("Add line item", "إضافة بند")}</p>
-                          <div className="grid gap-2 sm:grid-cols-[130px_1fr_70px_130px_auto] sm:items-end">
-                            <Field label={bi("Type", "النوع")}>
-                              <Select value={newLineKind} onChange={(event) => { setNewLineKind(event.target.value as EstimateLineKind); setNewLineLabel(""); setNewLineItemId(""); setNewLineUnitPrice(""); }}>
-                                {ESTIMATE_LINE_KINDS.map((kind) => <option key={kind} value={kind}>{ESTIMATE_KIND_LABEL[kind]}</option>)}
-                              </Select>
-                            </Field>
-                            {newLineKind === "part" ? (
-                              <Field label={bi("Part", "القطعة")}>
-                                <Select value={newLineItemId} onChange={(event) => { const item = inventoryItems.find((candidate) => candidate.id === event.target.value); setNewLineItemId(event.target.value); setNewLineUnitPrice(item ? String(item.unitPrice) : ""); }}>
-                                  <option value="">{bi("Choose part...", "اختر قطعة...")}</option>
-                                  {inventoryItems.map((item) => <option key={item.id} value={item.id}>{item.name}{item.nameAr ? ` · ${item.nameAr}` : ""}</option>)}
-                                </Select>
-                              </Field>
-                            ) : (
-                              <Field label={bi("Description", "الوصف")}>
-                                <Input
-                                  value={newLineLabel}
-                                  onChange={(event) => setNewLineLabel(event.target.value)}
-                                  placeholder={newLineKind === "labor" ? "e.g. Diagnostic & labor charge" : newLineKind === "discount" ? "e.g. Loyalty discount" : "e.g. Transport / callout fee"}
-                                />
-                              </Field>
-                            )}
-                            <Field label={bi("Qty", "الكمية")}><Input type="number" min="1" value={newLineQty} onChange={(event) => setNewLineQty(event.target.value)} /></Field>
-                            <Field label={newLineKind === "discount" ? bi("Discount (SAR)", "الخصم (ريال)") : bi("Unit price (SAR)", "سعر الوحدة (ريال)")}><Input type="number" min="0" value={newLineUnitPrice} onChange={(event) => setNewLineUnitPrice(event.target.value)} /></Field>
-                            <Button
-                              variant="secondary"
-                              onClick={() => {
-                                const item = newLineKind === "part" ? inventoryItems.find((candidate) => candidate.id === newLineItemId) : undefined;
-                                const label = newLineKind === "part" ? (item?.name ?? "Part") : newLineLabel;
-                                const enteredPrice = Number(newLineUnitPrice);
-                                const unitPrice = newLineKind === "discount" ? -Math.abs(enteredPrice) : enteredPrice;
-                                showResult(
-                                  addEstimateLine(job.id, { kind: newLineKind, label, itemId: newLineKind === "part" ? (newLineItemId || undefined) : undefined, qty: Number(newLineQty), unitPrice, notes: newLineNotes || undefined }),
-                                  () => { setNewLineLabel(""); setNewLineItemId(""); setNewLineQty("1"); setNewLineUnitPrice(""); setNewLineNotes(""); }
-                                );
-                              }}
-                            >
-                              <Plus size={14} /> {bi("Add", "إضافة")}
-                            </Button>
-                          </div>
-                          <Field label={bi("Note (optional)", "ملاحظة (اختياري)")}><Input value={newLineNotes} onChange={(event) => setNewLineNotes(event.target.value)} placeholder={bi("Visible on the printed estimate", "تظهر في التقدير المطبوع")} /></Field>
-                          <div className="flex flex-wrap items-end gap-2 border-t pt-3 [border-color:var(--color-border)]">
-                            <Field label={bi("Estimate valid until", "التقدير صالح حتى")}><Input type="date" value={estimateValidUntilInput} onChange={(event) => setEstimateValidUntilInput(event.target.value)} /></Field>
-                            <Button variant="secondary" onClick={() => showResult(setEstimateValidUntil(job.id, estimateValidUntilInput))}>{bi("Save", "حفظ")}</Button>
-                          </div>
-                        </div>
-                      )}
+                      <p className="text-xs text-[var(--color-ink-muted)]">
+                        {jobEstimateLines.length} {jobEstimateLines.length === 1 ? bi("line item", "بند") : bi("line items", "بنود")}
+                        {job.estimatePreparedBy ? ` · ${bi("Prepared by", "أُعد بواسطة")} ${job.estimatePreparedBy}` : ""}
+                      </p>
+                      <Link to={`/jobcards/${job.id}/estimate`} className="inline-flex">
+                        <Button variant="secondary">{bi("Open Estimate", "فتح التقدير")}</Button>
+                      </Link>
                     </div>
 
                     {job.currentStage === "Customer Approval" && job.customerApproved !== true && canPerform(role, "record_customer_approval") && (
@@ -671,21 +512,6 @@ export default function JobCardDetail() {
                       </div>
                     )}
                     <div className="border-t pt-4 [border-color:var(--color-border)] flex gap-2 flex-wrap">
-                      <Button
-                        variant="secondary"
-                        onClick={() => printEstimate({
-                          job, customer, appliance, brand, estimateLines: jobEstimateLines, inventoryItems,
-                          onApprove: () => approveCustomer(job.id, true),
-                          onDecline: () => approveCustomer(job.id, false),
-                        })}
-                      >
-                        <Printer size={14} /> {bi("Print Estimate", "طباعة التقدير")}
-                      </Button>
-                      {customer && (
-                        <Button variant="secondary" onClick={() => showResult(sendEstimateWhatsapp())}>
-                          <MessageCircle size={14} /> {bi("Send Estimate via WhatsApp", "إرسال التقدير عبر واتساب")}
-                        </Button>
-                      )}
                       {job.finalAmount != null && (
                         <Button
                           variant="secondary"
@@ -913,6 +739,15 @@ export default function JobCardDetail() {
 
         {/* Right panel */}
         <div className="space-y-4 xl:sticky xl:top-4 xl:max-h-[85vh] xl:overflow-y-auto xl:overscroll-contain">
+          <button
+            type="button"
+            onClick={() => setRightPanelCollapsed((collapsed) => !collapsed)}
+            title={rightPanelCollapsed ? bi("Expand panel", "توسيع اللوحة") : bi("Collapse panel", "طي اللوحة")}
+            className="hidden xl:flex w-full items-center justify-center gap-1.5 rounded-md border py-1.5 text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink-primary)] hover:bg-black/[0.03] dark:hover:bg-white/[0.05] [border-color:var(--color-border)]"
+          >
+            {rightPanelCollapsed ? <PanelRightOpen size={14} /> : <><PanelRightClose size={14} /> {bi("Collapse", "طي")}</>}
+          </button>
+          <div className={`space-y-4 ${rightPanelCollapsed ? "xl:hidden" : ""}`}>
           <Card interactive className="space-y-3">
             <CardHeader title={bi("Customer Tracking", "تتبع العميل")} subtitle={bi("Self-service link — no login required", "رابط ذاتي — بدون تسجيل دخول")} />
             <TrackingShare jobId={serviceOrder?.id ?? job.id} />
@@ -1083,6 +918,7 @@ export default function JobCardDetail() {
             <Textarea rows={3} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Message to customer…" />
             <Button className="w-full justify-center" onClick={handleSend} disabled={!message.trim()}>{bi("Send", "إرسال")}</Button>
           </Card>
+          </div>
         </div>
       </div>
     </div>

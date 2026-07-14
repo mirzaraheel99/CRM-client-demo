@@ -25,6 +25,7 @@ export default function CustomerDetail() {
       <button onClick={() => navigate(-1)} className="flex items-center gap-1.5 text-sm text-[var(--color-ink-muted)] hover:text-[var(--color-ink-primary)]"><ArrowLeft size={15} /> {bi("Back", "رجوع")}</button>
       <div className="animate-rise-in">
         <h1 className="text-xl font-semibold tracking-tight">{customer.name}</h1>
+        {customer.nameAr && <p dir="rtl" className="text-sm text-[var(--color-ink-secondary)]">{customer.nameAr}</p>}
         <p className="text-sm text-[var(--color-ink-muted)]">Customer No. {customer.documentNo} | Registered {formatDate(customer.createdAt)}</p>
       </div>
 

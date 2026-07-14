@@ -2,7 +2,7 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, ClipboardList, Users, PackageSearch, Tag, Boxes,
   UserCog, GitBranch, MessageSquare, BarChart3, Smartphone, Sun, Moon,
-  Languages, ChevronDown, Wrench, Menu, RotateCcw, Radar, X, Search,
+  Languages, ChevronDown, Wrench, Menu, RotateCcw, Radar, X, Search, Settings as SettingsIcon, LogOut,
 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { t } from "../lib/i18n";
@@ -13,6 +13,7 @@ import { useCommandPaletteStore } from "../lib/commandPaletteStore";
 import { toast } from "../lib/toast";
 import { cx } from "../lib/utils";
 import { canAccessPath } from "../lib/permissions";
+import { bi } from "../lib/domainAr";
 import { useState, type ReactNode } from "react";
 import type { Role } from "../lib/types";
 
@@ -29,6 +30,7 @@ const NAV: { to: string; labelKey: Parameters<typeof t>[1]; icon: ReactNode; rol
   { to: "/communications", labelKey: "communications", icon: <MessageSquare size={18} /> },
   { to: "/reports", labelKey: "reports", icon: <BarChart3 size={18} />, roles: ["admin", "manager", "supervisor"] },
   { to: "/mobile", labelKey: "mobileApps", icon: <Smartphone size={18} /> },
+  { to: "/settings", labelKey: "settings", icon: <SettingsIcon size={18} />, roles: ["admin"] },
 ];
 
 const ROLE_LABELS: Record<Role, string> = {
@@ -42,7 +44,7 @@ const ROLE_LABELS: Record<Role, string> = {
 export function Shell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { role, setRole, selectedBranchId, setBranch, branches, theme, setTheme, lang, setLang, sidebarCollapsed, toggleSidebar, resetDemoData } = useStore();
+  const { role, setRole, currentUser, logout, selectedBranchId, setBranch, branches, theme, setTheme, lang, setLang, sidebarCollapsed, toggleSidebar, resetDemoData } = useStore();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const visibleNav = NAV.filter((item) => canAccessPath(role, item.to));
 
@@ -186,22 +188,26 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
 
           <div className="order-3 ml-auto flex shrink-0 items-center gap-1.5 md:order-none md:gap-2">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-[var(--color-ink-muted)] hidden sm:inline">{t(lang, "role")}</span>
-              <div className="relative">
-                <select
-                  value={role}
-                  onChange={(e) => changeRole(e.target.value as Role)}
-                  aria-label={t(lang, "role")}
-                  className="max-w-[128px] appearance-none truncate rounded-lg border bg-[var(--color-surface-2)] py-1.5 pl-3 pr-7 text-sm font-medium outline-none [border-color:var(--color-border)] sm:max-w-none"
-                >
-                  {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
-                    <option key={r} value={r}>{ROLE_LABELS[r]}</option>
-                  ))}
-                </select>
-                <ChevronDown size={14} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-ink-muted)]" />
+            {currentUser?.role === "admin" ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-[var(--color-ink-muted)] hidden sm:inline">{bi("View as", "عرض كـ")}</span>
+                <div className="relative">
+                  <select
+                    value={role}
+                    onChange={(e) => changeRole(e.target.value as Role)}
+                    aria-label={t(lang, "role")}
+                    className="max-w-[128px] appearance-none truncate rounded-lg border bg-[var(--color-surface-2)] py-1.5 pl-3 pr-7 text-sm font-medium outline-none [border-color:var(--color-border)] sm:max-w-none"
+                  >
+                    {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
+                      <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={14} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-ink-muted)]" />
+                </div>
               </div>
-            </div>
+            ) : (
+              <span className="hidden text-xs text-[var(--color-ink-muted)] sm:inline">{ROLE_LABELS[role]}</span>
+            )}
 
             <button
               onClick={() => setLang(lang === "en" ? "ar" : "en")}
@@ -218,7 +224,14 @@ export function Shell({ children }: { children: ReactNode }) {
               {theme === "light" ? <Moon size={17} /> : <Sun size={17} />}
             </button>
             <div className="hidden items-center gap-2 border-l pl-2 ml-1 [border-color:var(--color-border)] sm:flex">
-              <Avatar name={ROLE_LABELS[role]} />
+              <Avatar name={currentUser?.name ?? ROLE_LABELS[role]} />
+              <button
+                onClick={() => { logout(); navigate("/login", { replace: true }); }}
+                title={bi("Sign out", "تسجيل الخروج")}
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--color-ink-secondary)] hover:bg-black/5 dark:hover:bg-white/10"
+              >
+                <LogOut size={16} />
+              </button>
             </div>
           </div>
         </header>

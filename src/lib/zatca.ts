@@ -60,7 +60,10 @@ export async function printTaxInvoice({
   const partsRows = parts
     .map((p) => {
       const item = inventoryItems.find((i) => i.id === p.itemId);
-      return `<tr><td>${item?.name ?? "—"}</td><td class="num">${p.qty}</td><td class="num">${fmt(p.unitPrice)}</td><td class="num">${fmt(p.totalPrice)}</td></tr>`;
+      const nameCell = item?.nameAr
+        ? `${item.name}<div class="ar" dir="rtl">${item.nameAr}</div>`
+        : (item?.name ?? "—");
+      return `<tr><td>${nameCell}</td><td class="num">${p.qty}</td><td class="num">${fmt(p.unitPrice)}</td><td class="num">${fmt(p.totalPrice)}</td></tr>`;
     })
     .join("");
 
@@ -83,6 +86,7 @@ export async function printTaxInvoice({
   th, td { padding: 8px; border-bottom: 1px solid #e1e0d9; text-align: left; }
   th { color: #898781; font-size: 11px; text-transform: uppercase; }
   .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .ar { color: #666; font-size: 12px; }
   tfoot td { font-weight: 700; border-top: 2px solid #0b0b0b; border-bottom: none; }
   .footer { margin-top: 32px; font-size: 11px; color: #898781; }
   @media print { body { padding: 0; } }

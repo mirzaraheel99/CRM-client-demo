@@ -26,16 +26,20 @@ import type {
 // Kept local (not imported from ./stageRefNo) so this file has zero runtime
 // cross-file imports — scripts/validate-dataflow.mjs transpiles seed.ts in
 // isolation via a data: URI, which cannot resolve relative imports.
-const STAGE_REF_PREFIX: Partial<Record<StageName, string>> = {
+const STAGE_REF_PREFIX: Record<StageName, string> = {
+  Received: "RCV",
+  "Warranty Validation": "WV",
   Diagnosis: "DX",
   Estimate: "EST",
   "Customer Approval": "APR",
+  "OEM Approval": "OEM",
   Repair: "RPR",
   QA: "QA",
+  "Ready for Handover": "RFH",
+  Delivered: "DLV",
 };
-function nextStageRefNo(history: JobCardStageHistory[], stageName: StageName): string | undefined {
+function nextStageRefNo(history: JobCardStageHistory[], stageName: StageName): string {
   const prefix = STAGE_REF_PREFIX[stageName];
-  if (!prefix) return undefined;
   const count = history.filter((h) => h.stageName === stageName && h.stageRefNo).length;
   return `${prefix}-${String(count + 1).padStart(6, "0")}`;
 }

@@ -350,7 +350,10 @@ export const useStore = create<DemoState>()(
             customerSignature: null,
           };
         });
-        const history = jobs.map<JobCardStageHistory>((job) => ({ id: nextId("hist"), jobcardId: job.id, stageName: "Received", changedBy: "Front Desk", timestamp: job.createdAt, notes: `Product sequence ${String(job.sequenceNo).padStart(2, "0")} received at counter.` }));
+        const history = jobs.reduce<JobCardStageHistory[]>((acc, job) => {
+          const entry: JobCardStageHistory = { id: nextId("hist"), jobcardId: job.id, stageName: "Received", changedBy: "Front Desk", timestamp: job.createdAt, notes: `Product sequence ${String(job.sequenceNo).padStart(2, "0")} received at counter.`, stageRefNo: nextStageRefNo([...state.stageHistory, ...acc], "Received") };
+          return [...acc, entry];
+        }, []);
         const logs = jobs.flatMap((job) => buildTriggeredLogs(state, job, "Received", job.createdAt));
         set((current) => ({
           serviceOrders: [serviceOrder, ...current.serviceOrders],

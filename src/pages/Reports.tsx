@@ -21,7 +21,7 @@ const TAB_LABELS: Record<string, string> = {
   "Workflow Stage Register": bi("Workflow Stage Register", "سجل مراحل سير العمل"),
 };
 const RANGE_OPTIONS = [30, 90, 365];
-const REGISTER_STAGES: StageName[] = ["Diagnosis", "Estimate", "Customer Approval", "Repair", "QA"];
+const REGISTER_STAGES: StageName[] = ["Received", "Warranty Validation", "Diagnosis", "Estimate", "Customer Approval", "Repair", "QA", "Ready for Handover", "Delivered"];
 
 function ReportKpi({ label, value, detail, icon, tone }: { label: string; value: string; detail: string; icon: ReactNode; tone: string }) {
   return (

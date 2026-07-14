@@ -75,6 +75,9 @@ export interface Brand {
 
 export type ApplianceCategory = "AC" | "Refrigerator" | "Washer" | "Mobile" | "TV" | "Microwave";
 
+// Saudi Energy Efficiency Program (SEEP) star rating shown on the appliance label.
+export type EnergyRating = 1 | 2 | 3 | 4 | 5;
+
 export interface Appliance {
   id: string;
   documentNo: string;
@@ -86,6 +89,22 @@ export interface Appliance {
   purchaseDate: string;
   warrantyStatus: "In Warranty" | "Out of Warranty" | "Unknown";
   isSmartConnected: boolean;
+  // Purchase & warranty proof
+  purchaseInvoiceNo?: string;
+  retailerName?: string;
+  purchasePrice?: number;
+  amcActive?: boolean;
+  amcExpiryDate?: string;
+  // Saudi compliance & specs
+  sasoCertNo?: string;
+  energyRating?: EnergyRating;
+  countryOfManufacture?: string;
+  color?: string;
+  specification?: string;
+  installationDate?: string;
+  // Site & photo
+  installedLocation?: string;
+  photoUrl?: string;
 }
 
 // Simulated IoT telemetry — in production this would come from the brand's
@@ -210,6 +229,8 @@ export interface CommunicationLog {
   timestamp: string;
 }
 
+export type RequestSource = "walk_in" | "phone" | "whatsapp" | "app" | "referral";
+
 export interface ServiceOrder {
   id: string;
   documentNo: string;
@@ -217,6 +238,18 @@ export interface ServiceOrder {
   branchId: string;
   createdAt: string;
   updatedAt: string;
+  // Saudi National Address (Saudi Post) for the service location
+  shortAddressCode?: string;
+  buildingNo?: string;
+  unitNo?: string;
+  district?: string;
+  postalCode?: string;
+  additionalNo?: string;
+  // Intake
+  requestSource?: RequestSource;
+  preferredDate?: string;
+  preferredTimeSlot?: string;
+  buyerVatNumber?: string;
 }
 
 export interface JobCard {

@@ -3,26 +3,19 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { PackagePlus, Plus, Trash2 } from "lucide-react";
 import { useStore } from "../../lib/store";
 import { Card, CardHeader, Field, Select, Textarea, Button, Badge, Input } from "../../components/ui";
+import { ApplianceBasicFields, AppliancePurchaseFields, ApplianceComplianceFields, ApplianceSiteFields } from "../../components/ApplianceFields";
+import { emptyApplianceForm, applianceFormToInput, type ApplianceFormState } from "../../lib/applianceForm";
 import { JobTypeBadge } from "../../components/StatusBadge";
 import { toast } from "../../lib/toast";
 import { filterByBranch } from "../../lib/selectors";
 import { formatDate, formatSequence } from "../../lib/utils";
-import { APPLIANCE_CATEGORY_AR, JOB_TYPE_AR, bi } from "../../lib/domainAr";
-import type { ApplianceCategory, JobType } from "../../lib/types";
+import { JOB_TYPE_AR, REQUEST_SOURCE_AR, bi } from "../../lib/domainAr";
+import type { JobType, RequestSource } from "../../lib/types";
 
-const CATEGORIES: ApplianceCategory[] = ["AC", "Refrigerator", "Washer", "Mobile", "TV", "Microwave"];
 const NEW_CUSTOMER = "__new_customer__";
 const NEW_PRODUCT = "__new_product__";
-
-type NewProductForm = {
-  brandId: string;
-  category: ApplianceCategory;
-  model: string;
-  serialNo: string;
-  imeiNo: string;
-  purchaseDate: string;
-  isSmartConnected: boolean;
-};
+const REQUEST_SOURCES: RequestSource[] = ["walk_in", "phone", "whatsapp", "app", "referral"];
+const TIME_SLOTS = ["09:00-12:00", "12:00-15:00", "15:00-18:00", "18:00-21:00"];
 
 type IntakeLine = {
   key: number;
@@ -30,7 +23,7 @@ type IntakeLine = {
   technicianId: string;
   problem: string;
   jobTypeOverride: JobType | "auto";
-  newProduct: NewProductForm;
+  newProduct: ApplianceFormState;
 };
 
 let lineKey = 1;
@@ -42,7 +35,7 @@ function emptyLine(applianceId = ""): IntakeLine {
     technicianId: "",
     problem: "",
     jobTypeOverride: "auto",
-    newProduct: { brandId: "", category: "AC", model: "", serialNo: "", imeiNo: "", purchaseDate: "", isSmartConnected: false },
+    newProduct: emptyApplianceForm(),
   };
 }
 
@@ -57,6 +50,10 @@ export default function NewJobCard() {
   const [branchId, setBranchId] = useState(initialCustomer?.branchId ?? (selectedBranchId === "all" ? branches[0]?.id ?? "" : selectedBranchId));
   const [newCustomer, setNewCustomer] = useState({ firstName: "", fatherName: "", grandfatherName: "", familyName: "", phone: "", homePhone: "", whatsapp: "", email: "", address: "" });
   const [lines, setLines] = useState<IntakeLine[]>([emptyLine(initialApplianceId)]);
+  const [orderDetails, setOrderDetails] = useState({
+    shortAddressCode: "", buildingNo: "", unitNo: "", district: "", postalCode: "", additionalNo: "",
+    requestSource: "" as RequestSource | "", preferredDate: "", preferredTimeSlot: "", buyerVatNumber: "",
+  });
 
   const scopedCustomers = useMemo(() => filterByBranch(customers, selectedBranchId), [customers, selectedBranchId]);
   const brandMap = useMemo(() => new Map(brands.map((brand) => [brand.id, brand])), [brands]);
@@ -85,16 +82,18 @@ export default function NewJobCard() {
     setLines((current) => current.map((line) => line.key === key ? { ...line, ...patch } : line));
   }
 
-  function patchNewProduct(key: number, patch: Partial<NewProductForm>) {
+  function patchNewProduct(key: number, patch: Partial<ApplianceFormState>) {
     setLines((current) => current.map((line) => line.key === key ? { ...line, newProduct: { ...line.newProduct, ...patch } } : line));
   }
 
-  function warrantyStatus(product: NewProductForm) {
+  function warrantyStatus(product: ApplianceFormState) {
     const brand = brands.find((candidate) => candidate.id === product.brandId);
     if (!brand || !product.purchaseDate) return "Unknown" as const;
     const months = (Date.now() - new Date(product.purchaseDate).getTime()) / (1000 * 60 * 60 * 24 * 30);
     return months < brand.warrantyMonths ? "In Warranty" as const : "Out of Warranty" as const;
   }
+
+  const selectedExistingCustomer = customerId && customerId !== NEW_CUSTOMER ? customers.find((candidate) => candidate.id === customerId) : undefined;
 
   function submit() {
     if (!canSubmit) return;
@@ -117,8 +116,7 @@ export default function NewJobCard() {
     for (const line of lines) {
       const appliance = line.applianceId === NEW_PRODUCT
         ? addAppliance({
-          ...line.newProduct,
-          imeiNo: line.newProduct.imeiNo || undefined,
+          ...applianceFormToInput(line.newProduct),
           warrantyStatus: warrantyStatus(line.newProduct),
         })
         : applianceMap.get(line.applianceId);
@@ -139,6 +137,16 @@ export default function NewJobCard() {
       customerId: customer.id,
       branchId,
       lines: preparedLines,
+      shortAddressCode: orderDetails.shortAddressCode || undefined,
+      buildingNo: orderDetails.buildingNo || undefined,
+      unitNo: orderDetails.unitNo || undefined,
+      district: orderDetails.district || undefined,
+      postalCode: orderDetails.postalCode || undefined,
+      additionalNo: orderDetails.additionalNo || undefined,
+      requestSource: orderDetails.requestSource || undefined,
+      preferredDate: orderDetails.preferredDate || undefined,
+      preferredTimeSlot: orderDetails.preferredTimeSlot || undefined,
+      buyerVatNumber: orderDetails.buyerVatNumber || undefined,
     });
     toast(result.message, result.ok ? "success" : "error");
     if (result.ok && result.jobs?.[0]) navigate(`/jobcards/${result.jobs[0].id}`);
@@ -182,6 +190,36 @@ export default function NewJobCard() {
               <div className="sm:col-span-2"><Field label={bi("Address", "العنوان")}><Input value={newCustomer.address} onChange={(event) => setNewCustomer({ ...newCustomer, address: event.target.value })} /></Field></div>
             </div>
           </div>
+        )}
+      </Card>
+
+      <Card className="space-y-4">
+        <CardHeader title={bi("Service address & intake", "عنوان الخدمة وبيانات الاستلام")} subtitle="Saudi National Address for the service location, plus how the request came in." />
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Field label={bi("Short address code", "الرمز المختصر للعنوان")}><Input value={orderDetails.shortAddressCode} onChange={(event) => setOrderDetails({ ...orderDetails, shortAddressCode: event.target.value })} placeholder="RAFH3552" /></Field>
+          <Field label={bi("Building no.", "رقم المبنى")}><Input value={orderDetails.buildingNo} onChange={(event) => setOrderDetails({ ...orderDetails, buildingNo: event.target.value })} /></Field>
+          <Field label={bi("Unit no. (optional)", "رقم الوحدة (اختياري)")}><Input value={orderDetails.unitNo} onChange={(event) => setOrderDetails({ ...orderDetails, unitNo: event.target.value })} /></Field>
+          <Field label={bi("District", "الحي")}><Input value={orderDetails.district} onChange={(event) => setOrderDetails({ ...orderDetails, district: event.target.value })} /></Field>
+          <Field label={bi("Postal code", "الرمز البريدي")}><Input value={orderDetails.postalCode} onChange={(event) => setOrderDetails({ ...orderDetails, postalCode: event.target.value })} /></Field>
+          <Field label={bi("Additional no.", "الرقم الإضافي")}><Input value={orderDetails.additionalNo} onChange={(event) => setOrderDetails({ ...orderDetails, additionalNo: event.target.value })} /></Field>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Field label={bi("Request source", "مصدر الطلب")}>
+            <Select value={orderDetails.requestSource} onChange={(event) => setOrderDetails({ ...orderDetails, requestSource: event.target.value as RequestSource | "" })}>
+              <option value="">{bi("Not set", "غير محدد")}</option>
+              {REQUEST_SOURCES.map((source) => <option key={source} value={source}>{bi(source.replace("_", " "), REQUEST_SOURCE_AR[source])}</option>)}
+            </Select>
+          </Field>
+          <Field label={bi("Preferred date", "التاريخ المفضل")}><Input type="date" value={orderDetails.preferredDate} onChange={(event) => setOrderDetails({ ...orderDetails, preferredDate: event.target.value })} /></Field>
+          <Field label={bi("Preferred time slot", "الفترة الزمنية المفضلة")}>
+            <Select value={orderDetails.preferredTimeSlot} onChange={(event) => setOrderDetails({ ...orderDetails, preferredTimeSlot: event.target.value })}>
+              <option value="">{bi("Not set", "غير محدد")}</option>
+              {TIME_SLOTS.map((slot) => <option key={slot} value={slot}>{slot}</option>)}
+            </Select>
+          </Field>
+        </div>
+        {selectedExistingCustomer?.customerType === "corporate" && (
+          <Field label={bi("Buyer VAT number", "الرقم الضريبي للمشتري")}><Input value={orderDetails.buyerVatNumber} onChange={(event) => setOrderDetails({ ...orderDetails, buyerVatNumber: event.target.value })} placeholder="3xxxxxxxxx00003" /></Field>
         )}
       </Card>
 
@@ -240,29 +278,25 @@ export default function NewJobCard() {
                 </div>
 
                 {line.applianceId === NEW_PRODUCT && (
-                  <div className="mt-3 rounded-md bg-black/[0.03] p-3 dark:bg-white/[0.05]">
-                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div className="mt-3 space-y-4 rounded-md bg-black/[0.03] p-3 dark:bg-white/[0.05]">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="text-sm font-medium">{bi("Register exact product unit", "تسجيل وحدة المنتج بالتحديد")}</p>
                       <Badge tone="brand">{bi("New Product No. after save", "رقم منتج جديد بعد الحفظ")}</Badge>
                     </div>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <Field label={bi("Brand", "العلامة التجارية")}>
-                        <Select value={line.newProduct.brandId} onChange={(event) => patchNewProduct(line.key, { brandId: event.target.value })}>
-                          <option value="">{bi("Choose brand...", "اختر العلامة التجارية...")}</option>
-                          {brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
-                        </Select>
-                      </Field>
-                      <Field label={bi("Category", "الفئة")}>
-                        <Select value={line.newProduct.category} onChange={(event) => patchNewProduct(line.key, { category: event.target.value as ApplianceCategory })}>
-                          {CATEGORIES.map((item) => <option key={item} value={item}>{bi(item, APPLIANCE_CATEGORY_AR[item])}</option>)}
-                        </Select>
-                      </Field>
-                      <Field label={bi("Model", "الطراز")}><Input value={line.newProduct.model} onChange={(event) => patchNewProduct(line.key, { model: event.target.value })} /></Field>
-                      <Field label={bi("Serial number / unit number", "الرقم التسلسلي / رقم الوحدة")}><Input value={line.newProduct.serialNo} onChange={(event) => patchNewProduct(line.key, { serialNo: event.target.value })} /></Field>
-                      {line.newProduct.category === "Mobile" && <Field label={bi("IMEI", "الآيمي")}><Input value={line.newProduct.imeiNo} onChange={(event) => patchNewProduct(line.key, { imeiNo: event.target.value })} /></Field>}
-                      <Field label={bi("Purchase date", "تاريخ الشراء")}><Input value={line.newProduct.purchaseDate} onChange={(event) => patchNewProduct(line.key, { purchaseDate: event.target.value })} placeholder="YYYY-MM-DD" /></Field>
+                    <ApplianceBasicFields value={line.newProduct} onChange={(patch) => patchNewProduct(line.key, patch)} brands={brands} />
+                    <div className="border-t pt-3 [border-color:var(--color-border)]">
+                      <p className="mb-2 text-xs font-semibold text-[var(--color-ink-secondary)]">{bi("Purchase & warranty", "الشراء والضمان")}</p>
+                      <AppliancePurchaseFields value={line.newProduct} onChange={(patch) => patchNewProduct(line.key, patch)} />
                     </div>
-                    <p className="mt-3 text-xs text-[var(--color-ink-muted)]">For five identical purchased units, register each physical unit separately with its own serial/unit number. The demo will assign an `AST-xxxxx` product number, then this service order will assign the affected unit its own sequence.</p>
+                    <div className="border-t pt-3 [border-color:var(--color-border)]">
+                      <p className="mb-2 text-xs font-semibold text-[var(--color-ink-secondary)]">{bi("Compliance & specs", "المطابقة والمواصفات")}</p>
+                      <ApplianceComplianceFields value={line.newProduct} onChange={(patch) => patchNewProduct(line.key, patch)} />
+                    </div>
+                    <div className="border-t pt-3 [border-color:var(--color-border)]">
+                      <p className="mb-2 text-xs font-semibold text-[var(--color-ink-secondary)]">{bi("Site & photo", "الموقع والصورة")}</p>
+                      <ApplianceSiteFields value={line.newProduct} onChange={(patch) => patchNewProduct(line.key, patch)} />
+                    </div>
+                    <p className="text-xs text-[var(--color-ink-muted)]">For five identical purchased units, register each physical unit separately with its own serial/unit number. The demo will assign an `AST-xxxxx` product number, then this service order will assign the affected unit its own sequence.</p>
                   </div>
                 )}
 

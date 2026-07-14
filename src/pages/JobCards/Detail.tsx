@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, MessageCircle, Smartphone, Mail, CheckCircle2, Circle, XCircle, ImagePlus, Printer, Sparkles, Trash2, AlertTriangle } from "lucide-react";
 import { useStore } from "../../lib/store";
-import { Card, CardHeader, Tabs, Button, Select, Textarea, Input, Field, Badge, Avatar, WorkflowStepper } from "../../components/ui";
+import { Card, CardHeader, Tabs, Button, Select, Textarea, Input, Field, Badge, Avatar, Modal, WorkflowStepper } from "../../components/ui";
 import { JobStatusBadge, JobTypeBadge } from "../../components/StatusBadge";
 import { PartsGrid } from "../../components/PartsGrid";
 import { TrackingShare } from "../../components/TrackingShare";
+import { ApplianceBasicFields, AppliancePurchaseFields, ApplianceComplianceFields, ApplianceSiteFields } from "../../components/ApplianceFields";
+import { emptyApplianceForm, applianceFormToInput, type ApplianceFormState } from "../../lib/applianceForm";
 import { formatCurrency, formatDate, formatDateTime, formatSequence, relativeTime } from "../../lib/utils";
 import { inventoryStockByBranch, totalStockByItem } from "../../lib/selectors";
 import { MESSAGE_TEMPLATES, renderTemplate } from "../../lib/templates";
@@ -18,9 +20,17 @@ import { toast } from "../../lib/toast";
 import { Wifi } from "lucide-react";
 import { canPerform } from "../../lib/permissions";
 import { stageAccessBlocker, stageRequirements } from "../../lib/workflow";
-import { STAGE_NAME_AR, CHANNEL_AR, COMM_STATUS_AR, bi } from "../../lib/domainAr";
-import type { StageName, Channel, ActionResult } from "../../lib/types";
+import { STAGE_NAME_AR, CHANNEL_AR, COMM_STATUS_AR, REQUEST_SOURCE_AR, bi } from "../../lib/domainAr";
+import type { StageName, Channel, ActionResult, JobType } from "../../lib/types";
 
+const NEW_PRODUCT_OPTION = "__new_product__";
+const ADD_PRODUCT_TABS = ["Basic", "Purchase", "Compliance", "Site"];
+const ADD_PRODUCT_TAB_LABELS: Record<string, string> = {
+  Basic: bi("Basic", "أساسي"),
+  Purchase: bi("Purchase & Warranty", "الشراء والضمان"),
+  Compliance: bi("Compliance & Specs", "المطابقة والمواصفات"),
+  Site: bi("Site & Photo", "الموقع والصورة"),
+};
 const TAB_LIST = ["Timeline", "Details", "Parts", "Attachments", "Communication"];
 const TAB_LABELS: Record<string, string> = {
   Timeline: bi("Timeline", "الجدول الزمني"),
@@ -63,7 +73,7 @@ export default function JobCardDetail() {
     stageHistory, attachments, partsUsed, communicationLogs, inventoryItems, inventoryLocations, inventoryStock, purchaseBills, payments, removedParts,
     role, selectedBranchId, advanceStage, assignTechnician, setDiagnosis, setEstimate, approveCustomer, setRepairNotes, setQaApproved,
     setFinalAmount, captureCustomerSignature, savePurchaseBill, addPartUsed, removePartUsed, addAttachment, sendCommunication,
-    logRemovedPart, notifyCustomerOfRemovedPart, confirmPartReturned,
+    logRemovedPart, notifyCustomerOfRemovedPart, confirmPartReturned, addAppliance, addProductToOrder,
   } = useStore();
   const [removedDesc, setRemovedDesc] = useState("");
   const [removedSerial, setRemovedSerial] = useState("");
@@ -125,6 +135,60 @@ export default function JobCardDetail() {
     const commEntries = jobComms.map((c) => ({ kind: "comm" as const, id: c.id, timestamp: c.timestamp, data: c }));
     return [...stageEntries, ...commEntries].sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp));
   }, [jobHistory, jobComms]);
+
+  const usedApplianceIds = useMemo(() => new Set(siblingJobs.map((line) => line.applianceId)), [siblingJobs]);
+  const branchTechnicians = useMemo(() => technicians.filter((technician) => technician.branchId === job?.branchId && technician.status !== "Off Duty"), [technicians, job?.branchId]);
+  const [addProductOpen, setAddProductOpen] = useState(false);
+  const [addProductForm, setAddProductForm] = useState({ applianceId: "", technicianId: "", problem: "", jobTypeOverride: "auto" as JobType | "auto" });
+  const [addProductTab, setAddProductTab] = useState("Basic");
+  const [newProductForm, setNewProductForm] = useState<ApplianceFormState>(emptyApplianceForm());
+  const selectedNewApplianceForOrder = appliances.find((candidate) => candidate.id === addProductForm.applianceId);
+  const addProductDetectedType: JobType = selectedNewApplianceForOrder?.warrantyStatus === "In Warranty" ? "warranty" : "non_warranty";
+
+  function resetAddProductForm() {
+    setAddProductForm({ applianceId: "", technicianId: "", problem: "", jobTypeOverride: "auto" });
+    setNewProductForm(emptyApplianceForm());
+    setAddProductTab("Basic");
+  }
+
+  function submitAddProduct() {
+    if (!job || !serviceOrder) return;
+    let applianceId = addProductForm.applianceId;
+    let jobType: JobType;
+    if (applianceId === NEW_PRODUCT_OPTION) {
+      if (!newProductForm.brandId || !newProductForm.model.trim() || !newProductForm.serialNo.trim() || !newProductForm.purchaseDate) {
+        toast("Fill in the required Basic fields for the new product.", "error");
+        return;
+      }
+      const brand = brands.find((candidate) => candidate.id === newProductForm.brandId)!;
+      const months = (Date.now() - new Date(newProductForm.purchaseDate).getTime()) / (1000 * 60 * 60 * 24 * 30);
+      const warrantyStatus = months < brand.warrantyMonths ? "In Warranty" as const : "Out of Warranty" as const;
+      const created = addAppliance({ ...applianceFormToInput(newProductForm), warrantyStatus });
+      applianceId = created.id;
+      jobType = warrantyStatus === "In Warranty" ? "warranty" : "non_warranty";
+    } else {
+      const appliance = appliances.find((candidate) => candidate.id === applianceId);
+      if (!appliance) {
+        toast("Choose or register a product.", "error");
+        return;
+      }
+      jobType = appliance.warrantyStatus === "In Warranty" ? "warranty" : "non_warranty";
+    }
+    if (addProductForm.jobTypeOverride !== "auto") jobType = addProductForm.jobTypeOverride;
+    const outcome = addProductToOrder({
+      serviceOrderId: serviceOrder.id,
+      applianceId,
+      jobType,
+      problemDescription: addProductForm.problem,
+      technicianId: addProductForm.technicianId || null,
+    });
+    toast(outcome.message, outcome.ok ? "success" : "error");
+    if (outcome.ok && outcome.job) {
+      setAddProductOpen(false);
+      resetAddProductForm();
+      navigate(`/jobcards/${outcome.job.id}`);
+    }
+  }
 
   if (!job) {
     return (
@@ -211,7 +275,10 @@ export default function JobCardDetail() {
       <Card padded={false}>
         <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-3 [border-color:var(--color-border)]">
           <div><p className="text-xs text-[var(--color-ink-muted)]">{bi("Parent service order", "أمر الخدمة الرئيسي")}</p><p className="font-semibold">{serviceOrder?.documentNo ?? job.serviceOrderId}</p></div>
-          <div className="text-right"><p className="text-xs text-[var(--color-ink-muted)]">{bi("Customer", "العميل")}</p><p className="text-sm font-medium">{customer?.documentNo} | {siblingJobs.length} {siblingJobs.length === 1 ? "product" : "products"}</p></div>
+          <div className="flex items-center gap-3">
+            <div className="text-right"><p className="text-xs text-[var(--color-ink-muted)]">{bi("Customer", "العميل")}</p><p className="text-sm font-medium">{customer?.documentNo} | {siblingJobs.length} {siblingJobs.length === 1 ? "product" : "products"}</p></div>
+            {canPerform(role, "create_job") && <Button size="sm" variant="secondary" onClick={() => { resetAddProductForm(); setAddProductOpen(true); }}>+ {bi("Add Product", "إضافة منتج")}</Button>}
+          </div>
         </div>
         <div className="flex gap-2 overflow-x-auto px-5 py-3">
           {siblingJobs.map((line) => {
@@ -220,6 +287,60 @@ export default function JobCardDetail() {
           })}
         </div>
       </Card>
+
+      <Modal open={addProductOpen} onClose={() => setAddProductOpen(false)} title={bi("Add Product to Service Order", "إضافة منتج إلى أمر الخدمة")} width="lg">
+        <div className="space-y-4">
+          <p className="text-xs text-[var(--color-ink-muted)]">{bi("Adds a new numbered sequence to", "إضافة تسلسل مرقّم جديد إلى")} {serviceOrder?.documentNo}.</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label={bi("Product / equipment", "المنتج / الجهاز")}>
+              <Select value={addProductForm.applianceId} onChange={(event) => setAddProductForm({ ...addProductForm, applianceId: event.target.value })}>
+                <option value="">{bi("Choose a registered product...", "اختر منتجاً مسجلاً...")}</option>
+                <option value={NEW_PRODUCT_OPTION}>+ {bi("Register new product unit", "تسجيل وحدة منتج جديدة")}</option>
+                {appliances.map((candidate) => (
+                  <option key={candidate.id} value={candidate.id} disabled={usedApplianceIds.has(candidate.id)}>
+                    {candidate.documentNo} - {candidate.model} - SN {candidate.serialNo}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label={bi("Warranty handling", "معالجة الضمان")}>
+              <Select value={addProductForm.jobTypeOverride} onChange={(event) => setAddProductForm({ ...addProductForm, jobTypeOverride: event.target.value as JobType | "auto" })}>
+                <option value="auto">{bi(`Auto-detect (${addProductDetectedType === "warranty" ? "Warranty" : "Non-Warranty"})`, `كشف تلقائي (${addProductDetectedType === "warranty" ? "ضمان" : "بدون ضمان"})`)}</option>
+                <option value="warranty">{bi("Force Warranty", "فرض الضمان")}</option>
+                <option value="non_warranty">{bi("Force Non-Warranty", "فرض بدون ضمان")}</option>
+              </Select>
+            </Field>
+          </div>
+
+          {addProductForm.applianceId === NEW_PRODUCT_OPTION && (
+            <div className="space-y-4 rounded-md bg-black/[0.03] p-3 dark:bg-white/[0.05]">
+              <Tabs tabs={ADD_PRODUCT_TABS} active={addProductTab} onChange={setAddProductTab} labels={ADD_PRODUCT_TAB_LABELS} />
+              {addProductTab === "Basic" && <ApplianceBasicFields value={newProductForm} onChange={(patch) => setNewProductForm({ ...newProductForm, ...patch })} brands={brands} />}
+              {addProductTab === "Purchase" && <AppliancePurchaseFields value={newProductForm} onChange={(patch) => setNewProductForm({ ...newProductForm, ...patch })} />}
+              {addProductTab === "Compliance" && <ApplianceComplianceFields value={newProductForm} onChange={(patch) => setNewProductForm({ ...newProductForm, ...patch })} />}
+              {addProductTab === "Site" && <ApplianceSiteFields value={newProductForm} onChange={(patch) => setNewProductForm({ ...newProductForm, ...patch })} />}
+            </div>
+          )}
+
+          <Field label={bi("Assign technician", "إسناد فني")}>
+            <Select value={addProductForm.technicianId} onChange={(event) => setAddProductForm({ ...addProductForm, technicianId: event.target.value })}>
+              <option value="">{bi("Assign later", "الإسناد لاحقاً")}</option>
+              {branchTechnicians
+                .filter((technician) => {
+                  const category = addProductForm.applianceId === NEW_PRODUCT_OPTION ? newProductForm.category : selectedNewApplianceForOrder?.category;
+                  return !category || technician.skills.includes(category);
+                })
+                .map((technician) => <option key={technician.id} value={technician.id}>{technician.name}</option>)}
+            </Select>
+          </Field>
+
+          <Field label={bi("Reported problem / requested service", "المشكلة المُبلّغ عنها / الخدمة المطلوبة")}>
+            <Textarea rows={3} value={addProductForm.problem} onChange={(event) => setAddProductForm({ ...addProductForm, problem: event.target.value })} placeholder="Describe the issue for this product sequence..." />
+          </Field>
+
+          <Button className="w-full justify-center" onClick={submitAddProduct}>{bi("Add Product Sequence", "إضافة تسلسل المنتج")}</Button>
+        </div>
+      </Modal>
 
       <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr_280px] gap-5 items-start animate-rise-in" style={{ animationDelay: "40ms" }}>
         {/* Left panel */}
@@ -323,6 +444,19 @@ export default function JobCardDetail() {
 
             {tab === "Details" && (
               <div className="space-y-4 text-sm">
+                {serviceOrder && (serviceOrder.shortAddressCode || serviceOrder.requestSource || serviceOrder.preferredDate || serviceOrder.buyerVatNumber) && (
+                  <div className="border-b pb-4 [border-color:var(--color-border)]">
+                    <p className="mb-2 text-xs font-semibold text-[var(--color-ink-secondary)]">{bi("Service address & intake", "عنوان الخدمة وبيانات الاستلام")}</p>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      {serviceOrder.shortAddressCode && <div><p className="text-xs text-[var(--color-ink-muted)]">{bi("Short address", "العنوان المختصر")}</p><p className="font-medium">{serviceOrder.shortAddressCode}</p></div>}
+                      {(serviceOrder.buildingNo || serviceOrder.district) && <div><p className="text-xs text-[var(--color-ink-muted)]">{bi("Building / district", "المبنى / الحي")}</p><p className="font-medium">{[serviceOrder.buildingNo, serviceOrder.unitNo && `Unit ${serviceOrder.unitNo}`, serviceOrder.district].filter(Boolean).join(", ")}</p></div>}
+                      {serviceOrder.postalCode && <div><p className="text-xs text-[var(--color-ink-muted)]">{bi("Postal / additional no.", "الرمز البريدي / الرقم الإضافي")}</p><p className="font-medium">{serviceOrder.postalCode}{serviceOrder.additionalNo ? ` / ${serviceOrder.additionalNo}` : ""}</p></div>}
+                      {serviceOrder.requestSource && <div><p className="text-xs text-[var(--color-ink-muted)]">{bi("Request source", "مصدر الطلب")}</p><p className="font-medium">{bi(serviceOrder.requestSource.replace("_", " "), REQUEST_SOURCE_AR[serviceOrder.requestSource])}</p></div>}
+                      {(serviceOrder.preferredDate || serviceOrder.preferredTimeSlot) && <div><p className="text-xs text-[var(--color-ink-muted)]">{bi("Preferred visit", "الزيارة المفضلة")}</p><p className="font-medium">{serviceOrder.preferredDate ? formatDate(serviceOrder.preferredDate) : ""} {serviceOrder.preferredTimeSlot ?? ""}</p></div>}
+                      {serviceOrder.buyerVatNumber && <div><p className="text-xs text-[var(--color-ink-muted)]">{bi("Buyer VAT no.", "الرقم الضريبي للمشتري")}</p><p className="font-medium">{serviceOrder.buyerVatNumber}</p></div>}
+                    </div>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-xs text-[var(--color-ink-muted)]">{bi("Estimate amount", "مبلغ التقدير")}</p>
@@ -376,7 +510,7 @@ export default function JobCardDetail() {
                   {job.finalAmount != null && (
                     <Button
                       variant="secondary"
-                      onClick={() => printTaxInvoice({ job, customer, appliance, brand, parts: jobParts, inventoryItems })}
+                      onClick={() => printTaxInvoice({ job, customer, appliance, brand, parts: jobParts, inventoryItems, serviceOrder })}
                     >
                       <Printer size={14} /> {bi("Print Tax Invoice (ZATCA)", "طباعة الفاتورة الضريبية")}
                     </Button>

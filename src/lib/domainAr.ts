@@ -1,4 +1,4 @@
-import type { JobStatus, JobType, StageName, ApplianceCategory, Role, CustomerType, Gender, PreferredLanguage } from "./types";
+import type { JobStatus, JobType, StageName, ApplianceCategory, Role, CustomerType, Gender, PreferredLanguage, RequestSource } from "./types";
 
 // Arabic aliases for operational vocabulary that appears throughout the app —
 // separate from the customer-facing per-item alias in InventoryItem.nameAr.
@@ -107,6 +107,14 @@ export const GENDER_AR: Record<Gender, string> = {
 export const PREFERRED_LANGUAGE_AR: Record<PreferredLanguage, string> = {
   ar: "العربية",
   en: "الإنجليزية",
+};
+
+export const REQUEST_SOURCE_AR: Record<RequestSource, string> = {
+  walk_in: "زيارة مباشرة",
+  phone: "اتصال هاتفي",
+  whatsapp: "واتساب",
+  app: "تطبيق الجوال",
+  referral: "إحالة",
 };
 
 /** "English · Arabic" — the compact inline form used in badges, headers, and buttons. */

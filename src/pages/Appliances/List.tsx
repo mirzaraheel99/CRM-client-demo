@@ -2,7 +2,9 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { PackageSearch, Search, Wifi } from "lucide-react";
 import { useStore } from "../../lib/store";
-import { Badge, Button, Card, EmptyState, Field, Input, Modal, Pagination, Select, SortableTh } from "../../components/ui";
+import { Badge, Button, Card, EmptyState, Input, Modal, Pagination, Select, SortableTh, Tabs } from "../../components/ui";
+import { ApplianceBasicFields, ApplianceComplianceFields, AppliancePurchaseFields, ApplianceSiteFields } from "../../components/ApplianceFields";
+import { emptyApplianceForm, applianceFormToInput, APPLIANCE_CATEGORIES } from "../../lib/applianceForm";
 import { formatDate } from "../../lib/utils";
 import { toast } from "../../lib/toast";
 import { useSort } from "../../lib/useSort";
@@ -11,16 +13,24 @@ import { canPerform } from "../../lib/permissions";
 import { APPLIANCE_CATEGORY_AR, WARRANTY_STATUS_AR, bi } from "../../lib/domainAr";
 import type { Appliance, ApplianceCategory } from "../../lib/types";
 
-const CATEGORIES: ApplianceCategory[] = ["AC", "Refrigerator", "Washer", "Mobile", "TV", "Microwave"];
 const PAGE_SIZE = 15;
 type SortKey = "document" | "model" | "category" | "brand" | "serial" | "purchased";
+
+const FORM_TABS = ["Basic", "Purchase", "Compliance", "Site"];
+const FORM_TAB_LABELS: Record<string, string> = {
+  Basic: bi("Basic", "أساسي"),
+  Purchase: bi("Purchase & Warranty", "الشراء والضمان"),
+  Compliance: bi("Compliance & Specs", "المطابقة والمواصفات"),
+  Site: bi("Site & Photo", "الموقع والصورة"),
+};
 
 export default function ApplianceList() {
   const { appliances, brands, jobCards, selectedBranchId, role, addAppliance } = useStore();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<ApplianceCategory | "all">("all");
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ brandId: "", category: "AC" as ApplianceCategory, model: "", serialNo: "", imeiNo: "", purchaseDate: "" });
+  const [form, setForm] = useState(emptyApplianceForm());
+  const [formTab, setFormTab] = useState("Basic");
   const [page, setPage] = useState(1);
 
   const brandMap = useMemo(() => new Map(brands.map((brand) => [brand.id, brand])), [brands]);
@@ -57,12 +67,11 @@ export default function ApplianceList() {
     const brand = brands.find((candidate) => candidate.id === form.brandId)!;
     const months = (Date.now() - new Date(form.purchaseDate).getTime()) / (1000 * 60 * 60 * 24 * 30);
     const appliance = addAppliance({
-      ...form,
-      imeiNo: form.imeiNo || undefined,
-      isSmartConnected: false,
+      ...applianceFormToInput(form),
       warrantyStatus: months < brand.warrantyMonths ? "In Warranty" : "Out of Warranty",
     });
-    setForm({ brandId: "", category: "AC", model: "", serialNo: "", imeiNo: "", purchaseDate: "" });
+    setForm(emptyApplianceForm());
+    setFormTab("Basic");
     setOpen(false);
     toast(`${appliance.documentNo} added to the product registry.`);
   }
@@ -74,7 +83,7 @@ export default function ApplianceList() {
           <h1 className="text-xl font-semibold tracking-tight">{bi("Product Registry", "سجل المنتجات")}</h1>
           <p className="mt-0.5 text-sm text-[var(--color-ink-muted)]">{rows.length} independent product records; customer association is created on each service order.</p>
         </div>
-        {canPerform(role, "create_appliance") && <Button onClick={() => setOpen(true)}>+ {bi("Add Product", "إضافة منتج")}</Button>}
+        {canPerform(role, "create_appliance") && <Button onClick={() => { setForm(emptyApplianceForm()); setFormTab("Basic"); setOpen(true); }}>+ {bi("Add Product", "إضافة منتج")}</Button>}
       </div>
 
       <Card className="flex flex-wrap gap-3">
@@ -85,7 +94,7 @@ export default function ApplianceList() {
         <div className="w-44">
           <Select value={category} onChange={(event) => { setCategory(event.target.value as ApplianceCategory | "all"); setPage(1); }}>
             <option value="all">{bi("All categories", "جميع الفئات")}</option>
-            {CATEGORIES.map((item) => <option key={item} value={item}>{bi(item, APPLIANCE_CATEGORY_AR[item])}</option>)}
+            {APPLIANCE_CATEGORIES.map((item) => <option key={item} value={item}>{bi(item, APPLIANCE_CATEGORY_AR[item])}</option>)}
           </Select>
         </div>
       </Card>
@@ -138,15 +147,14 @@ export default function ApplianceList() {
         <Pagination page={currentPage} pageSize={PAGE_SIZE} total={rows.length} onPageChange={setPage} />
       </Card>
 
-      <Modal open={open} onClose={() => setOpen(false)} title={bi("Add Product", "إضافة منتج")}>
-        <div className="space-y-3">
+      <Modal open={open} onClose={() => setOpen(false)} title={bi("Add Product", "إضافة منتج")} width="lg">
+        <div className="space-y-4">
           <p className="text-xs text-[var(--color-ink-muted)]">Products are registered independently. Select the customer when creating the service order.</p>
-          <Field label={bi("Brand", "العلامة التجارية")}><Select value={form.brandId} onChange={(event) => setForm({ ...form, brandId: event.target.value })}><option value="">{bi("Choose brand...", "اختر العلامة التجارية...")}</option>{brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}</Select></Field>
-          <Field label={bi("Category", "الفئة")}><Select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value as ApplianceCategory })}>{CATEGORIES.map((item) => <option key={item} value={item}>{bi(item, APPLIANCE_CATEGORY_AR[item])}</option>)}</Select></Field>
-          <Field label={bi("Model", "الطراز")}><Input value={form.model} onChange={(event) => setForm({ ...form, model: event.target.value })} /></Field>
-          <Field label={bi("Serial number", "الرقم التسلسلي")}><Input value={form.serialNo} onChange={(event) => setForm({ ...form, serialNo: event.target.value })} /></Field>
-          {form.category === "Mobile" && <Field label={bi("IMEI", "الآيمي")}><Input value={form.imeiNo} onChange={(event) => setForm({ ...form, imeiNo: event.target.value })} /></Field>}
-          <Field label={bi("Purchase date", "تاريخ الشراء")}><Input type="date" value={form.purchaseDate} onChange={(event) => setForm({ ...form, purchaseDate: event.target.value })} /></Field>
+          <Tabs tabs={FORM_TABS} active={formTab} onChange={setFormTab} labels={FORM_TAB_LABELS} />
+          {formTab === "Basic" && <ApplianceBasicFields value={form} onChange={(patch) => setForm({ ...form, ...patch })} brands={brands} />}
+          {formTab === "Purchase" && <AppliancePurchaseFields value={form} onChange={(patch) => setForm({ ...form, ...patch })} />}
+          {formTab === "Compliance" && <ApplianceComplianceFields value={form} onChange={(patch) => setForm({ ...form, ...patch })} />}
+          {formTab === "Site" && <ApplianceSiteFields value={form} onChange={(patch) => setForm({ ...form, ...patch })} />}
           <Button className="w-full justify-center" onClick={submit}>{bi("Save Product", "حفظ المنتج")}</Button>
         </div>
       </Modal>

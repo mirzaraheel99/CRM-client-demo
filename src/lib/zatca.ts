@@ -1,6 +1,6 @@
 import QRCode from "qrcode";
 import { formatDate } from "./utils";
-import type { Customer, Appliance, Brand, JobCard, JobCardPartUsed, InventoryItem } from "./types";
+import type { Customer, Appliance, Brand, JobCard, JobCardPartUsed, InventoryItem, ServiceOrder } from "./types";
 
 // Simulated ZATCA (Saudi tax authority) Phase-2 Simplified Tax Invoice QR payload.
 // Real certification requires a cryptographic stamp signed by a ZATCA-issued
@@ -37,7 +37,7 @@ function buildZatcaQrBase64(timestamp: string, totalWithVat: string, vatTotal: s
 }
 
 export async function printTaxInvoice({
-  job, customer, appliance, brand, parts, inventoryItems,
+  job, customer, appliance, brand, parts, inventoryItems, serviceOrder,
 }: {
   job: JobCard;
   customer?: Customer;
@@ -45,6 +45,7 @@ export async function printTaxInvoice({
   brand?: Brand;
   parts: JobCardPartUsed[];
   inventoryItems: InventoryItem[];
+  serviceOrder?: ServiceOrder;
 }) {
   const VAT_RATE = 0.15;
   const totalWithVat = job.finalAmount ?? job.estimateAmount ?? 0;
@@ -110,10 +111,12 @@ export async function printTaxInvoice({
   <div class="grid">
     <div class="box">
       <h3>Bill To</h3>
-      <p>${customer?.name ?? "—"}</p>
+      <p>${customer?.customerType === "corporate" && customer?.companyName ? customer.companyName : (customer?.name ?? "—")}</p>
+      ${customer?.customerType === "corporate" && customer?.companyName ? `<p class="muted">Contact: ${customer.name}</p>` : ""}
       <p class="muted">${customer?.documentNo ?? ""}</p>
       <p class="muted">${customer?.phone ?? ""}</p>
       <p class="muted">${customer?.address ?? ""}</p>
+      ${serviceOrder?.buyerVatNumber ? `<p class="muted">Buyer VAT: ${serviceOrder.buyerVatNumber}</p>` : ""}
     </div>
     <div class="box">
       <h3>Appliance / Job</h3>

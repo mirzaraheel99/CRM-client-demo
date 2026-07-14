@@ -53,7 +53,8 @@ export function printEstimate({
   <div class="grid">
     <div class="box">
       <h3>Customer</h3>
-      <p>${customer?.name ?? "—"}</p>
+      <p>${customer?.customerType === "corporate" && customer?.companyName ? customer.companyName : (customer?.name ?? "—")}</p>
+      ${customer?.customerType === "corporate" && customer?.companyName ? `<p class="muted">Contact: ${customer.name}</p>` : ""}
       <p class="muted">${customer?.documentNo ?? ""}</p>
       <p class="muted">${customer?.phone ?? ""}</p>
       <p class="muted">${customer?.address ?? ""}</p>

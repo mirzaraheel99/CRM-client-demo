@@ -3,7 +3,7 @@ import { ArrowLeft, Wifi } from "lucide-react";
 import { useStore } from "../../lib/store";
 import { Badge, Card, CardHeader } from "../../components/ui";
 import { JobStatusBadge, JobTypeBadge } from "../../components/StatusBadge";
-import { formatDate, relativeTime } from "../../lib/utils";
+import { formatCurrency, formatDate, relativeTime } from "../../lib/utils";
 import { APPLIANCE_CATEGORY_AR, WARRANTY_STATUS_AR, bi } from "../../lib/domainAr";
 
 export default function ApplianceDetail() {
@@ -40,6 +40,32 @@ export default function ApplianceDetail() {
         <p className="text-sm text-[var(--color-ink-secondary)]">{brand?.rules}</p>
         <p className="mt-2 text-xs text-[var(--color-ink-muted)]">Purchased {formatDate(appliance.purchaseDate)} | {brand?.warrantyMonths} month warranty period</p>
       </Card>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader title={bi("Purchase & warranty proof", "إثبات الشراء والضمان")} />
+          <div className="space-y-1.5 text-sm">
+            {appliance.purchaseInvoiceNo && <p><span className="text-[var(--color-ink-muted)]">{bi("Invoice / receipt no.", "رقم الفاتورة / الإيصال")}:</span> {appliance.purchaseInvoiceNo}</p>}
+            {appliance.retailerName && <p><span className="text-[var(--color-ink-muted)]">{bi("Retailer", "المتجر")}:</span> {appliance.retailerName}</p>}
+            {appliance.purchasePrice != null && <p><span className="text-[var(--color-ink-muted)]">{bi("Purchase price", "سعر الشراء")}:</span> {formatCurrency(appliance.purchasePrice)}</p>}
+            <p><span className="text-[var(--color-ink-muted)]">{bi("Extended warranty / AMC", "الضمان الممدد / عقد الصيانة")}:</span> {appliance.amcActive ? <Badge tone="good">{bi("Active", "فعال")}{appliance.amcExpiryDate ? ` — ${formatDate(appliance.amcExpiryDate)}` : ""}</Badge> : <Badge tone="neutral">{bi("Not active", "غير فعال")}</Badge>}</p>
+            {!appliance.purchaseInvoiceNo && !appliance.retailerName && appliance.purchasePrice == null && <p className="text-[var(--color-ink-muted)]">{bi("No purchase details on file.", "لا توجد تفاصيل شراء مسجلة.")}</p>}
+          </div>
+        </Card>
+        <Card>
+          <CardHeader title={bi("Compliance, specs & site", "المطابقة والمواصفات والموقع")} />
+          <div className="space-y-1.5 text-sm">
+            {appliance.sasoCertNo && <p><span className="text-[var(--color-ink-muted)]">{bi("SASO cert. no.", "رقم شهادة سابر")}:</span> {appliance.sasoCertNo}</p>}
+            {appliance.energyRating && <p><span className="text-[var(--color-ink-muted)]">{bi("Energy rating", "تصنيف الطاقة")}:</span> {"★".repeat(appliance.energyRating)}</p>}
+            {appliance.countryOfManufacture && <p><span className="text-[var(--color-ink-muted)]">{bi("Country of manufacture", "بلد الصنع")}:</span> {appliance.countryOfManufacture}</p>}
+            {appliance.color && <p><span className="text-[var(--color-ink-muted)]">{bi("Color", "اللون")}:</span> {appliance.color}</p>}
+            {appliance.specification && <p><span className="text-[var(--color-ink-muted)]">{bi("Specification", "المواصفات")}:</span> {appliance.specification}</p>}
+            {appliance.installationDate && <p><span className="text-[var(--color-ink-muted)]">{bi("Installed", "تاريخ التركيب")}:</span> {formatDate(appliance.installationDate)}</p>}
+            {appliance.installedLocation && <p><span className="text-[var(--color-ink-muted)]">{bi("Site location", "موقع التركيب")}:</span> {appliance.installedLocation}</p>}
+            {appliance.photoUrl && <img src={appliance.photoUrl} alt={appliance.model} className="mt-2 h-20 w-20 rounded-md border object-cover [border-color:var(--color-border)]" />}
+          </div>
+        </Card>
+      </div>
 
       {appliance.isSmartConnected && (
         <Card>

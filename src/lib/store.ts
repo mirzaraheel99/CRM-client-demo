@@ -9,7 +9,7 @@ import type {
   ActionResult, Customer, Appliance, ApplianceTelemetry, Brand, Technician, InventoryItem, InventoryLocation,
   InventoryStock, InventoryTransaction, JobCard, JobCardStageHistory,
   JobCardAttachment, JobCardPartUsed, PurchaseBill, CommunicationLog,
-  WorkflowDefinition, Role, StageName, Branch, Payment, PaymentMethod, Channel, ServiceOrder, RemovedPart,
+  WorkflowDefinition, Role, StageName, Branch, Payment, PaymentMethod, Channel, ServiceOrder, RemovedPart, RequestSource,
 } from "./types";
 
 type JobResult = ActionResult & { job?: JobCard };
@@ -69,7 +69,24 @@ interface DemoState {
     customerId: string;
     branchId: string;
     lines: ServiceOrderLineInput[];
+    shortAddressCode?: string;
+    buildingNo?: string;
+    unitNo?: string;
+    district?: string;
+    postalCode?: string;
+    additionalNo?: string;
+    requestSource?: RequestSource;
+    preferredDate?: string;
+    preferredTimeSlot?: string;
+    buyerVatNumber?: string;
   }) => ServiceOrderResult;
+  addProductToOrder: (input: {
+    serviceOrderId: string;
+    applianceId: string;
+    jobType: JobCard["jobType"];
+    problemDescription: string;
+    technicianId?: string | null;
+  }) => JobResult;
   createJobCard: (input: {
     customerId: string;
     applianceId: string;
@@ -298,7 +315,7 @@ export const useStore = create<DemoState>()(
         return result(true, "Inventory transaction recorded.");
       },
 
-      createServiceOrder: ({ customerId, branchId, lines }) => {
+      createServiceOrder: ({ customerId, branchId, lines, shortAddressCode, buildingNo, unitNo, district, postalCode, additionalNo, requestSource, preferredDate, preferredTimeSlot, buyerVatNumber }) => {
         const state = get();
         if (!canPerform(state.role, "create_job")) return { ...result(false, "Your role cannot create service orders.") };
         const customer = state.customers.find((candidate) => candidate.id === customerId);
@@ -322,7 +339,19 @@ export const useStore = create<DemoState>()(
         const now = new Date().toISOString();
         const orderIndex = state.serviceOrders.length + 1;
         const documentNo = `SO-${new Date(now).getFullYear()}-${String(orderIndex).padStart(5, "0")}`;
-        const serviceOrder: ServiceOrder = { id: nextId("order"), documentNo, customerId, branchId, createdAt: now, updatedAt: now };
+        const serviceOrder: ServiceOrder = {
+          id: nextId("order"), documentNo, customerId, branchId, createdAt: now, updatedAt: now,
+          shortAddressCode: shortAddressCode || undefined,
+          buildingNo: buildingNo || undefined,
+          unitNo: unitNo || undefined,
+          district: district || undefined,
+          postalCode: postalCode || undefined,
+          additionalNo: additionalNo || undefined,
+          requestSource,
+          preferredDate: preferredDate || undefined,
+          preferredTimeSlot: preferredTimeSlot || undefined,
+          buyerVatNumber: buyerVatNumber || undefined,
+        };
         const jobs = lines.map<JobCard>((line, index) => {
           const sequenceNo = index + 1;
           const lineDocumentNo = `${documentNo}-${String(sequenceNo).padStart(2, "0")}`;
@@ -366,6 +395,65 @@ export const useStore = create<DemoState>()(
         }));
         scheduleCommunicationReceipts(logs);
         return { ...result(true, `Service order ${documentNo} created with ${jobs.length} product ${jobs.length === 1 ? "sequence" : "sequences"}.`), serviceOrder, jobs };
+      },
+
+      addProductToOrder: ({ serviceOrderId, applianceId, jobType, problemDescription, technicianId }) => {
+        const state = get();
+        if (!canPerform(state.role, "create_job")) return result(false, "Your role cannot add products to service orders.");
+        const serviceOrder = state.serviceOrders.find((candidate) => candidate.id === serviceOrderId);
+        if (!serviceOrder) return result(false, "Service order not found.");
+        const appliance = state.appliances.find((candidate) => candidate.id === applianceId);
+        if (!appliance) return result(false, "Choose a valid product.");
+        const existingLines = state.jobCards.filter((line) => line.serviceOrderId === serviceOrderId);
+        if (existingLines.some((line) => line.applianceId === applianceId)) return result(false, "This product is already part of this service order.");
+        if (problemDescription.trim().length < 4) return result(false, "Describe the reported problem.");
+        if (technicianId) {
+          const technician = state.technicians.find((candidate) => candidate.id === technicianId);
+          if (!technician) return result(false, "Choose a valid technician.");
+          if (technician.branchId !== serviceOrder.branchId) return result(false, "Assigned technician must belong to the receiving branch.");
+          if (!technician.skills.includes(appliance.category)) return result(false, `${technician.name} is not qualified for ${appliance.category}.`);
+          if (technician.status === "Off Duty") return result(false, `${technician.name} is off duty.`);
+        }
+
+        const now = new Date().toISOString();
+        const sequenceNo = existingLines.length + 1;
+        const lineDocumentNo = `${serviceOrder.documentNo}-${String(sequenceNo).padStart(2, "0")}`;
+        const job: JobCard = {
+          id: nextId("job"),
+          serviceOrderId,
+          sequenceNo,
+          documentNo: lineDocumentNo,
+          invoiceNo: `INV-${lineDocumentNo}`,
+          customerId: serviceOrder.customerId,
+          applianceId,
+          technicianId: technicianId ?? null,
+          branchId: serviceOrder.branchId,
+          jobType,
+          status: "Received",
+          currentStage: "Received",
+          problemDescription: problemDescription.trim(),
+          estimateAmount: null,
+          finalAmount: null,
+          createdAt: now,
+          updatedAt: now,
+          scheduledAt: technicianId ? new Date(new Date(now).setDate(new Date(now).getDate() + 1)).toISOString() : null,
+          customerApproved: null,
+          diagnosisNotes: null,
+          repairNotes: null,
+          qaApproved: false,
+          customerSignature: null,
+        };
+        const history: JobCardStageHistory = { id: nextId("hist"), jobcardId: job.id, stageName: "Received", changedBy: "Front Desk", timestamp: now, notes: `Product sequence ${String(sequenceNo).padStart(2, "0")} received at counter.`, stageRefNo: nextStageRefNo(state.stageHistory, "Received") };
+        const logs = buildTriggeredLogs(state, job, "Received", now);
+        set((current) => ({
+          jobCards: [job, ...current.jobCards],
+          stageHistory: [history, ...current.stageHistory],
+          communicationLogs: [...logs, ...current.communicationLogs],
+          technicians: syncTechnicianStatuses(current.technicians, [job, ...current.jobCards]),
+          serviceOrders: current.serviceOrders.map((order) => order.id === serviceOrderId ? { ...order, updatedAt: now } : order),
+        }));
+        scheduleCommunicationReceipts(logs);
+        return { ...result(true, `${lineDocumentNo} added to ${serviceOrder.documentNo}.`), job };
       },
 
       createJobCard: ({ customerId, applianceId, jobType, problemDescription, branchId }) => {

@@ -24,6 +24,8 @@ import type {
   CustomerType,
   Gender,
   PreferredLanguage,
+  EnergyRating,
+  RequestSource,
 } from "./types";
 
 // Kept local (not imported from ./stageRefNo) so this file has zero runtime
@@ -142,6 +144,28 @@ const modelSuffixes = ["Pro", "Neo", "X2", "Max", "Lite", "Plus", "Ultra", "SE",
 
 const SMART_CAPABLE_BRANDS = new Set(["Samsung", "LG", "Apple"]);
 
+const RETAILERS = ["eXtra Stores", "Jarir Bookstore", "Al-Futtaim ACE", "Sharaf DG", "Carrefour", "Danube Home"];
+const MANUFACTURE_COUNTRIES = ["China", "South Korea", "Saudi Arabia", "Egypt", "Turkey", "Thailand", "Vietnam"];
+const APPLIANCE_COLORS = ["White", "Silver", "Black", "Stainless Steel", "Graphite"];
+const ENERGY_RATED_CATEGORIES = new Set<ApplianceCategory>(["AC", "Refrigerator", "Washer"]);
+const INSTALLED_CATEGORIES = new Set<ApplianceCategory>(["AC", "TV"]);
+const PRICE_RANGES: Record<ApplianceCategory, [number, number]> = {
+  AC: [1200, 6000],
+  Refrigerator: [1500, 8000],
+  Washer: [900, 4000],
+  Mobile: [800, 6000],
+  TV: [1000, 9000],
+  Microwave: [300, 1500],
+};
+function applianceSpec(category: ApplianceCategory): string {
+  if (category === "AC") return `${pick(["1", "1.5", "2", "3"])} Ton`;
+  if (category === "Refrigerator") return `${int(14, 26)} Cu.Ft`;
+  if (category === "Washer") return `${pick([7, 8, 9, 10, 12])} Kg`;
+  if (category === "Mobile") return `${pick([64, 128, 256, 512])} GB`;
+  if (category === "TV") return `${pick([43, 50, 55, 65, 75])}"`;
+  return `${pick([20, 25, 30, 32])} L`;
+}
+
 export const APPLIANCES: Appliance[] = Array.from({ length: 90 }, (_, i) => {
   const category = pick(CATEGORIES);
   const brand = category === "Mobile" ? BRANDS.find((b) => b.name === "Apple")! : pick(BRANDS.filter((b) => b.name !== "Apple"));
@@ -149,6 +173,8 @@ export const APPLIANCES: Appliance[] = Array.from({ length: 90 }, (_, i) => {
   const monthsSince = (Date.now() - new Date(purchaseDate).getTime()) / (1000 * 60 * 60 * 24 * 30);
   // Newer appliances from brands with a real connected-app ecosystem (SmartThings/ThinQ) are more likely IoT-enabled.
   const isSmartConnected = category !== "Mobile" && SMART_CAPABLE_BRANDS.has(brand.name) && monthsSince < 30 && rand() > 0.45;
+  const [minPrice, maxPrice] = PRICE_RANGES[category];
+  const amcActive = rand() > 0.7;
   return {
     id: id("app", i + 1),
     documentNo: `AST-${String(i + 1).padStart(5, "0")}`,
@@ -160,6 +186,18 @@ export const APPLIANCES: Appliance[] = Array.from({ length: 90 }, (_, i) => {
     purchaseDate,
     warrantyStatus: monthsSince < brand.warrantyMonths ? "In Warranty" : "Out of Warranty",
     isSmartConnected,
+    purchaseInvoiceNo: `INV-PUR-${int(100000, 999999)}`,
+    retailerName: pick(RETAILERS),
+    purchasePrice: int(minPrice, maxPrice),
+    amcActive,
+    amcExpiryDate: amcActive ? daysAgo(-int(30, 700)) : undefined,
+    sasoCertNo: rand() > 0.15 ? `SASO-${int(100000, 999999)}` : undefined,
+    energyRating: ENERGY_RATED_CATEGORIES.has(category) ? (int(1, 5) as EnergyRating) : undefined,
+    countryOfManufacture: pick(MANUFACTURE_COUNTRIES),
+    color: pick(APPLIANCE_COLORS),
+    specification: applianceSpec(category),
+    installationDate: category === "AC" ? daysAgo(int(15, 895)) : undefined,
+    installedLocation: INSTALLED_CATEGORIES.has(category) ? pick(["Majlis", "Living Room", "Master Bedroom", "Kitchen", "Office"]) : undefined,
   };
 });
 
@@ -330,6 +368,10 @@ const problems = [
   "Spinning issue during cycle", "Drainage blocked", "Compressor cycling on/off frequently", "Cracked display", "No cold air output",
 ];
 
+const DISTRICTS = ["Al Olaya", "Al Malaz", "An Nuzhah", "Al Naseem", "Ash Shifa", "Al Rawdah", "Al Hamra", "Ar Rabwah"];
+const TIME_SLOTS = ["09:00-12:00", "12:00-15:00", "15:00-18:00", "18:00-21:00"];
+const REQUEST_SOURCES: RequestSource[] = ["walk_in", "phone", "whatsapp", "app", "referral"];
+
 export const SERVICE_ORDERS: ServiceOrder[] = [];
 export const JOB_CARDS: JobCard[] = [];
 export const STAGE_HISTORY: JobCardStageHistory[] = [];
@@ -375,6 +417,16 @@ for (let i = 0; i < 130; i++) {
       branchId: customer.branchId,
       createdAt,
       updatedAt: createdAt,
+      shortAddressCode: `${pick(["RAHM", "JEDD", "DMAM", "RAFH", "ALOL"])}${int(1000, 9999)}`,
+      buildingNo: `${int(1000, 9999)}`,
+      unitNo: rand() > 0.5 ? `${int(1, 20)}` : undefined,
+      district: pick(DISTRICTS),
+      postalCode: `${int(10000, 99999)}`,
+      additionalNo: `${int(1000, 9999)}`,
+      requestSource: pick(REQUEST_SOURCES),
+      preferredDate: daysAgo(-int(1, 5)),
+      preferredTimeSlot: pick(TIME_SLOTS),
+      buyerVatNumber: customer.customerType === "corporate" ? `3${int(100000000, 999999999)}00003` : undefined,
     };
     serviceOrderId += 1;
     SERVICE_ORDERS.push(activeOrder);

@@ -18,9 +18,17 @@ import { toast } from "../../lib/toast";
 import { Wifi } from "lucide-react";
 import { canPerform } from "../../lib/permissions";
 import { stageAccessBlocker, stageRequirements } from "../../lib/workflow";
+import { STAGE_NAME_AR, CHANNEL_AR, COMM_STATUS_AR, bi } from "../../lib/domainAr";
 import type { StageName, Channel, ActionResult } from "../../lib/types";
 
 const TAB_LIST = ["Timeline", "Details", "Parts", "Attachments", "Communication"];
+const TAB_LABELS: Record<string, string> = {
+  Timeline: bi("Timeline", "الجدول الزمني"),
+  Details: bi("Details", "التفاصيل"),
+  Parts: bi("Parts", "القطع"),
+  Attachments: bi("Attachments", "المرفقات"),
+  Communication: bi("Communication", "التواصل"),
+};
 
 const CHANNEL_ICON: Record<Channel, React.ReactNode> = {
   whatsapp: <MessageCircle size={14} />,
@@ -121,8 +129,8 @@ export default function JobCardDetail() {
   if (!job) {
     return (
       <div className="text-center py-20">
-        <p className="text-sm text-[var(--color-ink-muted)]">Job card not found.</p>
-        <Link to="/jobcards" className="text-sm text-[var(--color-brand-1)]">Back to job cards</Link>
+        <p className="text-sm text-[var(--color-ink-muted)]">{bi("Job card not found.", "لم يتم العثور على بطاقة العمل.")}</p>
+        <Link to="/jobcards" className="text-sm text-[var(--color-brand-1)]">{bi("Back to job cards", "العودة إلى بطاقات العمل")}</Link>
       </div>
     );
   }
@@ -188,7 +196,7 @@ export default function JobCardDetail() {
   return (
     <div className="space-y-5">
       <button onClick={() => navigate(-1)} className="flex items-center gap-1.5 text-sm text-[var(--color-ink-muted)] hover:text-[var(--color-ink-primary)]">
-        <ArrowLeft size={15} /> Back
+        <ArrowLeft size={15} /> {bi("Back", "رجوع")}
       </button>
 
       <div className="flex items-center justify-between flex-wrap gap-3 animate-rise-in">
@@ -202,13 +210,13 @@ export default function JobCardDetail() {
 
       <Card padded={false}>
         <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-3 [border-color:var(--color-border)]">
-          <div><p className="text-xs text-[var(--color-ink-muted)]">Parent service order</p><p className="font-semibold">{serviceOrder?.documentNo ?? job.serviceOrderId}</p></div>
-          <div className="text-right"><p className="text-xs text-[var(--color-ink-muted)]">Customer</p><p className="text-sm font-medium">{customer?.documentNo} | {siblingJobs.length} {siblingJobs.length === 1 ? "product" : "products"}</p></div>
+          <div><p className="text-xs text-[var(--color-ink-muted)]">{bi("Parent service order", "أمر الخدمة الرئيسي")}</p><p className="font-semibold">{serviceOrder?.documentNo ?? job.serviceOrderId}</p></div>
+          <div className="text-right"><p className="text-xs text-[var(--color-ink-muted)]">{bi("Customer", "العميل")}</p><p className="text-sm font-medium">{customer?.documentNo} | {siblingJobs.length} {siblingJobs.length === 1 ? "product" : "products"}</p></div>
         </div>
         <div className="flex gap-2 overflow-x-auto px-5 py-3">
           {siblingJobs.map((line) => {
             const lineProduct = appliances.find((candidate) => candidate.id === line.applianceId);
-            return <Link key={line.id} to={`/jobcards/${line.id}`} className={`min-w-48 rounded-md border px-3 py-2 text-sm [border-color:var(--color-border)] ${line.id === job.id ? "bg-[var(--color-brand-soft)] ring-1 ring-[var(--color-brand-1)]" : "hover:bg-black/[0.03] dark:hover:bg-white/[0.05]"}`}><div className="flex items-center justify-between gap-2"><span className="font-semibold">Sequence {formatSequence(line.sequenceNo)}</span><JobStatusBadge status={line.status} /></div><p className="mt-1 truncate text-xs text-[var(--color-ink-secondary)]">{lineProduct?.model}</p><p className="text-[11px] text-[var(--color-ink-muted)]">{line.documentNo}</p></Link>;
+            return <Link key={line.id} to={`/jobcards/${line.id}`} className={`min-w-48 rounded-md border px-3 py-2 text-sm [border-color:var(--color-border)] ${line.id === job.id ? "bg-[var(--color-brand-soft)] ring-1 ring-[var(--color-brand-1)]" : "hover:bg-black/[0.03] dark:hover:bg-white/[0.05]"}`}><div className="flex items-center justify-between gap-2"><span className="font-semibold">{bi("Sequence", "تسلسل")} {formatSequence(line.sequenceNo)}</span><JobStatusBadge status={line.status} /></div><p className="mt-1 truncate text-xs text-[var(--color-ink-secondary)]">{lineProduct?.model}</p><p className="text-[11px] text-[var(--color-ink-muted)]">{line.documentNo}</p></Link>;
           })}
         </div>
       </Card>
@@ -217,7 +225,7 @@ export default function JobCardDetail() {
         {/* Left panel */}
         <Card className="space-y-4">
           <div>
-            <p className="text-xs text-[var(--color-ink-muted)] mb-1">Customer</p>
+            <p className="text-xs text-[var(--color-ink-muted)] mb-1">{bi("Customer", "العميل")}</p>
             <p className="text-sm font-medium">{customer ? <Link to={`/customers/${customer.id}`} className="text-[var(--color-brand-1)] hover:underline">{customer.name}</Link> : "-"}</p>
             <p className="text-xs text-[var(--color-ink-muted)]">{customer?.documentNo}</p>
             <p className="text-xs text-[var(--color-ink-secondary)]">{customer?.phone}</p>
@@ -225,7 +233,7 @@ export default function JobCardDetail() {
             {customer && <div className="mt-2"><WhatsappVerify customerId={customer.id} verified={customer.whatsappVerified} /></div>}
           </div>
           <div className="border-t pt-3 [border-color:var(--color-border)]">
-            <p className="text-xs text-[var(--color-ink-muted)] mb-1">Product sequence {formatSequence(job.sequenceNo)}</p>
+            <p className="text-xs text-[var(--color-ink-muted)] mb-1">{bi("Product sequence", "تسلسل المنتج")} {formatSequence(job.sequenceNo)}</p>
             <p className="text-sm font-medium">{appliance?.model}</p>
             <p className="text-xs text-[var(--color-ink-muted)]">{appliance?.documentNo} | Purchased {formatDate(appliance?.purchaseDate)}</p>
             <p className="text-xs text-[var(--color-ink-secondary)]">{brand?.name} · {appliance?.category}</p>
@@ -236,15 +244,15 @@ export default function JobCardDetail() {
             <div className="border-t pt-3 [border-color:var(--color-border)]">
               <div className="flex items-center gap-1.5 mb-1">
                 <Wifi size={13} className="text-[var(--color-status-good)]" />
-                <p className="text-xs font-medium">Smart Diagnostics</p>
+                <p className="text-xs font-medium">{bi("Smart Diagnostics", "التشخيص الذكي")}</p>
               </div>
               {telemetry?.lastErrorCode ? (
                 <>
-                  <Badge tone="serious">Error {telemetry.lastErrorCode}</Badge>
+                  <Badge tone="serious">{bi("Error", "خطأ")} {telemetry.lastErrorCode}</Badge>
                   <p className="text-xs text-[var(--color-ink-secondary)] mt-1">{telemetry.lastErrorDescription}</p>
                 </>
               ) : (
-                <p className="text-xs text-[var(--color-ink-secondary)]">No errors reported</p>
+                <p className="text-xs text-[var(--color-ink-secondary)]">{bi("No errors reported", "لا توجد أخطاء مسجلة")}</p>
               )}
               <p className="text-[11px] text-[var(--color-ink-muted)] mt-1">
                 {telemetry?.cycleCount.toLocaleString()} cycles · synced {telemetry ? relativeTime(telemetry.lastSyncAt) : "—"}
@@ -252,19 +260,21 @@ export default function JobCardDetail() {
             </div>
           )}
           <div className="border-t pt-3 [border-color:var(--color-border)]">
-            <p className="text-xs text-[var(--color-ink-muted)] mb-1">Warranty</p>
-            <Badge tone={appliance?.warrantyStatus === "In Warranty" ? "good" : "neutral"}>{appliance?.warrantyStatus}</Badge>
-            {bill && <p className="text-xs text-[var(--color-ink-secondary)] mt-2">Bill {bill.billNo} · {bill.vendorName}</p>}
+            <p className="text-xs text-[var(--color-ink-muted)] mb-1">{bi("Warranty", "الضمان")}</p>
+            <Badge tone={appliance?.warrantyStatus === "In Warranty" ? "good" : "neutral"}>
+              {bi(appliance?.warrantyStatus ?? "", appliance?.warrantyStatus === "In Warranty" ? "ساري الضمان" : "خارج الضمان")}
+            </Badge>
+            {bill && <p className="text-xs text-[var(--color-ink-secondary)] mt-2">{bi("Bill", "الفاتورة")} {bill.billNo} · {bill.vendorName}</p>}
           </div>
           <div className="border-t pt-3 [border-color:var(--color-border)]">
-            <p className="text-xs text-[var(--color-ink-muted)] mb-1">Problem reported</p>
+            <p className="text-xs text-[var(--color-ink-muted)] mb-1">{bi("Problem reported", "المشكلة المُبلّغ عنها")}</p>
             <p className="text-sm text-[var(--color-ink-secondary)]">{job.problemDescription}</p>
           </div>
         </Card>
 
         {/* Center tabs */}
         <Card padded={false}>
-          <div className="px-5 pt-4"><Tabs tabs={TAB_LIST} active={tab} onChange={setTab} /></div>
+          <div className="px-5 pt-4"><Tabs tabs={TAB_LIST} active={tab} onChange={setTab} labels={TAB_LABELS} /></div>
           <div className="p-5">
             {tab === "Timeline" && (
               <ol className="relative border-l ml-2 [border-color:var(--color-border)]">
@@ -276,7 +286,7 @@ export default function JobCardDetail() {
                       <li key={entry.id} className="mb-6 ml-4">
                         <span className="absolute -left-1.5 h-3 w-3 rounded-full bg-[var(--color-brand-1)]" />
                         <div className="flex items-center gap-2 flex-wrap">
-                          <p className="text-sm font-medium">{h.stageName}</p>
+                          <p className="text-sm font-medium">{bi(h.stageName, STAGE_NAME_AR[h.stageName])}</p>
                           {h.stageRefNo && <Badge tone="brand">{h.stageRefNo}</Badge>}
                           <span className="text-xs text-[var(--color-ink-muted)]">{relativeTime(h.timestamp)}</span>
                         </div>
@@ -288,7 +298,7 @@ export default function JobCardDetail() {
                               {attachment.fileUrl !== "#" ? <img src={attachment.fileUrl} alt={attachment.label} className="h-full w-full object-cover" /> : <ImagePlus size={14} className="text-[var(--color-ink-muted)]" />}
                             </div>
                           ))}
-                          <StagePhotoUpload compact label="Add photo" onFile={(file) => uploadPhoto(h.stageName, file)} />
+                          <StagePhotoUpload compact label={bi("Add photo", "إضافة صورة")} onFile={(file) => uploadPhoto(h.stageName, file)} />
                         </div>
                       </li>
                     );
@@ -299,15 +309,15 @@ export default function JobCardDetail() {
                       <span className="absolute -left-1.5 h-3 w-3 rounded-full bg-[var(--color-surface-2)] border-2 [border-color:var(--color-brand-1)]" />
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-[var(--color-brand-1)]">{CHANNEL_ICON[c.channel]}</span>
-                        <p className="text-sm font-medium">{c.channel.toUpperCase()} sent</p>
-                        <Badge tone={COMM_STATUS_TONE[c.status]}>{c.status}</Badge>
+                        <p className="text-sm font-medium">{bi(`${c.channel.toUpperCase()} sent`, `تم الإرسال عبر ${CHANNEL_AR[c.channel]}`)}</p>
+                        <Badge tone={COMM_STATUS_TONE[c.status]}>{bi(c.status, COMM_STATUS_AR[c.status as keyof typeof COMM_STATUS_AR])}</Badge>
                         <span className="text-xs text-[var(--color-ink-muted)]">{relativeTime(c.timestamp)}</span>
                       </div>
                       <p className="text-xs text-[var(--color-ink-secondary)]">{c.message}</p>
                     </li>
                   );
                 })}
-                {timelineEntries.length === 0 && <p className="text-sm text-[var(--color-ink-muted)]">No activity yet.</p>}
+                {timelineEntries.length === 0 && <p className="text-sm text-[var(--color-ink-muted)]">{bi("No activity yet.", "لا يوجد نشاط بعد.")}</p>}
               </ol>
             )}
 
@@ -315,26 +325,26 @@ export default function JobCardDetail() {
               <div className="space-y-4 text-sm">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-xs text-[var(--color-ink-muted)]">Estimate amount</p>
+                    <p className="text-xs text-[var(--color-ink-muted)]">{bi("Estimate amount", "مبلغ التقدير")}</p>
                     <p className="font-medium tabular-nums">{formatCurrency(job.estimateAmount)}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-[var(--color-ink-muted)]">Final amount</p>
+                    <p className="text-xs text-[var(--color-ink-muted)]">{bi("Final amount", "المبلغ النهائي")}</p>
                     <p className="font-medium tabular-nums">{formatCurrency(job.finalAmount)}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-[var(--color-ink-muted)]">Customer approval</p>
-                    <p className="font-medium">{job.customerApproved == null ? "Pending" : job.customerApproved ? "Approved" : "Declined"}</p>
+                    <p className="text-xs text-[var(--color-ink-muted)]">{bi("Customer approval", "موافقة العميل")}</p>
+                    <p className="font-medium">{job.customerApproved == null ? bi("Pending", "قيد الانتظار") : job.customerApproved ? bi("Approved", "تمت الموافقة") : bi("Declined", "مرفوض")}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-[var(--color-ink-muted)]">Created</p>
+                    <p className="text-xs text-[var(--color-ink-muted)]">{bi("Created", "تاريخ الإنشاء")}</p>
                     <p className="font-medium">{formatDateTime(job.createdAt)}</p>
                   </div>
                 </div>
                 {job.jobType === "non_warranty" && canPerform(role, "set_estimate") && (
                   <div className="border-t pt-4 [border-color:var(--color-border)] flex items-end gap-2">
                     <div className="flex-1">
-                      <p className="text-xs text-[var(--color-ink-muted)] mb-1">Set / update estimate (SAR)</p>
+                      <p className="text-xs text-[var(--color-ink-muted)] mb-1">{bi("Set / update estimate (SAR)", "تحديد / تحديث التقدير (ريال)")}</p>
                       <input
                         value={estimateInput}
                         onChange={(e) => setEstimateInput(e.target.value)}
@@ -346,14 +356,14 @@ export default function JobCardDetail() {
                       variant="secondary"
                       onClick={() => showResult(setEstimate(job.id, Number(estimateInput)), () => setEstimateInput(""))}
                     >
-                      Save Estimate
+                      {bi("Save Estimate", "حفظ التقدير")}
                     </Button>
                   </div>
                 )}
                 {job.currentStage === "Customer Approval" && job.customerApproved !== true && canPerform(role, "record_customer_approval") && (
                   <div className="border-t pt-4 [border-color:var(--color-border)] flex gap-2">
-                    <Button onClick={() => showResult(approveCustomer(job.id, true))}><CheckCircle2 size={14} /> Approve</Button>
-                    {job.customerApproved == null && <Button variant="danger" onClick={() => showResult(approveCustomer(job.id, false))}><XCircle size={14} /> Decline</Button>}
+                    <Button onClick={() => showResult(approveCustomer(job.id, true))}><CheckCircle2 size={14} /> {bi("Approve", "موافقة")}</Button>
+                    {job.customerApproved == null && <Button variant="danger" onClick={() => showResult(approveCustomer(job.id, false))}><XCircle size={14} /> {bi("Decline", "رفض")}</Button>}
                   </div>
                 )}
                 <div className="border-t pt-4 [border-color:var(--color-border)] flex gap-2 flex-wrap">
@@ -361,20 +371,20 @@ export default function JobCardDetail() {
                     variant="secondary"
                     onClick={() => printEstimate({ job, customer, appliance, brand, parts: jobParts, inventoryItems })}
                   >
-                    <Printer size={14} /> Print Estimate
+                    <Printer size={14} /> {bi("Print Estimate", "طباعة التقدير")}
                   </Button>
                   {job.finalAmount != null && (
                     <Button
                       variant="secondary"
                       onClick={() => printTaxInvoice({ job, customer, appliance, brand, parts: jobParts, inventoryItems })}
                     >
-                      <Printer size={14} /> Print Tax Invoice (ZATCA)
+                      <Printer size={14} /> {bi("Print Tax Invoice (ZATCA)", "طباعة الفاتورة الضريبية")}
                     </Button>
                   )}
                 </div>
                 {job.jobType === "non_warranty" && (job.finalAmount != null || jobPayments.length > 0) && (
                   <div className="border-t pt-4 [border-color:var(--color-border)]">
-                    <p className="text-xs text-[var(--color-ink-muted)] mb-2">Payment</p>
+                    <p className="text-xs text-[var(--color-ink-muted)] mb-2">{bi("Payment", "الدفع")}</p>
                     <PaymentPanel jobcardId={job.id} amount={job.finalAmount} payments={jobPayments} />
                   </div>
                 )}
@@ -387,7 +397,7 @@ export default function JobCardDetail() {
                   <Card interactive className="!bg-[var(--color-brand-1)]/[0.04]">
                     <div className="flex items-center gap-1.5 mb-2">
                       <Sparkles size={14} className="text-[var(--color-brand-1)]" />
-                      <p className="text-sm font-semibold">AI Diagnosis Assistant</p>
+                      <p className="text-sm font-semibold">{bi("AI Diagnosis Assistant", "مساعد التشخيص الذكي")}</p>
                     </div>
                     <div className="space-y-3">
                       {diagnosisSuggestions.map((s, i) => (
@@ -431,11 +441,11 @@ export default function JobCardDetail() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-xs text-[var(--color-ink-muted)] border-y [border-color:var(--color-border)]">
-                      <th className="py-2 font-medium">Part</th>
-                      <th className="py-2 font-medium">Qty</th>
-                      <th className="py-2 font-medium">Unit Price</th>
-                      <th className="py-2 font-medium">Total</th>
-                      <th className="py-2 font-medium text-right">Action</th>
+                      <th className="py-2 font-medium">{bi("Part", "القطعة")}</th>
+                      <th className="py-2 font-medium">{bi("Qty", "الكمية")}</th>
+                      <th className="py-2 font-medium">{bi("Unit Price", "سعر الوحدة")}</th>
+                      <th className="py-2 font-medium">{bi("Total", "الإجمالي")}</th>
+                      <th className="py-2 font-medium text-right">{bi("Action", "الإجراء")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -460,17 +470,17 @@ export default function JobCardDetail() {
                         </tr>
                       );
                     })}
-                    {jobParts.length === 0 && <tr><td colSpan={5} className="py-6 text-center text-[var(--color-ink-muted)]">No parts recorded yet.</td></tr>}
+                    {jobParts.length === 0 && <tr><td colSpan={5} className="py-6 text-center text-[var(--color-ink-muted)]">{bi("No parts recorded yet.", "لم يتم تسجيل أي قطع بعد.")}</td></tr>}
                   </tbody>
                   {jobParts.length > 0 && (
                     <tfoot>
-                      <tr><td colSpan={3} className="py-2 pr-4 text-right font-medium">Parts total</td><td className="py-2 font-semibold tabular-nums">{formatCurrency(partsTotal)}</td><td /></tr>
+                      <tr><td colSpan={3} className="py-2 pr-4 text-right font-medium">{bi("Parts total", "إجمالي القطع")}</td><td className="py-2 font-semibold tabular-nums">{formatCurrency(partsTotal)}</td><td /></tr>
                     </tfoot>
                   )}
                 </table>
 
                 <Card className="space-y-3">
-                  <CardHeader title="Removed Parts / Asset Custody" subtitle="Old or faulty parts must be handed back to the customer — track that chain here" />
+                  <CardHeader title={bi("Removed Parts / Asset Custody", "القطع المُزالة / عهدة الأصول")} subtitle={bi("Old or faulty parts must be handed back to the customer — track that chain here", "يجب إعادة القطع القديمة أو التالفة للعميل — تتبع ذلك هنا")} />
                   <div className="space-y-2">
                     {jobRemovedParts.map((rp) => (
                       <div key={rp.id} className="rounded-lg border p-3 text-sm [border-color:var(--color-border)]">
@@ -482,7 +492,7 @@ export default function JobCardDetail() {
                             </p>
                           </div>
                           <Badge tone={rp.returnStatus === "returned_to_customer" ? "good" : rp.customerNotifiedAt ? "warning" : "neutral"}>
-                            {rp.returnStatus === "returned_to_customer" ? "Returned to customer" : rp.customerNotifiedAt ? "Customer notified" : "Pending"}
+                            {rp.returnStatus === "returned_to_customer" ? bi("Returned to customer", "تم الإرجاع للعميل") : rp.customerNotifiedAt ? bi("Customer notified", "تم إبلاغ العميل") : bi("Pending", "قيد الانتظار")}
                           </Badge>
                         </div>
                         {rp.returnStatus === "returned_to_customer" && rp.returnConfirmedAt && (
@@ -492,21 +502,21 @@ export default function JobCardDetail() {
                           <div className="flex gap-2 mt-2">
                             {!rp.customerNotifiedAt && (
                               <Button size="sm" variant="secondary" onClick={() => { notifyCustomerOfRemovedPart(rp.id); toast("Customer notified about removed part."); }}>
-                                Notify Customer
+                                {bi("Notify Customer", "إبلاغ العميل")}
                               </Button>
                             )}
                             <Button size="sm" onClick={() => { confirmPartReturned(rp.id, "You"); toast("Marked as returned to customer."); }}>
-                              <CheckCircle2 size={13} /> Confirm Returned
+                              <CheckCircle2 size={13} /> {bi("Confirm Returned", "تأكيد الإرجاع")}
                             </Button>
                           </div>
                         )}
                       </div>
                     ))}
-                    {jobRemovedParts.length === 0 && <p className="text-sm text-[var(--color-ink-muted)] py-2">No removed parts logged yet.</p>}
+                    {jobRemovedParts.length === 0 && <p className="text-sm text-[var(--color-ink-muted)] py-2">{bi("No removed parts logged yet.", "لم يتم تسجيل أي قطع مُزالة بعد.")}</p>}
                   </div>
                   <div className="border-t pt-3 [border-color:var(--color-border)] flex items-end gap-2 flex-wrap">
                     <div className="flex-1 min-w-40">
-                      <p className="text-xs text-[var(--color-ink-muted)] mb-1">Part description</p>
+                      <p className="text-xs text-[var(--color-ink-muted)] mb-1">{bi("Part description", "وصف القطعة")}</p>
                       <input
                         value={removedDesc}
                         onChange={(e) => setRemovedDesc(e.target.value)}
@@ -515,7 +525,7 @@ export default function JobCardDetail() {
                       />
                     </div>
                     <div className="w-32">
-                      <p className="text-xs text-[var(--color-ink-muted)] mb-1">Serial (optional)</p>
+                      <p className="text-xs text-[var(--color-ink-muted)] mb-1">{bi("Serial (optional)", "الرقم التسلسلي")}</p>
                       <input
                         value={removedSerial}
                         onChange={(e) => setRemovedSerial(e.target.value)}
@@ -533,7 +543,7 @@ export default function JobCardDetail() {
                         toast("Removed part logged.");
                       }}
                     >
-                      Log Removed Part
+                      {bi("Log Removed Part", "تسجيل قطعة مُزالة")}
                     </Button>
                   </div>
                 </Card>
@@ -542,7 +552,7 @@ export default function JobCardDetail() {
 
             {tab === "Attachments" && (
               <div className="space-y-3">
-                <StagePhotoUpload label={`Upload to ${job.currentStage}`} onFile={(file) => uploadPhoto(job.currentStage, file)} />
+                <StagePhotoUpload label={bi(`Upload to ${job.currentStage}`, `رفع إلى ${STAGE_NAME_AR[job.currentStage]}`)} onFile={(file) => uploadPhoto(job.currentStage, file)} />
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {jobAttachments.map((a) => (
                     <div key={a.id} className="rounded-lg border [border-color:var(--color-border)] p-3">
@@ -553,7 +563,7 @@ export default function JobCardDetail() {
                       <p className="text-[11px] text-[var(--color-ink-muted)]">{a.stageName} · {relativeTime(a.timestamp)}</p>
                     </div>
                   ))}
-                  {jobAttachments.length === 0 && <p className="col-span-full text-sm text-[var(--color-ink-muted)] py-6 text-center">No attachments yet.</p>}
+                  {jobAttachments.length === 0 && <p className="col-span-full text-sm text-[var(--color-ink-muted)] py-6 text-center">{bi("No attachments yet.", "لا توجد مرفقات بعد.")}</p>}
                 </div>
               </div>
             )}
@@ -567,10 +577,10 @@ export default function JobCardDetail() {
                       <p>{c.message}</p>
                       <p className="text-[11px] text-[var(--color-ink-muted)] mt-0.5">{c.channel.toUpperCase()} · {relativeTime(c.timestamp)}</p>
                     </div>
-                    <Badge tone={COMM_STATUS_TONE[c.status]}>{c.status}</Badge>
+                    <Badge tone={COMM_STATUS_TONE[c.status]}>{bi(c.status, COMM_STATUS_AR[c.status as keyof typeof COMM_STATUS_AR])}</Badge>
                   </div>
                 ))}
-                {jobComms.length === 0 && <p className="text-sm text-[var(--color-ink-muted)] py-6 text-center">No messages sent yet.</p>}
+                {jobComms.length === 0 && <p className="text-sm text-[var(--color-ink-muted)] py-6 text-center">{bi("No messages sent yet.", "لم يتم إرسال أي رسائل بعد.")}</p>}
               </div>
             )}
           </div>
@@ -579,13 +589,13 @@ export default function JobCardDetail() {
         {/* Right panel */}
         <div className="space-y-4">
           <Card interactive className="space-y-3">
-            <CardHeader title="Customer Tracking" subtitle="Self-service link — no login required" />
+            <CardHeader title={bi("Customer Tracking", "تتبع العميل")} subtitle={bi("Self-service link — no login required", "رابط ذاتي — بدون تسجيل دخول")} />
             <TrackingShare jobId={serviceOrder?.id ?? job.id} />
           </Card>
 
           {job.currentStage !== "Delivered" && (
             <Card className="space-y-3">
-              <CardHeader title={job.currentStage} subtitle="Complete the stage requirements below" />
+              <CardHeader title={bi(job.currentStage, STAGE_NAME_AR[job.currentStage])} subtitle={bi("Complete the stage requirements below", "أكمل متطلبات المرحلة أدناه")} />
 
               {requirements.length > 0 && (
                 <div className="space-y-1.5">
@@ -600,44 +610,44 @@ export default function JobCardDetail() {
 
               {job.currentStage === "Warranty Validation" && canPerform(role, "create_job") && (
                 <div className="space-y-2 border-t pt-3 [border-color:var(--color-border)]">
-                  <Field label="Purchase bill number"><Input value={billForm.billNo} onChange={(event) => setBillForm({ ...billForm, billNo: event.target.value })} /></Field>
-                  <Field label="Vendor"><Input value={billForm.vendorName} onChange={(event) => setBillForm({ ...billForm, vendorName: event.target.value })} /></Field>
-                  <Field label="Bill date"><Input type="date" value={billForm.billDate} onChange={(event) => setBillForm({ ...billForm, billDate: event.target.value })} /></Field>
-                  <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(savePurchaseBill(job.id, billForm))}>Save Purchase Bill</Button>
+                  <Field label={bi("Purchase bill number", "رقم فاتورة الشراء")}><Input value={billForm.billNo} onChange={(event) => setBillForm({ ...billForm, billNo: event.target.value })} /></Field>
+                  <Field label={bi("Vendor", "المورد")}><Input value={billForm.vendorName} onChange={(event) => setBillForm({ ...billForm, vendorName: event.target.value })} /></Field>
+                  <Field label={bi("Bill date", "تاريخ الفاتورة")}><Input type="date" value={billForm.billDate} onChange={(event) => setBillForm({ ...billForm, billDate: event.target.value })} /></Field>
+                  <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(savePurchaseBill(job.id, billForm))}>{bi("Save Purchase Bill", "حفظ فاتورة الشراء")}</Button>
                 </div>
               )}
 
               {job.currentStage === "Diagnosis" && canPerform(role, "set_diagnosis") && (
                 <div className="space-y-2 border-t pt-3 [border-color:var(--color-border)]">
                   <Textarea rows={4} value={diagnosisInput} onChange={(event) => setDiagnosisInput(event.target.value)} placeholder="Record fault, checks, and likely cause..." />
-                  <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(setDiagnosis(job.id, diagnosisInput))}>Save Diagnosis</Button>
+                  <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(setDiagnosis(job.id, diagnosisInput))}>{bi("Save Diagnosis", "حفظ التشخيص")}</Button>
                 </div>
               )}
 
               {job.currentStage === "Estimate" && canPerform(role, "set_estimate") && (
                 <div className="space-y-2 border-t pt-3 [border-color:var(--color-border)]">
-                  <Field label="Estimate amount (SAR)"><Input type="number" min={partsTotal} value={estimateInput} onChange={(event) => setEstimateInput(event.target.value)} /></Field>
-                  <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(setEstimate(job.id, Number(estimateInput)), () => setEstimateInput(""))}>Save Estimate</Button>
+                  <Field label={bi("Estimate amount (SAR)", "مبلغ التقدير (ريال)")}><Input type="number" min={partsTotal} value={estimateInput} onChange={(event) => setEstimateInput(event.target.value)} /></Field>
+                  <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(setEstimate(job.id, Number(estimateInput)), () => setEstimateInput(""))}>{bi("Save Estimate", "حفظ التقدير")}</Button>
                 </div>
               )}
 
               {job.currentStage === "Customer Approval" && job.customerApproved !== true && canPerform(role, "record_customer_approval") && (
                 <div className="grid grid-cols-2 gap-2 border-t pt-3 [border-color:var(--color-border)]">
-                  <Button onClick={() => showResult(approveCustomer(job.id, true))}><CheckCircle2 size={14} /> Approve</Button>
-                  {job.customerApproved == null && <Button variant="danger" onClick={() => showResult(approveCustomer(job.id, false))}><XCircle size={14} /> Decline</Button>}
+                  <Button onClick={() => showResult(approveCustomer(job.id, true))}><CheckCircle2 size={14} /> {bi("Approve", "موافقة")}</Button>
+                  {job.customerApproved == null && <Button variant="danger" onClick={() => showResult(approveCustomer(job.id, false))}><XCircle size={14} /> {bi("Decline", "رفض")}</Button>}
                 </div>
               )}
 
               {job.currentStage === "Repair" && canPerform(role, "set_repair_notes") && (
                 <div className="space-y-2 border-t pt-3 [border-color:var(--color-border)]">
                   <Textarea rows={4} value={repairInput} onChange={(event) => setRepairInput(event.target.value)} placeholder="Record work completed and parts fitted..." />
-                  <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(setRepairNotes(job.id, repairInput))}>Save Repair Notes</Button>
+                  <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(setRepairNotes(job.id, repairInput))}>{bi("Save Repair Notes", "حفظ ملاحظات الإصلاح")}</Button>
                 </div>
               )}
 
               {job.currentStage === "QA" && canPerform(role, "approve_qa") && (
                 <div className="border-t pt-3 [border-color:var(--color-border)]">
-                  <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(setQaApproved(job.id, true))}><CheckCircle2 size={14} /> Approve QA</Button>
+                  <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(setQaApproved(job.id, true))}><CheckCircle2 size={14} /> {bi("Approve QA", "اعتماد فحص الجودة")}</Button>
                 </div>
               )}
 
@@ -645,14 +655,14 @@ export default function JobCardDetail() {
                 <div className="space-y-3 border-t pt-3 [border-color:var(--color-border)]">
                   {job.jobType === "non_warranty" && canPerform(role, "finalize_job") && (
                     <div className="space-y-2">
-                      <Field label="Final amount (SAR)"><Input type="number" min={partsTotal} value={finalAmountInput} onChange={(event) => setFinalAmountInput(event.target.value)} /></Field>
-                      <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(setFinalAmount(job.id, Number(finalAmountInput)))}>Confirm Final Amount</Button>
+                      <Field label={bi("Final amount (SAR)", "المبلغ النهائي (ريال)")}><Input type="number" min={partsTotal} value={finalAmountInput} onChange={(event) => setFinalAmountInput(event.target.value)} /></Field>
+                      <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(setFinalAmount(job.id, Number(finalAmountInput)))}>{bi("Confirm Final Amount", "تأكيد المبلغ النهائي")}</Button>
                     </div>
                   )}
                   {canPerform(role, "capture_signature") && (
                     <div className="space-y-2">
-                      <Field label="Customer signature / name"><Input value={signatureInput} onChange={(event) => setSignatureInput(event.target.value)} /></Field>
-                      <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(captureCustomerSignature(job.id, signatureInput))}>Capture Signature</Button>
+                      <Field label={bi("Customer signature / name", "توقيع / اسم العميل")}><Input value={signatureInput} onChange={(event) => setSignatureInput(event.target.value)} /></Field>
+                      <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(captureCustomerSignature(job.id, signatureInput))}>{bi("Capture Signature", "تسجيل التوقيع")}</Button>
                     </div>
                   )}
                 </div>
@@ -665,44 +675,44 @@ export default function JobCardDetail() {
           )}
 
           <Card className="space-y-3">
-            <CardHeader title="Workflow" subtitle={workflow ? `${workflow.steps.length}-step ${job.jobType.replace("_", " ")} flow` : undefined} />
+            <CardHeader title={bi("Workflow", "سير العمل")} subtitle={workflow ? `${workflow.steps.length}-step ${job.jobType.replace("_", " ")} flow` : undefined} />
             {workflow && <WorkflowStepper steps={workflow.steps} currentIdx={currentStepIdx} orientation="vertical" />}
             {nextStep ? (
               <div className="border-t pt-3 [border-color:var(--color-border)] space-y-2">
-                <p className="text-xs text-[var(--color-ink-muted)]">Next: <span className="font-medium text-[var(--color-ink-secondary)]">{nextStep.stepName}</span></p>
+                <p className="text-xs text-[var(--color-ink-muted)]">{bi("Next", "التالي")}: <span className="font-medium text-[var(--color-ink-secondary)]">{bi(nextStep.stepName, STAGE_NAME_AR[nextStep.stepName as StageName])}</span></p>
                 <Button
                   className="w-full justify-center"
                   onClick={handleAdvance}
                   disabled={Boolean(accessBlocker) || blockers.length > 0}
                 >
-                  Complete {job.currentStage}
+                  {bi(`Complete ${job.currentStage}`, `إكمال ${STAGE_NAME_AR[job.currentStage]}`)}
                 </Button>
                 {accessBlocker && <p className="flex items-start gap-1.5 text-[11px] text-[var(--color-status-serious)]"><AlertTriangle size={12} className="mt-0.5 shrink-0" />{accessBlocker}</p>}
                 {!accessBlocker && blockers.length > 0 && <p className="text-[11px] text-[var(--color-ink-muted)]">Complete {blockers.join(" and ").toLowerCase()} before advancing.</p>}
               </div>
             ) : (
-              <p className="text-xs text-[var(--color-status-good)] font-medium border-t pt-3 [border-color:var(--color-border)]">Job complete — delivered.</p>
+              <p className="text-xs text-[var(--color-status-good)] font-medium border-t pt-3 [border-color:var(--color-border)]">{bi("Job complete — delivered.", "اكتملت المهمة — تم التسليم.")}</p>
             )}
           </Card>
 
           <Card className="space-y-3">
-            <CardHeader title="Technician" />
+            <CardHeader title={bi("Technician", "الفني")} />
             <div className="flex items-center gap-2">
               {technician ? <Avatar name={technician.name} color={technician.avatarColor} size={28} /> : <div className="h-7 w-7 rounded-full bg-black/10 dark:bg-white/10" />}
-              <span className="text-sm">{technician?.name ?? "Unassigned"}</span>
+              <span className="text-sm">{technician?.name ?? bi("Unassigned", "غير مسند")}</span>
             </div>
             <Select value={techSelect} onChange={(e) => setTechSelect(e.target.value)}>
-              <option value="">Reassign to…</option>
+              <option value="">{bi("Reassign to…", "إعادة الإسناد إلى…")}</option>
               {eligibleTechnicians.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name} - {candidate.zone} - {candidate.status}</option>)}
             </Select>
             <Button variant="secondary" className="w-full justify-center" disabled={!techSelect || !canPerform(role, "assign_technician")} onClick={() => showResult(assignTechnician(job.id, techSelect), () => setTechSelect(""))}>
-              Assign
+              {bi("Assign", "إسناد")}
             </Button>
             {eligibleTechnicians.length === 0 && <p className="text-[11px] text-[var(--color-status-serious)]">No on-duty technician in this branch has the required {appliance?.category} skill.</p>}
           </Card>
 
           <Card className="space-y-3">
-            <CardHeader title="Send Message" />
+            <CardHeader title={bi("Send Message", "إرسال رسالة")} />
             <Select
               value={channel}
               onChange={(e) => {
@@ -712,15 +722,15 @@ export default function JobCardDetail() {
                 applyTemplate(stillValid ? templateId : MESSAGE_TEMPLATES.find((t) => t.channels.includes(ch))!.id);
               }}
             >
-              <option value="whatsapp">WhatsApp</option>
-              <option value="sms">SMS</option>
-              <option value="email">Email</option>
+              <option value="whatsapp">{bi("WhatsApp", CHANNEL_AR.whatsapp)}</option>
+              <option value="sms">{bi("SMS", CHANNEL_AR.sms)}</option>
+              <option value="email">{bi("Email", CHANNEL_AR.email)}</option>
             </Select>
             <Select value={selectedTemplate?.id} onChange={(e) => applyTemplate(e.target.value)}>
               {availableTemplates.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
             </Select>
             <Textarea rows={3} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Message to customer…" />
-            <Button className="w-full justify-center" onClick={handleSend} disabled={!message.trim()}>Send</Button>
+            <Button className="w-full justify-center" onClick={handleSend} disabled={!message.trim()}>{bi("Send", "إرسال")}</Button>
           </Card>
         </div>
       </div>

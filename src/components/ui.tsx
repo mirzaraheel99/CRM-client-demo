@@ -2,6 +2,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Check, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { cx } from "../lib/utils";
 import { useCountUp } from "../lib/useCountUp";
+import { STAGE_NAME_AR } from "../lib/domainAr";
+import type { StageName } from "../lib/types";
 
 export function Card({
   children, className, padded = true, interactive = false,
@@ -140,7 +142,7 @@ export function Modal({ open, onClose, title, children, width = "md" }: { open: 
   );
 }
 
-export function Tabs({ tabs, active, onChange }: { tabs: string[]; active: string; onChange: (t: string) => void }) {
+export function Tabs({ tabs, active, onChange, labels }: { tabs: string[]; active: string; onChange: (t: string) => void; labels?: Record<string, string> }) {
   return (
     <div className="flex gap-1 border-b [border-color:var(--color-border)] overflow-x-auto">
       {tabs.map((tab) => (
@@ -154,7 +156,7 @@ export function Tabs({ tabs, active, onChange }: { tabs: string[]; active: strin
               : "border-transparent text-[var(--color-ink-muted)] hover:text-[var(--color-ink-primary)]"
           )}
         >
-          {tab}
+          {labels?.[tab] ?? tab}
         </button>
       ))}
     </div>
@@ -204,9 +206,10 @@ export function WorkflowStepper({
                 )}
               </div>
               <div className={cx("pb-4", active ? "pt-0" : "")}>
-                <p className={cx("text-sm leading-6", active ? "font-semibold text-[var(--color-ink-primary)]" : done ? "text-[var(--color-ink-secondary)]" : "text-[var(--color-ink-muted)]")}>
+                <p className={cx("text-sm leading-tight", active ? "font-semibold text-[var(--color-ink-primary)]" : done ? "text-[var(--color-ink-secondary)]" : "text-[var(--color-ink-muted)]")}>
                   {s.stepName}
                 </p>
+                <p className="text-xs leading-tight text-[var(--color-ink-muted)]" dir="rtl">{STAGE_NAME_AR[s.stepName as StageName] ?? ""}</p>
               </div>
             </li>
           );
@@ -233,9 +236,10 @@ export function WorkflowStepper({
               >
                 {done ? <Check size={14} strokeWidth={3} /> : i + 1}
               </span>
-              <span className={cx("text-[11px] text-center", active ? "font-semibold text-[var(--color-ink-primary)]" : "text-[var(--color-ink-muted)]")}>
+              <span className={cx("text-[11px] text-center leading-tight", active ? "font-semibold text-[var(--color-ink-primary)]" : "text-[var(--color-ink-muted)]")}>
                 {s.stepName}
               </span>
+              <span className="text-[10px] leading-tight text-center text-[var(--color-ink-muted)]" dir="rtl">{STAGE_NAME_AR[s.stepName as StageName] ?? ""}</span>
             </div>
             {i < steps.length - 1 && (
               <div className={cx("h-0.5 w-6 sm:w-10 transition-colors", done ? "bg-[var(--color-status-good)]" : "bg-black/10 dark:bg-white/10")} />

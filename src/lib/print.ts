@@ -1,28 +1,34 @@
 import { formatCurrency, formatDate } from "./utils";
-import type { Customer, Appliance, Brand, JobCard, JobCardPartUsed, InventoryItem } from "./types";
+import type { ActionResult, Customer, Appliance, Brand, JobCard, JobCardEstimateLine, InventoryItem } from "./types";
 
 export function printEstimate({
-  job, customer, appliance, brand, parts, inventoryItems,
+  job, customer, appliance, brand, estimateLines, inventoryItems, onApprove, onDecline,
 }: {
   job: JobCard;
   customer?: Customer;
   appliance?: Appliance;
   brand?: Brand;
-  parts: JobCardPartUsed[];
+  estimateLines: JobCardEstimateLine[];
   inventoryItems: InventoryItem[];
+  onApprove?: () => ActionResult;
+  onDecline?: () => ActionResult;
 }) {
-  const partsRows = parts
-    .map((p) => {
-      const item = inventoryItems.find((i) => i.id === p.itemId);
+  const lineRows = estimateLines
+    .map((line) => {
+      const item = line.itemId ? inventoryItems.find((i) => i.id === line.itemId) : undefined;
       const nameCell = item?.nameAr
-        ? `${item.name}<div class="ar" dir="rtl">${item.nameAr}</div>`
-        : (item?.name ?? "—");
-      return `<tr><td>${nameCell}</td><td class="num">${p.qty}</td><td class="num">${formatCurrency(p.unitPrice)}</td><td class="num">${formatCurrency(p.totalPrice)}</td></tr>`;
+        ? `${line.label}<div class="ar" dir="rtl">${item.nameAr}</div>`
+        : line.label;
+      const kindTag = line.kind === "labor" ? `<span class="tag">Labor</span>` : "";
+      return `<tr><td>${nameCell}${kindTag}</td><td class="num">${line.qty}</td><td class="num">${formatCurrency(line.unitPrice)}</td><td class="num">${formatCurrency(line.totalPrice)}</td></tr>`;
     })
     .join("");
-  const partsTotal = parts.reduce((acc, p) => acc + p.totalPrice, 0);
-  const laborEstimate = Math.max(0, (job.estimateAmount ?? 0) - partsTotal);
+  const total = job.estimateAmount ?? 0;
+  const subtotal = total / 1.15;
+  const vatTotal = total - subtotal;
   const estimateNo = `EST-${job.documentNo}`;
+  const needsApproval = job.jobType === "non_warranty" && job.currentStage === "Customer Approval" && job.customerApproved !== true;
+  const showDecision = needsApproval && Boolean(onApprove || onDecline);
 
   const html = `<!doctype html>
 <html><head><meta charset="utf-8" /><title>Estimate - ${estimateNo}</title>
@@ -33,23 +39,38 @@ export function printEstimate({
   .brand-sub { font-size: 12px; color: #666; }
   h1 { font-size: 16px; margin: 0 0 4px; }
   .muted { color: #666; font-size: 12px; }
+  .badge { display: inline-block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; border-radius: 999px; padding: 3px 8px; margin-bottom: 4px; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
   .box { border: 1px solid #e1e0d9; border-radius: 8px; padding: 12px; }
   .box h3 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: #898781; }
+  .diagnosis { border: 1px solid #e1e0d9; border-left: 3px solid #c2410c; border-radius: 8px; padding: 12px; margin: 16px 0; background: #fafaf8; }
+  .diagnosis h3 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: #898781; }
   table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; }
   th, td { padding: 8px; border-bottom: 1px solid #e1e0d9; text-align: left; }
   th { color: #898781; font-size: 11px; text-transform: uppercase; }
   .num { text-align: right; font-variant-numeric: tabular-nums; }
   .ar { color: #666; font-size: 12px; }
-  tfoot td { font-weight: 700; border-top: 2px solid #0b0b0b; border-bottom: none; }
-  .footer { margin-top: 32px; font-size: 11px; color: #898781; }
-  @media print { body { padding: 0; } }
+  .tag { margin-left: 6px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.03em; color: #898781; border: 1px solid #e1e0d9; border-radius: 999px; padding: 1px 6px; }
+  tfoot td { border-bottom: none; }
+  tfoot tr:last-child td { font-weight: 700; border-top: 2px solid #0b0b0b; padding-top: 10px; }
+  .validity { margin: 16px 0; font-size: 12px; color: #c2410c; font-weight: 600; }
+  .decision { margin: 20px 0; border: 1px solid #e1e0d9; border-radius: 8px; padding: 16px; text-align: center; }
+  .decision button { font-size: 14px; font-weight: 600; padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; margin: 0 6px; }
+  .decision .approve { background: #c2410c; color: #fff; }
+  .decision .decline { background: transparent; color: #b91c1c; border: 1px solid #fca5a5; }
+  .decision button:disabled { opacity: 0.5; cursor: default; }
+  #fixflow-decision-status { margin-top: 10px; font-size: 12px; color: #666; min-height: 16px; }
+  .terms { margin-top: 24px; font-size: 11px; color: #898781; }
+  .terms ul { margin: 6px 0 0; padding-left: 18px; }
+  @media print { body { padding: 0; } .decision { display: none; } }
 </style>
 </head><body>
   <div class="header">
     <div><div class="brand">FixFlow</div><div class="brand-sub">Appliance Service Estimate</div></div>
     <div style="text-align:right"><h1>${estimateNo}</h1><p class="muted">${job.documentNo} | ${formatDate(job.createdAt)}</p></div>
   </div>
+  <span class="badge">Estimate — Not a Tax Invoice</span>
+  ${job.estimateValidUntil ? `<p class="validity">Valid until ${formatDate(job.estimateValidUntil)}</p>` : ""}
   <div class="grid">
     <div class="box">
       <h3>Customer</h3>
@@ -67,22 +88,58 @@ export function printEstimate({
       <p class="muted">${job.jobType === "warranty" ? "Warranty job" : "Non-warranty job"}</p>
     </div>
   </div>
+  ${job.diagnosisNotes ? `<div class="diagnosis"><h3>Diagnosis & Recommended Work</h3><p>${job.diagnosisNotes}</p></div>` : ""}
   <table>
-    <thead><tr><th>Part</th><th class="num">Qty</th><th class="num">Unit Price</th><th class="num">Total</th></tr></thead>
-    <tbody>${partsRows || '<tr><td colspan="4" class="muted">No parts recorded yet</td></tr>'}</tbody>
+    <thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Unit Price</th><th class="num">Total</th></tr></thead>
+    <tbody>${lineRows || '<tr><td colspan="4" class="muted">No estimate items recorded yet</td></tr>'}</tbody>
     <tfoot>
-      <tr><td colspan="3">Parts subtotal</td><td class="num">${formatCurrency(partsTotal)}</td></tr>
-      <tr><td colspan="3">Labor / service charge</td><td class="num">${formatCurrency(laborEstimate)}</td></tr>
-      <tr><td colspan="3">Estimated Total</td><td class="num">${formatCurrency(job.estimateAmount)}</td></tr>
+      <tr><td colspan="3">Subtotal (excl. VAT)</td><td class="num">${formatCurrency(subtotal)}</td></tr>
+      <tr><td colspan="3">VAT (15%)</td><td class="num">${formatCurrency(vatTotal)}</td></tr>
+      <tr><td colspan="3">Estimated Total (incl. VAT)</td><td class="num">${formatCurrency(total)}</td></tr>
     </tfoot>
   </table>
-  <p class="footer">This is a system-generated estimate from FixFlow and is subject to change after diagnosis. Approval required before repair proceeds on non-warranty jobs.</p>
+  ${showDecision ? `
+  <div class="decision">
+    <p style="margin:0 0 10px;font-size:13px;font-weight:600;">Please approve or decline this estimate to proceed</p>
+    <button id="fixflow-approve-btn" class="approve">Approve Estimate</button>
+    <button id="fixflow-decline-btn" class="decline">Decline</button>
+    <p id="fixflow-decision-status"></p>
+  </div>` : ""}
+  <div class="terms">
+    <p>This estimate is subject to change if additional faults are found once the unit is opened for repair. Approval is required before repair work begins on non-warranty jobs.</p>
+    <ul>
+      <li>Prices shown are in Saudi Riyals (SAR) and include 15% VAT unless noted otherwise.</li>
+      <li>Parts listed are the technician's best assessment prior to teardown; the final invoice reflects parts actually installed.</li>
+      ${job.estimateValidUntil ? `<li>This estimate is valid until ${formatDate(job.estimateValidUntil)}; a revised estimate may be issued after that date.</li>` : ""}
+    </ul>
+  </div>
 </body></html>`;
 
-  const win = window.open("", "_blank", "width=800,height=900");
+  const win = window.open("", "_blank", "width=800,height=950");
   if (!win) return;
   win.document.write(html);
   win.document.close();
+
+  if (showDecision) {
+    const approveBtn = win.document.getElementById("fixflow-approve-btn") as HTMLButtonElement | null;
+    const declineBtn = win.document.getElementById("fixflow-decline-btn") as HTMLButtonElement | null;
+    const status = win.document.getElementById("fixflow-decision-status");
+    const handleDecision = (action: (() => ActionResult) | undefined) => {
+      if (!action) return;
+      const outcome = action();
+      if (status) status.textContent = outcome.message;
+      if (outcome.ok) {
+        approveBtn?.setAttribute("disabled", "true");
+        declineBtn?.setAttribute("disabled", "true");
+        setTimeout(() => win.close(), 1200);
+      }
+    };
+    approveBtn?.addEventListener("click", () => handleDecision(onApprove));
+    declineBtn?.addEventListener("click", () => handleDecision(onDecline));
+  }
+
   win.focus();
-  setTimeout(() => win.print(), 300);
+  // Skip the auto-print dialog when Approve/Decline is on-screen — popping a
+  // browser print sheet over the decision buttons would block interaction.
+  if (!showDecision) setTimeout(() => win.print(), 300);
 }

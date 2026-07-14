@@ -21,7 +21,19 @@ export const MESSAGE_TEMPLATES: MessageTemplate[] = [
     id: "estimate_ready",
     label: "Estimate Ready",
     channels: ["whatsapp", "sms", "email"],
-    body: "Estimate ready for {{jobId}}: {{amount}} for parts + labor. Reply YES to approve.",
+    body: "Estimate ready for {{jobId}}: {{amount}} (parts + labor, incl. VAT), valid until {{validUntil}}. Reply YES to approve.",
+  },
+  {
+    id: "estimate_document",
+    label: "Estimate Document (WhatsApp)",
+    channels: ["whatsapp"],
+    body: "Hi {{customer}}, your itemized estimate {{estimateNo}} for {{appliance}} ({{jobId}}) is ready: {{amount}} (incl. VAT), valid until {{validUntil}}. Approve or decline anytime at {{link}}.",
+  },
+  {
+    id: "invoice_document",
+    label: "Tax Invoice Document (WhatsApp)",
+    channels: ["whatsapp"],
+    body: "Hi {{customer}}, here is your Tax Invoice {{invoiceNo}} for {{appliance}} ({{jobId}}): {{amount}} (incl. VAT). Thank you for choosing FixFlow.",
   },
   {
     id: "repair_complete",

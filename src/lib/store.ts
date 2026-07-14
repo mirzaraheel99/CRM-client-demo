@@ -4,11 +4,12 @@ import * as seed from "./seed";
 import { canAdvanceCurrentStage, canPerform } from "./permissions";
 import { MESSAGE_TEMPLATES, renderTemplate } from "./templates";
 import { stageBlockers } from "./workflow";
+import { formatDate } from "./utils";
 import { nextStageRefNo } from "./stageRefNo";
 import type {
   ActionResult, Customer, Appliance, ApplianceTelemetry, Brand, Technician, InventoryItem, InventoryLocation,
   InventoryStock, InventoryTransaction, JobCard, JobCardStageHistory,
-  JobCardAttachment, JobCardPartUsed, PurchaseBill, CommunicationLog,
+  JobCardAttachment, JobCardPartUsed, JobCardEstimateLine, EstimateLineKind, PurchaseBill, CommunicationLog,
   WorkflowDefinition, Role, StageName, Branch, Payment, PaymentMethod, Channel, ServiceOrder, RemovedPart, RequestSource,
 } from "./types";
 
@@ -38,6 +39,7 @@ interface DemoState {
   stageHistory: JobCardStageHistory[];
   attachments: JobCardAttachment[];
   partsUsed: JobCardPartUsed[];
+  estimateLineItems: JobCardEstimateLine[];
   purchaseBills: PurchaseBill[];
   communicationLogs: CommunicationLog[];
   workflows: WorkflowDefinition[];
@@ -97,7 +99,9 @@ interface DemoState {
   advanceStage: (jobcardId: string, stage: StageName, notes: string, changedBy: string) => ActionResult;
   assignTechnician: (jobcardId: string, technicianId: string) => ActionResult;
   setDiagnosis: (jobcardId: string, notes: string) => ActionResult;
-  setEstimate: (jobcardId: string, amount: number) => ActionResult;
+  addEstimateLine: (jobcardId: string, input: { kind: EstimateLineKind; label: string; itemId?: string; qty: number; unitPrice: number }) => ActionResult;
+  removeEstimateLine: (lineId: string) => ActionResult;
+  setEstimateValidUntil: (jobcardId: string, date: string) => ActionResult;
   approveCustomer: (jobcardId: string, approved: boolean, source?: "internal" | "customer") => ActionResult;
   setRepairNotes: (jobcardId: string, notes: string) => ActionResult;
   setQaApproved: (jobcardId: string, approved: boolean) => ActionResult;
@@ -108,6 +112,7 @@ interface DemoState {
   removePartUsed: (partUsedId: string) => ActionResult;
   addAttachment: (jobcardId: string, stageName: StageName, label: string, fileUrl?: string) => ActionResult;
   sendCommunication: (jobcardId: string, channel: CommunicationLog["channel"], message: string) => ActionResult;
+  retryCommunication: (logId: string) => ActionResult;
   updateWorkflowStep: (workflowId: string, stepOrder: number, patch: Partial<WorkflowDefinition["steps"][number]>) => ActionResult;
   addWorkflowStep: (workflowId: string, step: WorkflowDefinition["steps"][number]) => ActionResult;
   sendMaintenanceReminder: (applianceId: string) => ActionResult;
@@ -144,6 +149,7 @@ const initialSlice = () => ({
   stageHistory: clone(seed.STAGE_HISTORY),
   attachments: clone(seed.ATTACHMENTS),
   partsUsed: clone(seed.PARTS_USED),
+  estimateLineItems: clone(seed.ESTIMATE_LINE_ITEMS),
   purchaseBills: clone(seed.PURCHASE_BILLS),
   communicationLogs: clone(seed.COMMUNICATION_LOGS),
   workflows: clone(seed.WORKFLOWS),
@@ -200,6 +206,7 @@ function buildTriggeredLogs(state: DemoState, job: JobCard, stageName: StageName
       appliance: appliance.model,
       jobId: job.documentNo,
       amount: job.estimateAmount == null ? "pending" : `SAR ${job.estimateAmount.toLocaleString()}`,
+      validUntil: job.estimateValidUntil ? formatDate(job.estimateValidUntil) : "further notice",
     }),
     status: "sent",
     timestamp,
@@ -214,15 +221,22 @@ function syncTechnicianStatuses(technicians: Technician[], jobs: JobCard[]) {
   }));
 }
 
-function scheduleCommunicationReceipts(logs: CommunicationLog[]) {
+function scheduleCommunicationReceipts(logs: CommunicationLog[], options: { allowFailure?: boolean } = {}) {
+  const allowFailure = options.allowFailure ?? true;
   for (const log of logs) {
     const setStatus = (status: CommunicationLog["status"]) => {
       useStore.setState((state) => ({
         communicationLogs: state.communicationLogs.map((communication) => communication.id === log.id ? { ...communication, status } : communication),
       }));
     };
-    setTimeout(() => setStatus("delivered"), 2200);
-    if (log.channel === "whatsapp") setTimeout(() => setStatus("read"), 5500);
+    setTimeout(() => {
+      // Real carrier/API delivery isn't 100% — simulate an occasional failure
+      // (bad number, gateway timeout) so the "failed" status and retry flow
+      // are genuinely reachable instead of purely decorative.
+      const failed = allowFailure && Math.random() < 0.07;
+      setStatus(failed ? "failed" : "delivered");
+      if (!failed && log.channel === "whatsapp") setTimeout(() => setStatus("read"), 3300);
+    }, 2200);
   }
 }
 
@@ -520,24 +534,59 @@ export const useStore = create<DemoState>()(
         set({ jobCards: state.jobCards.map((job) => job.id === jobcardId ? { ...job, diagnosisNotes: notes.trim(), updatedAt: new Date().toISOString() } : job) });
         return result(true, "Diagnosis notes saved.");
       },
-      setEstimate: (jobcardId, amount) => {
+      addEstimateLine: (jobcardId, input) => {
         const state = get();
         if (!canPerform(state.role, "set_estimate")) return result(false, "Your role cannot set estimates.");
         const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
         if (!job) return result(false, "Job card not found.");
         if (job.currentStage !== "Estimate" && job.currentStage !== "Customer Approval") return result(false, "Estimates can only be changed before repair begins.");
-        const partsTotal = state.partsUsed.filter((part) => part.jobcardId === jobcardId).reduce((sum, part) => sum + part.totalPrice, 0);
-        if (!Number.isFinite(amount) || amount <= 0) return result(false, "Estimate must be greater than zero.");
-        if (amount < partsTotal) return result(false, `Estimate cannot be below the ${partsTotal.toLocaleString()} SAR parts total.`);
+        if (!input.label.trim()) return result(false, "Describe this line item.");
+        if (!Number.isFinite(input.qty) || input.qty <= 0) return result(false, "Quantity must be greater than zero.");
+        if (!Number.isFinite(input.unitPrice) || input.unitPrice < 0) return result(false, "Unit price must be zero or more.");
+        const line: JobCardEstimateLine = {
+          id: nextId("estl"), jobcardId, kind: input.kind, label: input.label.trim(), itemId: input.itemId,
+          qty: input.qty, unitPrice: input.unitPrice, totalPrice: input.qty * input.unitPrice,
+        };
+        const lines = [...state.estimateLineItems, line];
+        const total = lines.filter((candidate) => candidate.jobcardId === jobcardId).reduce((sum, candidate) => sum + candidate.totalPrice, 0);
         const now = new Date().toISOString();
-        const updatedJob = { ...job, estimateAmount: amount, customerApproved: null, updatedAt: now };
+        const updatedJob = { ...job, estimateAmount: total, customerApproved: null, updatedAt: now };
         const logs = job.currentStage === "Customer Approval" ? buildTriggeredLogs(state, updatedJob, "Customer Approval", now) : [];
         set({
+          estimateLineItems: lines,
           jobCards: state.jobCards.map((candidate) => candidate.id === jobcardId ? updatedJob : candidate),
           communicationLogs: [...logs, ...state.communicationLogs],
         });
         scheduleCommunicationReceipts(logs);
-        return result(true, `Estimate set to SAR ${amount.toLocaleString()}.`);
+        return result(true, `Added "${line.label}" to the estimate.`);
+      },
+      removeEstimateLine: (lineId) => {
+        const state = get();
+        if (!canPerform(state.role, "set_estimate")) return result(false, "Your role cannot edit estimates.");
+        const line = state.estimateLineItems.find((candidate) => candidate.id === lineId);
+        if (!line) return result(false, "Estimate line not found.");
+        const job = state.jobCards.find((candidate) => candidate.id === line.jobcardId);
+        if (!job) return result(false, "Job card not found.");
+        if (job.currentStage !== "Estimate" && job.currentStage !== "Customer Approval") return result(false, "Estimates can only be changed before repair begins.");
+        const lines = state.estimateLineItems.filter((candidate) => candidate.id !== lineId);
+        const total = lines.filter((candidate) => candidate.jobcardId === job.id).reduce((sum, candidate) => sum + candidate.totalPrice, 0);
+        const partsUsedTotal = state.partsUsed.filter((part) => part.jobcardId === job.id).reduce((sum, part) => sum + part.totalPrice, 0);
+        if (total < partsUsedTotal) return result(false, `Estimate cannot drop below the ${partsUsedTotal.toLocaleString()} SAR already issued in parts.`);
+        const now = new Date().toISOString();
+        const updatedJob = { ...job, estimateAmount: total || null, customerApproved: null, updatedAt: now };
+        set({
+          estimateLineItems: lines,
+          jobCards: state.jobCards.map((candidate) => candidate.id === job.id ? updatedJob : candidate),
+        });
+        return result(true, "Removed line item from the estimate.");
+      },
+      setEstimateValidUntil: (jobcardId, date) => {
+        const state = get();
+        if (!canPerform(state.role, "set_estimate")) return result(false, "Your role cannot edit estimates.");
+        const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
+        if (!job) return result(false, "Job card not found.");
+        set({ jobCards: state.jobCards.map((candidate) => candidate.id === jobcardId ? { ...candidate, estimateValidUntil: date || undefined } : candidate) });
+        return result(true, "Estimate validity updated.");
       },
       approveCustomer: (jobcardId, approved, source = "internal") => {
         const state = get();
@@ -694,6 +743,17 @@ export const useStore = create<DemoState>()(
         set({ communicationLogs: [log, ...state.communicationLogs] });
         scheduleCommunicationReceipts([log]);
         return result(true, `Message sent via ${channel === "whatsapp" ? "WhatsApp" : channel.toUpperCase()}.`);
+      },
+      retryCommunication: (logId) => {
+        const state = get();
+        if (!canPerform(state.role, "send_message")) return result(false, "Your role cannot resend messages.");
+        const log = state.communicationLogs.find((candidate) => candidate.id === logId);
+        if (!log) return result(false, "Message not found.");
+        if (log.status !== "failed") return result(false, "Only failed messages can be retried.");
+        const now = new Date().toISOString();
+        set({ communicationLogs: state.communicationLogs.map((candidate) => candidate.id === logId ? { ...candidate, status: "sent", timestamp: now } : candidate) });
+        scheduleCommunicationReceipts([{ ...log, status: "sent", timestamp: now }], { allowFailure: false });
+        return result(true, "Message resent.");
       },
 
       updateWorkflowStep: (workflowId, stepOrder, patch) => {

@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { CheckCheck, Mail, MessageCircle, Search, Smartphone } from "lucide-react";
+import { AlertCircle, CheckCheck, Mail, MessageCircle, RefreshCw, Search, Smartphone } from "lucide-react";
 import { useStore } from "../lib/store";
 import { Card, Select, Input, Badge, EmptyState, Pagination } from "../components/ui";
 import { formatDateTime } from "../lib/utils";
+import { toast } from "../lib/toast";
 import type { Channel, CommunicationLog } from "../lib/types";
 import { communicationsByBranch } from "../lib/selectors";
 import { CHANNEL_AR, COMM_STATUS_AR, bi } from "../lib/domainAr";
@@ -17,7 +18,7 @@ const CHANNEL_ICON: Record<Channel, React.ReactNode> = {
 };
 
 export default function Communications() {
-  const { communicationLogs, jobCards, customers, selectedBranchId } = useStore();
+  const { communicationLogs, jobCards, customers, selectedBranchId, retryCommunication } = useStore();
   const [channel, setChannel] = useState<Channel | "all">("all");
   const [status, setStatus] = useState<CommunicationLog["status"] | "all">("all");
   const [search, setSearch] = useState("");
@@ -48,6 +49,12 @@ export default function Communications() {
   };
   const successfullyDelivered = scopedLogs.filter((message) => message.status === "delivered" || message.status === "read").length;
   const deliveryRate = scopedLogs.length ? Math.round((successfullyDelivered / scopedLogs.length) * 100) : 0;
+  const failedCount = scopedLogs.filter((message) => message.status === "failed").length;
+
+  function retry(logId: string) {
+    const result = retryCommunication(logId);
+    toast(result.message, result.ok ? "success" : "error");
+  }
 
   return (
     <div className="space-y-4">
@@ -56,11 +63,12 @@ export default function Communications() {
         <p className="text-sm text-[var(--color-ink-muted)] mt-0.5">Every WhatsApp, SMS, and email trigger fired by the workflow engine</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4 xl:max-w-4xl">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-5 xl:max-w-5xl">
         <Card interactive className="flex items-center gap-2"><MessageCircle size={16} className="text-[var(--color-status-good)]" /><span className="text-sm font-semibold tabular-nums">{counts.whatsapp}</span><span className="text-xs text-[var(--color-ink-muted)]">{bi("WhatsApp", CHANNEL_AR.whatsapp)}</span></Card>
         <Card interactive className="flex items-center gap-2"><Smartphone size={16} className="text-[var(--color-series-3)]" /><span className="text-sm font-semibold tabular-nums">{counts.sms}</span><span className="text-xs text-[var(--color-ink-muted)]">{bi("SMS", CHANNEL_AR.sms)}</span></Card>
         <Card interactive className="flex items-center gap-2"><Mail size={16} className="text-[var(--color-series-1)]" /><span className="text-sm font-semibold tabular-nums">{counts.email}</span><span className="text-xs text-[var(--color-ink-muted)]">{bi("Email", CHANNEL_AR.email)}</span></Card>
         <Card interactive className="flex items-center gap-2"><CheckCheck size={16} className="text-[var(--color-series-2)]" /><span className="text-sm font-semibold tabular-nums">{deliveryRate}%</span><span className="text-xs text-[var(--color-ink-muted)]">{bi("Delivered", "تم التوصيل")}</span></Card>
+        <Card interactive className="flex items-center gap-2"><AlertCircle size={16} className="text-[var(--color-status-critical)]" /><span className="text-sm font-semibold tabular-nums">{failedCount}</span><span className="text-xs text-[var(--color-ink-muted)]">{bi("Failed", COMM_STATUS_AR.failed)}</span></Card>
       </div>
 
       <Card className="flex flex-wrap gap-3">
@@ -103,13 +111,18 @@ export default function Communications() {
                 </div>
                 <p className="mt-2 truncate text-xs font-medium text-[var(--color-ink-secondary)]">{customer?.name ?? bi("Unknown customer", "عميل غير معروف")}</p>
                 <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--color-ink-muted)]">{message.message}</p>
-                <p className="mt-2 text-right text-xs tabular-nums text-[var(--color-ink-muted)]">{formatDateTime(message.timestamp)}</p>
+                <div className="mt-2 flex items-center justify-between">
+                  {message.status === "failed" ? (
+                    <button onClick={() => retry(message.id)} className="flex items-center gap-1 text-xs font-medium text-[var(--color-brand-1)]"><RefreshCw size={12} /> {bi("Retry", "إعادة المحاولة")}</button>
+                  ) : <span />}
+                  <p className="text-right text-xs tabular-nums text-[var(--color-ink-muted)]">{formatDateTime(message.timestamp)}</p>
+                </div>
               </div>
             );
           })}
         </div>
         <div className="hidden overflow-x-auto sm:block">
-          <table className="w-full text-sm min-w-[840px]">
+          <table className="w-full text-sm min-w-[900px]">
             <thead>
               <tr className="text-left text-xs text-[var(--color-ink-muted)] border-b [border-color:var(--color-border)]">
                 <th className="px-5 py-3 font-medium">{bi("Message No.", "رقم الرسالة")}</th>
@@ -118,7 +131,8 @@ export default function Communications() {
                 <th className="px-3 py-3 font-medium">{bi("Customer", "العميل")}</th>
                 <th className="px-3 py-3 font-medium">{bi("Message", "الرسالة")}</th>
                 <th className="px-3 py-3 font-medium">{bi("Status", "الحالة")}</th>
-                <th className="px-5 py-3 font-medium">{bi("Sent", "تاريخ الإرسال")}</th>
+                <th className="px-3 py-3 font-medium">{bi("Sent", "تاريخ الإرسال")}</th>
+                <th className="px-5 py-3 font-medium" />
               </tr>
             </thead>
             <tbody>
@@ -132,7 +146,8 @@ export default function Communications() {
                     <td className="px-3 py-2.5 text-[var(--color-ink-secondary)]">{cust?.name ?? "—"}</td>
                     <td className="px-3 py-2.5 text-[var(--color-ink-secondary)] max-w-xs truncate">{c.message}</td>
                     <td className="px-3 py-2.5"><Badge tone={c.status === "failed" ? "critical" : c.status === "read" ? "good" : "neutral"}>{bi(c.status, COMM_STATUS_AR[c.status as keyof typeof COMM_STATUS_AR])}</Badge></td>
-                    <td className="px-5 py-2.5 text-[var(--color-ink-muted)]">{formatDateTime(c.timestamp)}</td>
+                    <td className="px-3 py-2.5 text-[var(--color-ink-muted)]">{formatDateTime(c.timestamp)}</td>
+                    <td className="px-5 py-2.5">{c.status === "failed" && <button onClick={() => retry(c.id)} className="flex items-center gap-1 text-xs font-medium text-[var(--color-brand-1)] hover:underline"><RefreshCw size={12} /> {bi("Retry", "إعادة المحاولة")}</button>}</td>
                   </tr>
                 );
               })}

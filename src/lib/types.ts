@@ -195,6 +195,22 @@ export interface JobCardPartUsed {
   totalPrice: number;
 }
 
+// A quoted line on the estimate — distinct from JobCardPartUsed, which tracks
+// parts actually issued from stock. An estimated part is a priced guess made
+// before repair; it has no locationId because nothing has left inventory yet.
+export type EstimateLineKind = "labor" | "part";
+
+export interface JobCardEstimateLine {
+  id: string;
+  jobcardId: string;
+  kind: EstimateLineKind;
+  label: string;
+  itemId?: string;
+  qty: number;
+  unitPrice: number;
+  totalPrice: number;
+}
+
 export interface RemovedPart {
   id: string;
   jobcardId: string;
@@ -277,6 +293,7 @@ export interface JobCard {
   qaApproved: boolean;
   customerSignature: string | null;
   oemClaimNo?: string;
+  estimateValidUntil?: string;
 }
 
 export interface ActionResult {

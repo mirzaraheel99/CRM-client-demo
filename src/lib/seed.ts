@@ -26,6 +26,7 @@ import type {
   PreferredLanguage,
   EnergyRating,
   RequestSource,
+  JobCardEstimateLine,
 } from "./types";
 
 // Kept local (not imported from ./stageRefNo) so this file has zero runtime
@@ -377,11 +378,12 @@ export const JOB_CARDS: JobCard[] = [];
 export const STAGE_HISTORY: JobCardStageHistory[] = [];
 export const ATTACHMENTS: JobCardAttachment[] = [];
 export const PARTS_USED: JobCardPartUsed[] = [];
+export const ESTIMATE_LINE_ITEMS: JobCardEstimateLine[] = [];
 export const PURCHASE_BILLS: PurchaseBill[] = [];
 export const COMMUNICATION_LOGS: CommunicationLog[] = [];
 export const REMOVED_PARTS: RemovedPart[] = [];
 
-let stageHistId = 1, attId = 1, partId = 1, billId = 1, commId = 1, jobTxnId = 5000, serviceOrderId = 1, removedPartId = 1;
+let stageHistId = 1, attId = 1, partId = 1, billId = 1, commId = 1, jobTxnId = 5000, serviceOrderId = 1, removedPartId = 1, estimateLineId = 1;
 let activeOrder: ServiceOrder | null = null;
 let activeOrderCustomer: Customer | null = null;
 let activeOrderRemaining = 0;
@@ -564,6 +566,35 @@ for (let i = 0; i < 130; i++) {
   if (jobType === "non_warranty" && estimateAmount != null && partsTotal > 0) {
     estimateAmount = Math.max(estimateAmount, partsTotal + 350);
     job.estimateAmount = estimateAmount;
+  }
+  if (jobType === "non_warranty" && estimateAmount != null) {
+    const estimateParts = PARTS_USED.filter((part) => part.jobcardId === jobCardId);
+    for (const part of estimateParts) {
+      const item = INVENTORY_ITEMS.find((candidate) => candidate.id === part.itemId);
+      ESTIMATE_LINE_ITEMS.push({
+        id: id("estl", estimateLineId++),
+        jobcardId: jobCardId,
+        kind: "part",
+        label: item?.name ?? "Replacement part",
+        itemId: part.itemId,
+        qty: part.qty,
+        unitPrice: part.unitPrice,
+        totalPrice: part.totalPrice,
+      });
+    }
+    const laborAmount = estimateAmount - estimateParts.reduce((sum, part) => sum + part.totalPrice, 0);
+    ESTIMATE_LINE_ITEMS.push({
+      id: id("estl", estimateLineId++),
+      jobcardId: jobCardId,
+      kind: "labor",
+      label: "Diagnostic & labor charge",
+      qty: 1,
+      unitPrice: laborAmount,
+      totalPrice: laborAmount,
+    });
+    const validUntilDate = new Date(ts);
+    validUntilDate.setDate(validUntilDate.getDate() + int(5, 10));
+    job.estimateValidUntil = validUntilDate.toISOString().slice(0, 10);
   }
   if (jobType === "non_warranty" && readyIndex >= 0 && progressIdx >= readyIndex) {
     job.finalAmount = partsTotal + int(120, 350);

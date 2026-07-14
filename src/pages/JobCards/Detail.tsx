@@ -534,7 +534,7 @@ export default function JobCardDetail() {
                         {job.estimateValidUntil && <Badge tone="neutral">{bi("Valid until", "صالح حتى")} {formatDate(job.estimateValidUntil)}</Badge>}
                       </div>
 
-                      {jobEstimateLines.length > 0 ? (
+                      {jobEstimateLines.length > 0 && (
                         <div className="overflow-x-auto rounded-lg border [border-color:var(--color-border)]">
                           <table className="w-full min-w-[560px] text-sm">
                             <thead>
@@ -610,8 +610,6 @@ export default function JobCardDetail() {
                             </tfoot>
                           </table>
                         </div>
-                      ) : (
-                        <p className="text-sm text-[var(--color-ink-muted)]">{bi("No estimate items yet.", "لا توجد بنود تقدير بعد.")}</p>
                       )}
 
                       {canPerform(role, "set_estimate") && (job.currentStage === "Estimate" || job.currentStage === "Customer Approval" || (job.currentStage === "Diagnosis" && job.diagnosisNotes)) && (

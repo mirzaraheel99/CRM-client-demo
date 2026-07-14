@@ -21,9 +21,22 @@ import { Wifi } from "lucide-react";
 import { canPerform } from "../../lib/permissions";
 import { stageAccessBlocker, stageRequirements } from "../../lib/workflow";
 import { STAGE_NAME_AR, CHANNEL_AR, COMM_STATUS_AR, REQUEST_SOURCE_AR, bi } from "../../lib/domainAr";
-import type { StageName, Channel, ActionResult, JobType } from "../../lib/types";
+import type { StageName, Channel, ActionResult, JobType, EstimateLineKind } from "../../lib/types";
 
 const NEW_PRODUCT_OPTION = "__new_product__";
+const ESTIMATE_LINE_KINDS: EstimateLineKind[] = ["labor", "part", "other", "discount"];
+const ESTIMATE_KIND_LABEL: Record<EstimateLineKind, string> = {
+  labor: bi("Labor", "عمالة"),
+  part: bi("Part", "قطعة"),
+  other: bi("Other charge", "رسوم أخرى"),
+  discount: bi("Discount", "خصم"),
+};
+const ESTIMATE_KIND_TONE: Record<EstimateLineKind, "neutral" | "brand" | "warning" | "good"> = {
+  labor: "neutral",
+  part: "brand",
+  other: "warning",
+  discount: "good",
+};
 const ADD_PRODUCT_TABS = ["Basic", "Purchase", "Compliance", "Site"];
 const ADD_PRODUCT_TAB_LABELS: Record<string, string> = {
   Basic: bi("Basic", "أساسي"),
@@ -71,7 +84,7 @@ export default function JobCardDetail() {
   const {
     jobCards, serviceOrders, customers, appliances, applianceTelemetry, brands, technicians, workflows,
     stageHistory, attachments, partsUsed, estimateLineItems, communicationLogs, inventoryItems, inventoryLocations, inventoryStock, purchaseBills, payments, removedParts,
-    role, selectedBranchId, advanceStage, assignTechnician, setDiagnosis, addEstimateLine, removeEstimateLine, setEstimateValidUntil, approveCustomer, setRepairNotes, setQaApproved,
+    role, selectedBranchId, advanceStage, assignTechnician, setDiagnosis, addEstimateLine, updateEstimateLine, removeEstimateLine, setEstimateValidUntil, approveCustomer, setRepairNotes, setQaApproved,
     setFinalAmount, captureCustomerSignature, savePurchaseBill, addPartUsed, removePartUsed, addAttachment, sendCommunication,
     logRemovedPart, notifyCustomerOfRemovedPart, confirmPartReturned, addAppliance, addProductToOrder,
   } = useStore();
@@ -83,11 +96,12 @@ export default function JobCardDetail() {
   const [channel, setChannel] = useState<Channel>("whatsapp");
   const [templateId, setTemplateId] = useState("received");
   const [message, setMessage] = useState("");
-  const [laborLabel, setLaborLabel] = useState("");
-  const [laborAmount, setLaborAmount] = useState("");
-  const [estPartItemId, setEstPartItemId] = useState("");
-  const [estPartQty, setEstPartQty] = useState("1");
-  const [estPartUnitPrice, setEstPartUnitPrice] = useState("");
+  const [newLineKind, setNewLineKind] = useState<EstimateLineKind>("labor");
+  const [newLineLabel, setNewLineLabel] = useState("");
+  const [newLineItemId, setNewLineItemId] = useState("");
+  const [newLineQty, setNewLineQty] = useState("1");
+  const [newLineUnitPrice, setNewLineUnitPrice] = useState("");
+  const [newLineNotes, setNewLineNotes] = useState("");
   const [estimateValidUntilInput, setEstimateValidUntilInput] = useState("");
   const [diagnosisInput, setDiagnosisInput] = useState("");
   const [repairInput, setRepairInput] = useState("");
@@ -493,148 +507,212 @@ export default function JobCardDetail() {
                     </div>
                   </div>
                 )}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-[var(--color-ink-muted)]">{bi("Estimate amount", "مبلغ التقدير")}</p>
-                    <p className="font-medium tabular-nums">{formatCurrency(job.estimateAmount)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-[var(--color-ink-muted)]">{bi("Final amount", "المبلغ النهائي")}</p>
-                    <p className="font-medium tabular-nums">{formatCurrency(job.finalAmount)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-[var(--color-ink-muted)]">{bi("Customer approval", "موافقة العميل")}</p>
-                    <p className="font-medium">{job.customerApproved == null ? bi("Pending", "قيد الانتظار") : job.customerApproved ? bi("Approved", "تمت الموافقة") : bi("Declined", "مرفوض")}</p>
-                  </div>
+                {job.jobType === "non_warranty" ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs text-[var(--color-ink-muted)]">{bi("Estimate amount", "مبلغ التقدير")}</p>
+                        <p className="font-medium tabular-nums">{formatCurrency(job.estimateAmount)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-[var(--color-ink-muted)]">{bi("Final amount", "المبلغ النهائي")}</p>
+                        <p className="font-medium tabular-nums">{formatCurrency(job.finalAmount)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-[var(--color-ink-muted)]">{bi("Customer approval", "موافقة العميل")}</p>
+                        <p className="font-medium">{job.customerApproved == null ? bi("Pending", "قيد الانتظار") : job.customerApproved ? bi("Approved", "تمت الموافقة") : bi("Declined", "مرفوض")}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-[var(--color-ink-muted)]">{bi("Created", "تاريخ الإنشاء")}</p>
+                        <p className="font-medium">{formatDateTime(job.createdAt)}</p>
+                      </div>
+                    </div>
+
+                    <div className="border-t pt-4 [border-color:var(--color-border)] space-y-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-sm font-semibold">{bi("Estimate builder", "منشئ التقدير")}</p>
+                        {job.estimateValidUntil && <Badge tone="neutral">{bi("Valid until", "صالح حتى")} {formatDate(job.estimateValidUntil)}</Badge>}
+                      </div>
+
+                      {jobEstimateLines.length > 0 ? (
+                        <div className="overflow-x-auto rounded-lg border [border-color:var(--color-border)]">
+                          <table className="w-full min-w-[560px] text-sm">
+                            <thead>
+                              <tr className="text-left text-xs text-[var(--color-ink-muted)]">
+                                <th className="px-3 py-2 font-medium">{bi("Item", "البند")}</th>
+                                <th className="px-3 py-2 text-right font-medium">{bi("Qty", "الكمية")}</th>
+                                <th className="px-3 py-2 text-right font-medium">{bi("Unit price", "سعر الوحدة")}</th>
+                                <th className="px-3 py-2 text-right font-medium">{bi("Total", "الإجمالي")}</th>
+                                {canPerform(role, "set_estimate") && <th className="px-3 py-2" />}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {jobEstimateLines.map((line) => {
+                                const editable = canPerform(role, "set_estimate");
+                                return (
+                                  <tr key={line.id} className="border-t transition-colors [border-color:var(--color-border)] hover:bg-black/[0.015] dark:hover:bg-white/[0.02]">
+                                    <td className="px-3 py-2">
+                                      <div className="flex items-center gap-1.5">
+                                        <Badge tone={ESTIMATE_KIND_TONE[line.kind]}>{ESTIMATE_KIND_LABEL[line.kind]}</Badge>
+                                        {editable ? (
+                                          <input
+                                            defaultValue={line.label}
+                                            onBlur={(event) => { const value = event.target.value.trim(); if (value && value !== line.label) showResult(updateEstimateLine(line.id, { label: value })); }}
+                                            className="min-w-0 flex-1 rounded px-1 py-0.5 text-sm outline-none focus:bg-black/[0.04] dark:focus:bg-white/[0.06]"
+                                          />
+                                        ) : <span>{line.label}</span>}
+                                      </div>
+                                      {editable ? (
+                                        <input
+                                          defaultValue={line.notes ?? ""}
+                                          placeholder={bi("Add a note...", "أضف ملاحظة...")}
+                                          onBlur={(event) => { const value = event.target.value.trim(); if (value !== (line.notes ?? "")) showResult(updateEstimateLine(line.id, { notes: value })); }}
+                                          className="mt-0.5 w-full rounded px-1 py-0.5 text-xs text-[var(--color-ink-muted)] outline-none focus:bg-black/[0.04] dark:focus:bg-white/[0.06]"
+                                        />
+                                      ) : (line.notes && <p className="mt-0.5 text-xs text-[var(--color-ink-muted)]">{line.notes}</p>)}
+                                    </td>
+                                    <td className="px-3 py-2 text-right">
+                                      {editable ? (
+                                        <input
+                                          type="number"
+                                          defaultValue={line.qty}
+                                          onBlur={(event) => { const qty = Number(event.target.value); if (Number.isFinite(qty) && qty > 0 && qty !== line.qty) showResult(updateEstimateLine(line.id, { qty })); }}
+                                          className="w-16 rounded px-1 py-0.5 text-right tabular-nums outline-none focus:bg-black/[0.04] dark:focus:bg-white/[0.06]"
+                                        />
+                                      ) : <span className="tabular-nums">{line.qty}</span>}
+                                    </td>
+                                    <td className="px-3 py-2 text-right">
+                                      {editable ? (
+                                        <input
+                                          type="number"
+                                          defaultValue={line.unitPrice}
+                                          onBlur={(event) => { const unitPrice = Number(event.target.value); if (Number.isFinite(unitPrice) && unitPrice !== line.unitPrice) showResult(updateEstimateLine(line.id, { unitPrice })); }}
+                                          className="w-24 rounded px-1 py-0.5 text-right tabular-nums outline-none focus:bg-black/[0.04] dark:focus:bg-white/[0.06]"
+                                        />
+                                      ) : <span className="tabular-nums">{formatCurrency(line.unitPrice)}</span>}
+                                    </td>
+                                    <td className="px-3 py-2 text-right font-medium tabular-nums">{formatCurrency(line.totalPrice)}</td>
+                                    {editable && (
+                                      <td className="px-3 py-2 text-right">
+                                        <button onClick={() => showResult(removeEstimateLine(line.id))} className="text-[var(--color-ink-muted)] hover:text-[var(--color-status-critical)]" title="Remove line item" aria-label="Remove line item">
+                                          <Trash2 size={14} />
+                                        </button>
+                                      </td>
+                                    )}
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                            <tfoot>
+                              <tr className="border-t [border-color:var(--color-border)]"><td colSpan={3} className="px-3 py-2 text-right text-[var(--color-ink-muted)]">{bi("Subtotal (excl. VAT)", "الإجمالي (غير شامل الضريبة)")}</td><td className="px-3 py-2 text-right tabular-nums">{formatCurrency((job.estimateAmount ?? 0) / 1.15)}</td></tr>
+                              <tr className="border-t [border-color:var(--color-border)]"><td colSpan={3} className="px-3 py-2 text-right text-[var(--color-ink-muted)]">{bi("VAT (15%)", "ضريبة القيمة المضافة (15%)")}</td><td className="px-3 py-2 text-right tabular-nums">{formatCurrency((job.estimateAmount ?? 0) - (job.estimateAmount ?? 0) / 1.15)}</td></tr>
+                              <tr className="border-t font-semibold [border-color:var(--color-border)]"><td colSpan={3} className="px-3 py-2 text-right">{bi("Estimated total (incl. VAT)", "الإجمالي المقدر (شامل الضريبة)")}</td><td className="px-3 py-2 text-right tabular-nums">{formatCurrency(job.estimateAmount)}</td></tr>
+                            </tfoot>
+                          </table>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-[var(--color-ink-muted)]">{bi("No estimate items yet.", "لا توجد بنود تقدير بعد.")}</p>
+                      )}
+
+                      {canPerform(role, "set_estimate") && (job.currentStage === "Estimate" || job.currentStage === "Customer Approval" || (job.currentStage === "Diagnosis" && job.diagnosisNotes)) && (
+                        <div className="space-y-3 rounded-lg border [border-color:var(--color-border)] bg-[var(--color-surface-1)] p-3">
+                          <p className="text-xs font-semibold text-[var(--color-ink-secondary)]">{bi("Add line item", "إضافة بند")}</p>
+                          <div className="grid gap-2 sm:grid-cols-[130px_1fr_70px_130px_auto] sm:items-end">
+                            <Field label={bi("Type", "النوع")}>
+                              <Select value={newLineKind} onChange={(event) => { setNewLineKind(event.target.value as EstimateLineKind); setNewLineLabel(""); setNewLineItemId(""); setNewLineUnitPrice(""); }}>
+                                {ESTIMATE_LINE_KINDS.map((kind) => <option key={kind} value={kind}>{ESTIMATE_KIND_LABEL[kind]}</option>)}
+                              </Select>
+                            </Field>
+                            {newLineKind === "part" ? (
+                              <Field label={bi("Part", "القطعة")}>
+                                <Select value={newLineItemId} onChange={(event) => { const item = inventoryItems.find((candidate) => candidate.id === event.target.value); setNewLineItemId(event.target.value); setNewLineUnitPrice(item ? String(item.unitPrice) : ""); }}>
+                                  <option value="">{bi("Choose part...", "اختر قطعة...")}</option>
+                                  {inventoryItems.map((item) => <option key={item.id} value={item.id}>{item.name}{item.nameAr ? ` · ${item.nameAr}` : ""}</option>)}
+                                </Select>
+                              </Field>
+                            ) : (
+                              <Field label={bi("Description", "الوصف")}>
+                                <Input
+                                  value={newLineLabel}
+                                  onChange={(event) => setNewLineLabel(event.target.value)}
+                                  placeholder={newLineKind === "labor" ? "e.g. Diagnostic & labor charge" : newLineKind === "discount" ? "e.g. Loyalty discount" : "e.g. Transport / callout fee"}
+                                />
+                              </Field>
+                            )}
+                            <Field label={bi("Qty", "الكمية")}><Input type="number" min="1" value={newLineQty} onChange={(event) => setNewLineQty(event.target.value)} /></Field>
+                            <Field label={newLineKind === "discount" ? bi("Discount (SAR)", "الخصم (ريال)") : bi("Unit price (SAR)", "سعر الوحدة (ريال)")}><Input type="number" min="0" value={newLineUnitPrice} onChange={(event) => setNewLineUnitPrice(event.target.value)} /></Field>
+                            <Button
+                              variant="secondary"
+                              onClick={() => {
+                                const item = newLineKind === "part" ? inventoryItems.find((candidate) => candidate.id === newLineItemId) : undefined;
+                                const label = newLineKind === "part" ? (item?.name ?? "Part") : newLineLabel;
+                                const enteredPrice = Number(newLineUnitPrice);
+                                const unitPrice = newLineKind === "discount" ? -Math.abs(enteredPrice) : enteredPrice;
+                                showResult(
+                                  addEstimateLine(job.id, { kind: newLineKind, label, itemId: newLineKind === "part" ? (newLineItemId || undefined) : undefined, qty: Number(newLineQty), unitPrice, notes: newLineNotes || undefined }),
+                                  () => { setNewLineLabel(""); setNewLineItemId(""); setNewLineQty("1"); setNewLineUnitPrice(""); setNewLineNotes(""); }
+                                );
+                              }}
+                            >
+                              <Plus size={14} /> {bi("Add", "إضافة")}
+                            </Button>
+                          </div>
+                          <Field label={bi("Note (optional)", "ملاحظة (اختياري)")}><Input value={newLineNotes} onChange={(event) => setNewLineNotes(event.target.value)} placeholder={bi("Visible on the printed estimate", "تظهر في التقدير المطبوع")} /></Field>
+                          <div className="flex flex-wrap items-end gap-2 border-t pt-3 [border-color:var(--color-border)]">
+                            <Field label={bi("Estimate valid until", "التقدير صالح حتى")}><Input type="date" value={estimateValidUntilInput} onChange={(event) => setEstimateValidUntilInput(event.target.value)} /></Field>
+                            <Button variant="secondary" onClick={() => showResult(setEstimateValidUntil(job.id, estimateValidUntilInput))}>{bi("Save", "حفظ")}</Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {job.currentStage === "Customer Approval" && job.customerApproved !== true && canPerform(role, "record_customer_approval") && (
+                      <div className="border-t pt-4 [border-color:var(--color-border)] flex gap-2">
+                        <Button onClick={() => showResult(approveCustomer(job.id, true))}><CheckCircle2 size={14} /> {bi("Approve", "موافقة")}</Button>
+                        {job.customerApproved == null && <Button variant="danger" onClick={() => showResult(approveCustomer(job.id, false))}><XCircle size={14} /> {bi("Decline", "رفض")}</Button>}
+                      </div>
+                    )}
+                    <div className="border-t pt-4 [border-color:var(--color-border)] flex gap-2 flex-wrap">
+                      <Button
+                        variant="secondary"
+                        onClick={() => printEstimate({
+                          job, customer, appliance, brand, estimateLines: jobEstimateLines, inventoryItems,
+                          onApprove: () => approveCustomer(job.id, true),
+                          onDecline: () => approveCustomer(job.id, false),
+                        })}
+                      >
+                        <Printer size={14} /> {bi("Print Estimate", "طباعة التقدير")}
+                      </Button>
+                      {customer && (
+                        <Button variant="secondary" onClick={() => showResult(sendEstimateWhatsapp())}>
+                          <MessageCircle size={14} /> {bi("Send Estimate via WhatsApp", "إرسال التقدير عبر واتساب")}
+                        </Button>
+                      )}
+                      {job.finalAmount != null && (
+                        <Button
+                          variant="secondary"
+                          onClick={() => printTaxInvoice({ job, customer, appliance, brand, parts: jobParts, inventoryItems, serviceOrder })}
+                        >
+                          <Printer size={14} /> {bi("Print Tax Invoice (ZATCA)", "طباعة الفاتورة الضريبية")}
+                        </Button>
+                      )}
+                      {job.finalAmount != null && customer && (
+                        <Button variant="secondary" onClick={() => showResult(sendInvoiceWhatsapp())}>
+                          <MessageCircle size={14} /> {bi("Send Invoice via WhatsApp", "إرسال الفاتورة عبر واتساب")}
+                        </Button>
+                      )}
+                    </div>
+                    {(job.finalAmount != null || jobPayments.length > 0) && (
+                      <div className="border-t pt-4 [border-color:var(--color-border)]">
+                        <p className="text-xs text-[var(--color-ink-muted)] mb-2">{bi("Payment", "الدفع")}</p>
+                        <PaymentPanel jobcardId={job.id} amount={job.finalAmount} payments={jobPayments} />
+                      </div>
+                    )}
+                  </>
+                ) : (
                   <div>
                     <p className="text-xs text-[var(--color-ink-muted)]">{bi("Created", "تاريخ الإنشاء")}</p>
                     <p className="font-medium">{formatDateTime(job.createdAt)}</p>
-                  </div>
-                </div>
-                {job.jobType === "non_warranty" && (
-                  <div className="border-t pt-4 [border-color:var(--color-border)] space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-sm font-semibold">{bi("Estimate builder", "منشئ التقدير")}</p>
-                      {job.estimateValidUntil && <Badge tone="neutral">{bi("Valid until", "صالح حتى")} {formatDate(job.estimateValidUntil)}</Badge>}
-                    </div>
-
-                    {jobEstimateLines.length > 0 ? (
-                      <div className="overflow-x-auto rounded-md border [border-color:var(--color-border)]">
-                        <table className="w-full min-w-[480px] text-sm">
-                          <thead>
-                            <tr className="text-left text-xs text-[var(--color-ink-muted)]">
-                              <th className="px-3 py-2 font-medium">{bi("Item", "البند")}</th>
-                              <th className="px-3 py-2 text-right font-medium">{bi("Qty", "الكمية")}</th>
-                              <th className="px-3 py-2 text-right font-medium">{bi("Unit price", "سعر الوحدة")}</th>
-                              <th className="px-3 py-2 text-right font-medium">{bi("Total", "الإجمالي")}</th>
-                              {canPerform(role, "set_estimate") && <th className="px-3 py-2" />}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {jobEstimateLines.map((line) => (
-                              <tr key={line.id} className="border-t [border-color:var(--color-border)]">
-                                <td className="px-3 py-2">{line.label}{line.kind === "labor" && <span className="ml-1.5 text-xs text-[var(--color-ink-muted)]">({bi("Labor", "عمالة")})</span>}</td>
-                                <td className="px-3 py-2 text-right tabular-nums">{line.qty}</td>
-                                <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(line.unitPrice)}</td>
-                                <td className="px-3 py-2 text-right font-medium tabular-nums">{formatCurrency(line.totalPrice)}</td>
-                                {canPerform(role, "set_estimate") && (
-                                  <td className="px-3 py-2 text-right">
-                                    <button onClick={() => showResult(removeEstimateLine(line.id))} className="text-[var(--color-ink-muted)] hover:text-[var(--color-status-critical)]" title="Remove line item" aria-label="Remove line item">
-                                      <Trash2 size={14} />
-                                    </button>
-                                  </td>
-                                )}
-                              </tr>
-                            ))}
-                          </tbody>
-                          <tfoot>
-                            <tr className="border-t [border-color:var(--color-border)]"><td colSpan={3} className="px-3 py-2 text-right text-[var(--color-ink-muted)]">{bi("Subtotal (excl. VAT)", "الإجمالي (غير شامل الضريبة)")}</td><td className="px-3 py-2 text-right tabular-nums">{formatCurrency((job.estimateAmount ?? 0) / 1.15)}</td></tr>
-                            <tr className="border-t [border-color:var(--color-border)]"><td colSpan={3} className="px-3 py-2 text-right text-[var(--color-ink-muted)]">{bi("VAT (15%)", "ضريبة القيمة المضافة (15%)")}</td><td className="px-3 py-2 text-right tabular-nums">{formatCurrency((job.estimateAmount ?? 0) - (job.estimateAmount ?? 0) / 1.15)}</td></tr>
-                            <tr className="border-t font-semibold [border-color:var(--color-border)]"><td colSpan={3} className="px-3 py-2 text-right">{bi("Estimated total (incl. VAT)", "الإجمالي المقدر (شامل الضريبة)")}</td><td className="px-3 py-2 text-right tabular-nums">{formatCurrency(job.estimateAmount)}</td></tr>
-                          </tfoot>
-                        </table>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-[var(--color-ink-muted)]">{bi("No estimate items yet.", "لا توجد بنود تقدير بعد.")}</p>
-                    )}
-
-                    {canPerform(role, "set_estimate") && (job.currentStage === "Estimate" || job.currentStage === "Customer Approval") && (
-                      <div className="space-y-3 rounded-md bg-black/[0.03] p-3 dark:bg-white/[0.05]">
-                        <div className="grid gap-2 sm:grid-cols-[1fr_140px_auto] sm:items-end">
-                          <Field label={bi("Labor / service charge", "أجرة العمل / رسوم الخدمة")}><Input value={laborLabel} onChange={(event) => setLaborLabel(event.target.value)} placeholder="e.g. Diagnostic & labor charge" /></Field>
-                          <Field label={bi("Amount (SAR)", "المبلغ (ريال)")}><Input type="number" min="0" value={laborAmount} onChange={(event) => setLaborAmount(event.target.value)} /></Field>
-                          <Button variant="secondary" onClick={() => showResult(addEstimateLine(job.id, { kind: "labor", label: laborLabel, qty: 1, unitPrice: Number(laborAmount) }), () => { setLaborLabel(""); setLaborAmount(""); })}><Plus size={14} /> {bi("Add", "إضافة")}</Button>
-                        </div>
-                        <div className="grid gap-2 sm:grid-cols-[1fr_80px_120px_auto] sm:items-end">
-                          <Field label={bi("Estimated part", "قطعة مقدّرة")}>
-                            <Select value={estPartItemId} onChange={(event) => { const item = inventoryItems.find((candidate) => candidate.id === event.target.value); setEstPartItemId(event.target.value); setEstPartUnitPrice(item ? String(item.unitPrice) : ""); }}>
-                              <option value="">{bi("Choose part...", "اختر قطعة...")}</option>
-                              {inventoryItems.map((item) => <option key={item.id} value={item.id}>{item.name}{item.nameAr ? ` · ${item.nameAr}` : ""}</option>)}
-                            </Select>
-                          </Field>
-                          <Field label={bi("Qty", "الكمية")}><Input type="number" min="1" value={estPartQty} onChange={(event) => setEstPartQty(event.target.value)} /></Field>
-                          <Field label={bi("Unit price (SAR)", "سعر الوحدة (ريال)")}><Input type="number" min="0" value={estPartUnitPrice} onChange={(event) => setEstPartUnitPrice(event.target.value)} /></Field>
-                          <Button
-                            variant="secondary"
-                            onClick={() => {
-                              const item = inventoryItems.find((candidate) => candidate.id === estPartItemId);
-                              showResult(
-                                addEstimateLine(job.id, { kind: "part", label: item?.name ?? "Part", itemId: estPartItemId || undefined, qty: Number(estPartQty), unitPrice: Number(estPartUnitPrice) }),
-                                () => { setEstPartItemId(""); setEstPartQty("1"); setEstPartUnitPrice(""); }
-                              );
-                            }}
-                          >
-                            <Plus size={14} /> {bi("Add", "إضافة")}
-                          </Button>
-                        </div>
-                        <div className="flex flex-wrap items-end gap-2">
-                          <Field label={bi("Estimate valid until", "التقدير صالح حتى")}><Input type="date" value={estimateValidUntilInput} onChange={(event) => setEstimateValidUntilInput(event.target.value)} /></Field>
-                          <Button variant="secondary" onClick={() => showResult(setEstimateValidUntil(job.id, estimateValidUntilInput))}>{bi("Save", "حفظ")}</Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-                {job.currentStage === "Customer Approval" && job.customerApproved !== true && canPerform(role, "record_customer_approval") && (
-                  <div className="border-t pt-4 [border-color:var(--color-border)] flex gap-2">
-                    <Button onClick={() => showResult(approveCustomer(job.id, true))}><CheckCircle2 size={14} /> {bi("Approve", "موافقة")}</Button>
-                    {job.customerApproved == null && <Button variant="danger" onClick={() => showResult(approveCustomer(job.id, false))}><XCircle size={14} /> {bi("Decline", "رفض")}</Button>}
-                  </div>
-                )}
-                <div className="border-t pt-4 [border-color:var(--color-border)] flex gap-2 flex-wrap">
-                  <Button
-                    variant="secondary"
-                    onClick={() => printEstimate({
-                      job, customer, appliance, brand, estimateLines: jobEstimateLines, inventoryItems,
-                      onApprove: () => approveCustomer(job.id, true),
-                      onDecline: () => approveCustomer(job.id, false),
-                    })}
-                  >
-                    <Printer size={14} /> {bi("Print Estimate", "طباعة التقدير")}
-                  </Button>
-                  {customer && (
-                    <Button variant="secondary" onClick={() => showResult(sendEstimateWhatsapp())}>
-                      <MessageCircle size={14} /> {bi("Send Estimate via WhatsApp", "إرسال التقدير عبر واتساب")}
-                    </Button>
-                  )}
-                  {job.finalAmount != null && (
-                    <Button
-                      variant="secondary"
-                      onClick={() => printTaxInvoice({ job, customer, appliance, brand, parts: jobParts, inventoryItems, serviceOrder })}
-                    >
-                      <Printer size={14} /> {bi("Print Tax Invoice (ZATCA)", "طباعة الفاتورة الضريبية")}
-                    </Button>
-                  )}
-                  {job.finalAmount != null && customer && (
-                    <Button variant="secondary" onClick={() => showResult(sendInvoiceWhatsapp())}>
-                      <MessageCircle size={14} /> {bi("Send Invoice via WhatsApp", "إرسال الفاتورة عبر واتساب")}
-                    </Button>
-                  )}
-                </div>
-                {job.jobType === "non_warranty" && (job.finalAmount != null || jobPayments.length > 0) && (
-                  <div className="border-t pt-4 [border-color:var(--color-border)]">
-                    <p className="text-xs text-[var(--color-ink-muted)] mb-2">{bi("Payment", "الدفع")}</p>
-                    <PaymentPanel jobcardId={job.id} amount={job.finalAmount} payments={jobPayments} />
                   </div>
                 )}
               </div>

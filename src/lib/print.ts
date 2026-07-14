@@ -13,14 +13,16 @@ export function printEstimate({
   onApprove?: () => ActionResult;
   onDecline?: () => ActionResult;
 }) {
+  const KIND_LABEL: Record<JobCardEstimateLine["kind"], string> = { labor: "Labor", part: "", other: "Other", discount: "Discount" };
   const lineRows = estimateLines
     .map((line) => {
       const item = line.itemId ? inventoryItems.find((i) => i.id === line.itemId) : undefined;
       const nameCell = item?.nameAr
         ? `${line.label}<div class="ar" dir="rtl">${item.nameAr}</div>`
         : line.label;
-      const kindTag = line.kind === "labor" ? `<span class="tag">Labor</span>` : "";
-      return `<tr><td>${nameCell}${kindTag}</td><td class="num">${line.qty}</td><td class="num">${formatCurrency(line.unitPrice)}</td><td class="num">${formatCurrency(line.totalPrice)}</td></tr>`;
+      const kindTag = KIND_LABEL[line.kind] ? `<span class="tag">${KIND_LABEL[line.kind]}</span>` : "";
+      const notesRow = line.notes ? `<div class="line-note">${line.notes}</div>` : "";
+      return `<tr><td>${nameCell}${kindTag}${notesRow}</td><td class="num">${line.qty}</td><td class="num">${formatCurrency(line.unitPrice)}</td><td class="num">${formatCurrency(line.totalPrice)}</td></tr>`;
     })
     .join("");
   const total = job.estimateAmount ?? 0;
@@ -51,6 +53,7 @@ export function printEstimate({
   .num { text-align: right; font-variant-numeric: tabular-nums; }
   .ar { color: #666; font-size: 12px; }
   .tag { margin-left: 6px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.03em; color: #898781; border: 1px solid #e1e0d9; border-radius: 999px; padding: 1px 6px; }
+  .line-note { margin-top: 2px; font-size: 11px; color: #898781; font-style: italic; }
   tfoot td { border-bottom: none; }
   tfoot tr:last-child td { font-weight: 700; border-top: 2px solid #0b0b0b; padding-top: 10px; }
   .validity { margin: 16px 0; font-size: 12px; color: #c2410c; font-weight: 600; }

@@ -55,7 +55,7 @@ export default function NewJobCard() {
   const initialApplianceId = searchParams.get("applianceId") ?? "";
   const [customerId, setCustomerId] = useState(initialCustomerId);
   const [branchId, setBranchId] = useState(initialCustomer?.branchId ?? (selectedBranchId === "all" ? branches[0]?.id ?? "" : selectedBranchId));
-  const [newCustomer, setNewCustomer] = useState({ name: "", phone: "", whatsapp: "", email: "", address: "" });
+  const [newCustomer, setNewCustomer] = useState({ firstName: "", fatherName: "", grandfatherName: "", familyName: "", phone: "", homePhone: "", whatsapp: "", email: "", address: "" });
   const [lines, setLines] = useState<IntakeLine[]>([emptyLine(initialApplianceId)]);
 
   const scopedCustomers = useMemo(() => filterByBranch(customers, selectedBranchId), [customers, selectedBranchId]);
@@ -63,7 +63,7 @@ export default function NewJobCard() {
   const applianceMap = useMemo(() => new Map(appliances.map((appliance) => [appliance.id, appliance])), [appliances]);
   const selectedIds = useMemo(() => new Set(lines.map((line) => line.applianceId).filter((id) => id && id !== NEW_PRODUCT)), [lines]);
   const branchTechnicians = useMemo(() => technicians.filter((technician) => technician.branchId === branchId && technician.status !== "Off Duty"), [technicians, branchId]);
-  const customerReady = customerId === NEW_CUSTOMER ? Boolean(newCustomer.name.trim() && newCustomer.phone.trim() && branchId) : Boolean(customerId);
+  const customerReady = customerId === NEW_CUSTOMER ? Boolean(newCustomer.firstName.trim() && newCustomer.familyName.trim() && newCustomer.phone.trim() && branchId) : Boolean(customerId);
   const lineReady = (line: IntakeLine) => {
     if (!line.problem.trim() || line.problem.trim().length <= 3) return false;
     if (line.applianceId === NEW_PRODUCT) return Boolean(line.newProduct.brandId && line.newProduct.model.trim() && line.newProduct.serialNo.trim() && line.newProduct.purchaseDate);
@@ -101,8 +101,11 @@ export default function NewJobCard() {
     const customer = customerId === NEW_CUSTOMER
       ? addCustomer({
         ...newCustomer,
+        grandfatherName: newCustomer.grandfatherName || undefined,
+        homePhone: newCustomer.homePhone || undefined,
         whatsapp: newCustomer.whatsapp.trim() || newCustomer.phone,
         branchId,
+        customerType: "individual",
       })
       : customers.find((candidate) => candidate.id === customerId);
     if (!customer) {
@@ -165,12 +168,19 @@ export default function NewJobCard() {
           </Field>
         </div>
         {customerId === NEW_CUSTOMER && (
-          <div className="grid gap-4 rounded-md bg-black/[0.03] p-3 dark:bg-white/[0.05] sm:grid-cols-2">
-            <Field label={bi("Customer name", "اسم العميل")}><Input value={newCustomer.name} onChange={(event) => setNewCustomer({ ...newCustomer, name: event.target.value })} /></Field>
-            <Field label={bi("Phone", "الهاتف")}><Input value={newCustomer.phone} onChange={(event) => setNewCustomer({ ...newCustomer, phone: event.target.value })} placeholder="+966..." /></Field>
-            <Field label={bi("WhatsApp", "واتساب")}><Input value={newCustomer.whatsapp} onChange={(event) => setNewCustomer({ ...newCustomer, whatsapp: event.target.value })} placeholder="Defaults to phone" /></Field>
-            <Field label={bi("Email", "البريد الإلكتروني")}><Input value={newCustomer.email} onChange={(event) => setNewCustomer({ ...newCustomer, email: event.target.value })} /></Field>
-            <div className="sm:col-span-2"><Field label={bi("Address", "العنوان")}><Input value={newCustomer.address} onChange={(event) => setNewCustomer({ ...newCustomer, address: event.target.value })} /></Field></div>
+          <div className="space-y-3 rounded-md bg-black/[0.03] p-3 dark:bg-white/[0.05]">
+            <p className="text-xs text-[var(--color-ink-muted)]">{bi("Saudi naming convention: given name, father's name, grandfather's name (optional), family name.", "الترتيب السعودي للاسم: الاسم الأول، اسم الأب، اسم الجد (اختياري)، اسم العائلة.")}</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label={bi("First name", "الاسم الأول")}><Input value={newCustomer.firstName} onChange={(event) => setNewCustomer({ ...newCustomer, firstName: event.target.value })} /></Field>
+              <Field label={bi("Father's name", "اسم الأب")}><Input value={newCustomer.fatherName} onChange={(event) => setNewCustomer({ ...newCustomer, fatherName: event.target.value })} /></Field>
+              <Field label={bi("Grandfather's name (optional)", "اسم الجد (اختياري)")}><Input value={newCustomer.grandfatherName} onChange={(event) => setNewCustomer({ ...newCustomer, grandfatherName: event.target.value })} /></Field>
+              <Field label={bi("Family name", "اسم العائلة")}><Input value={newCustomer.familyName} onChange={(event) => setNewCustomer({ ...newCustomer, familyName: event.target.value })} /></Field>
+              <Field label={bi("Mobile phone", "الجوال")}><Input value={newCustomer.phone} onChange={(event) => setNewCustomer({ ...newCustomer, phone: event.target.value })} placeholder="+966..." /></Field>
+              <Field label={bi("Home phone (optional)", "الهاتف المنزلي (اختياري)")}><Input value={newCustomer.homePhone} onChange={(event) => setNewCustomer({ ...newCustomer, homePhone: event.target.value })} placeholder="+9661..." /></Field>
+              <Field label={bi("WhatsApp", "واتساب")}><Input value={newCustomer.whatsapp} onChange={(event) => setNewCustomer({ ...newCustomer, whatsapp: event.target.value })} placeholder="Defaults to mobile" /></Field>
+              <Field label={bi("Email", "البريد الإلكتروني")}><Input value={newCustomer.email} onChange={(event) => setNewCustomer({ ...newCustomer, email: event.target.value })} /></Field>
+              <div className="sm:col-span-2"><Field label={bi("Address", "العنوان")}><Input value={newCustomer.address} onChange={(event) => setNewCustomer({ ...newCustomer, address: event.target.value })} /></Field></div>
+            </div>
           </div>
         )}
       </Card>

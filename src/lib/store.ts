@@ -57,7 +57,7 @@ interface DemoState {
   setLang: (lang: "en" | "ar") => void;
   toggleSidebar: () => void;
 
-  addCustomer: (customer: Omit<Customer, "id" | "documentNo" | "createdAt" | "whatsappVerified">) => Customer;
+  addCustomer: (customer: Omit<Customer, "id" | "documentNo" | "createdAt" | "whatsappVerified" | "name">) => Customer;
   verifyWhatsapp: (customerId: string) => void;
   addAppliance: (appliance: Omit<Appliance, "id" | "documentNo">) => Appliance;
   addBrand: (brand: Omit<Brand, "id">) => Brand;
@@ -233,8 +233,10 @@ export const useStore = create<DemoState>()(
       addCustomer: (input) => {
         const existing = get().customers.find((customer) => customer.phone.replace(/\D/g, "") === input.phone.replace(/\D/g, ""));
         if (existing) return existing;
+        const name = [input.firstName, input.fatherName, input.grandfatherName, input.familyName].filter((part) => part?.trim()).join(" ");
         const customer: Customer = {
           ...input,
+          name,
           id: nextId("cust"),
           documentNo: `CUST-${String(get().customers.length + 1).padStart(5, "0")}`,
           createdAt: new Date().toISOString(),

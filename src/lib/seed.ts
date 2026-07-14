@@ -21,6 +21,9 @@ import type {
   Payment,
   ServiceOrder,
   RemovedPart,
+  CustomerType,
+  Gender,
+  PreferredLanguage,
 } from "./types";
 
 // Kept local (not imported from ./stageRefNo) so this file has zero runtime
@@ -81,7 +84,10 @@ export const BRANCHES: Branch[] = [
 ];
 
 const firstNames = ["Ahmed", "Fatima", "Omar", "Sara", "Yusuf", "Layla", "Hamdan", "Mariam", "Khalid", "Noura", "Rashid", "Aisha", "Tariq", "Huda", "Salem", "Amina", "Faisal", "Reem", "Bilal", "Dana"];
+const femaleFirstNames = new Set(["Fatima", "Sara", "Layla", "Mariam", "Noura", "Aisha", "Huda", "Amina", "Reem", "Dana"]);
+const maleGivenNames = ["Ahmed", "Omar", "Yusuf", "Khalid", "Rashid", "Tariq", "Salem", "Faisal", "Bilal", "Abdullah", "Mohammed", "Ibrahim", "Abdulaziz", "Sultan"];
 const lastNames = ["Al-Ghamdi", "Al-Qahtani", "Al-Otaibi", "Al-Harbi", "Al-Zahrani", "Al-Shehri", "Al-Dosari", "Al-Mutairi", "Al-Amri", "Al-Anazi"];
+const NATIONALITIES = ["Saudi", "Saudi", "Saudi", "Saudi", "Saudi", "Saudi", "Egyptian", "Pakistani", "Indian", "Filipino", "Jordanian", "Yemeni"];
 
 const CATEGORIES: ApplianceCategory[] = ["AC", "Refrigerator", "Washer", "Mobile", "TV", "Microwave"];
 
@@ -95,16 +101,37 @@ export const BRANDS: Brand[] = [
 ];
 
 export const CUSTOMERS: Customer[] = Array.from({ length: 60 }, (_, i) => {
-  const name = `${pick(firstNames)} ${pick(lastNames)}`;
+  const firstName = pick(firstNames);
+  const fatherName = pick(maleGivenNames);
+  const grandfatherName = rand() > 0.3 ? pick(maleGivenNames) : "";
+  const familyName = pick(lastNames);
+  const name = [firstName, fatherName, grandfatherName, familyName].filter(Boolean).join(" ");
+  const gender: Gender = femaleFirstNames.has(firstName) ? "female" : "male";
+  const nationality = pick(NATIONALITIES);
+  const customerType: CustomerType = rand() > 0.85 ? "corporate" : "individual";
+  const preferredLanguage: PreferredLanguage = rand() > 0.4 ? "ar" : "en";
   const branch = pick(BRANCHES);
   return {
     id: id("cust", i + 1),
     documentNo: `CUST-${String(i + 1).padStart(5, "0")}`,
+    firstName,
+    fatherName,
+    grandfatherName: grandfatherName || undefined,
+    familyName,
     name,
     phone: `+9665${int(0, 9)}${int(1000000, 9999999)}`,
+    homePhone: rand() > 0.5 ? `+9661${int(1000000, 9999999)}` : undefined,
     whatsapp: `+9665${int(0, 9)}${int(1000000, 9999999)}`,
     email: `${name.toLowerCase().replace(/\s+/g, ".")}@example.com`,
     address: `Building ${int(1, 40)}, Street ${int(1, 20)}, ${branch.city}`,
+    nationalId: `${nationality === "Saudi" ? "1" : "2"}${int(100000000, 999999999)}`,
+    nationality,
+    preferredLanguage,
+    customerType,
+    companyName: customerType === "corporate" ? `${familyName} Trading Est.` : undefined,
+    crNumber: customerType === "corporate" ? `CR-${int(1000000000, 9999999999)}` : undefined,
+    dateOfBirth: daysAgo(int(6570, 25550)).slice(0, 10),
+    gender,
     branchId: branch.id,
     createdAt: daysAgo(int(10, 700)),
     whatsappVerified: rand() > 0.35,

@@ -1,4 +1,4 @@
-import type { JobStatus, JobType, StageName, ApplianceCategory, Role } from "./types";
+import type { JobStatus, JobType, StageName, ApplianceCategory, Role, CustomerType, Gender, PreferredLanguage } from "./types";
 
 // Arabic aliases for operational vocabulary that appears throughout the app —
 // separate from the customer-facing per-item alias in InventoryItem.nameAr.
@@ -92,6 +92,21 @@ export const WARRANTY_STATUS_AR: Record<"In Warranty" | "Out of Warranty" | "Unk
 export const PAYMENT_STATUS_AR: Record<"paid" | "failed", string> = {
   paid: "مدفوع",
   failed: "فشل",
+};
+
+export const CUSTOMER_TYPE_AR: Record<CustomerType, string> = {
+  individual: "فرد",
+  corporate: "شركة",
+};
+
+export const GENDER_AR: Record<Gender, string> = {
+  male: "ذكر",
+  female: "أنثى",
+};
+
+export const PREFERRED_LANGUAGE_AR: Record<PreferredLanguage, string> = {
+  ar: "العربية",
+  en: "الإنجليزية",
 };
 
 /** "English · Arabic" — the compact inline form used in badges, headers, and buttons. */

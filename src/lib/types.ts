@@ -31,14 +31,36 @@ export interface Branch {
   city: string;
 }
 
+export type CustomerType = "individual" | "corporate";
+export type Gender = "male" | "female";
+export type PreferredLanguage = "ar" | "en";
+
 export interface Customer {
   id: string;
   documentNo: string;
+  // Saudi naming convention: given name, father's name, grandfather's name
+  // (commonly omitted), family/tribe name. `name` is the composed full name
+  // kept for display so the many read sites across the app don't need to
+  // rebuild it from parts.
+  firstName: string;
+  fatherName: string;
+  grandfatherName?: string;
+  familyName: string;
   name: string;
   phone: string;
+  homePhone?: string;
   whatsapp: string;
   email: string;
   address: string;
+  nationalId?: string;
+  nationality?: string;
+  preferredLanguage?: PreferredLanguage;
+  customerType: CustomerType;
+  companyName?: string;
+  crNumber?: string;
+  dateOfBirth?: string;
+  gender?: Gender;
+  notes?: string;
   branchId: string;
   createdAt: string;
   whatsappVerified: boolean;

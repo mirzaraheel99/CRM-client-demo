@@ -5,7 +5,7 @@ import { Badge, Card, CardHeader } from "../../components/ui";
 import { JobStatusBadge, JobTypeBadge } from "../../components/StatusBadge";
 import { WhatsappVerify } from "../../components/WhatsappVerify";
 import { formatDate, formatDateTime, formatSequence } from "../../lib/utils";
-import { bi } from "../../lib/domainAr";
+import { bi, CUSTOMER_TYPE_AR, GENDER_AR, PREFERRED_LANGUAGE_AR } from "../../lib/domainAr";
 
 export default function CustomerDetail() {
   const { id } = useParams();
@@ -28,15 +28,33 @@ export default function CustomerDetail() {
         <p className="text-sm text-[var(--color-ink-muted)]">Customer No. {customer.documentNo} | Registered {formatDate(customer.createdAt)}</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.15fr_1fr]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card>
-          <CardHeader title={bi("Contact", "بيانات الاتصال")} subtitle="Phone number is the duplicate-customer check" />
+          <CardHeader title={bi("Contact", "بيانات الاتصال")} subtitle="Mobile number is the duplicate-customer check" />
           <div className="space-y-1.5 text-sm">
-            <p><span className="text-[var(--color-ink-muted)]">{bi("Phone", "الهاتف")}:</span> {customer.phone}</p>
+            <p><span className="text-[var(--color-ink-muted)]">{bi("Mobile", "الجوال")}:</span> {customer.phone}</p>
+            {customer.homePhone && <p><span className="text-[var(--color-ink-muted)]">{bi("Home phone", "الهاتف المنزلي")}:</span> {customer.homePhone}</p>}
             <p><span className="text-[var(--color-ink-muted)]">{bi("WhatsApp", "واتساب")}:</span> {customer.whatsapp}</p>
             <p><span className="text-[var(--color-ink-muted)]">{bi("Email", "البريد الإلكتروني")}:</span> {customer.email}</p>
             <p><span className="text-[var(--color-ink-muted)]">{bi("Address", "العنوان")}:</span> {customer.address}</p>
             <div className="border-t pt-2 [border-color:var(--color-border)]"><WhatsappVerify customerId={customer.id} verified={customer.whatsappVerified} /></div>
+          </div>
+        </Card>
+        <Card>
+          <CardHeader title={bi("Personal details", "البيانات الشخصية")} subtitle="Saudi naming convention and identification" />
+          <div className="space-y-1.5 text-sm">
+            <p><span className="text-[var(--color-ink-muted)]">{bi("First name", "الاسم الأول")}:</span> {customer.firstName}</p>
+            <p><span className="text-[var(--color-ink-muted)]">{bi("Father's name", "اسم الأب")}:</span> {customer.fatherName}</p>
+            {customer.grandfatherName && <p><span className="text-[var(--color-ink-muted)]">{bi("Grandfather's name", "اسم الجد")}:</span> {customer.grandfatherName}</p>}
+            <p><span className="text-[var(--color-ink-muted)]">{bi("Family name", "اسم العائلة")}:</span> {customer.familyName}</p>
+            <p><span className="text-[var(--color-ink-muted)]">{bi("Customer type", "نوع العميل")}:</span> {bi(customer.customerType === "corporate" ? "Corporate" : "Individual", CUSTOMER_TYPE_AR[customer.customerType])}</p>
+            {customer.companyName && <p><span className="text-[var(--color-ink-muted)]">{bi("Company", "الشركة")}:</span> {customer.companyName} {customer.crNumber && `(${customer.crNumber})`}</p>}
+            {customer.nationalId && <p><span className="text-[var(--color-ink-muted)]">{bi("National ID / Iqama", "الهوية / الإقامة")}:</span> {customer.nationalId}</p>}
+            {customer.nationality && <p><span className="text-[var(--color-ink-muted)]">{bi("Nationality", "الجنسية")}:</span> {customer.nationality}</p>}
+            {customer.gender && <p><span className="text-[var(--color-ink-muted)]">{bi("Gender", "الجنس")}:</span> {bi(customer.gender === "male" ? "Male" : "Female", GENDER_AR[customer.gender])}</p>}
+            {customer.dateOfBirth && <p><span className="text-[var(--color-ink-muted)]">{bi("Date of birth", "تاريخ الميلاد")}:</span> {formatDate(customer.dateOfBirth)}</p>}
+            {customer.preferredLanguage && <p><span className="text-[var(--color-ink-muted)]">{bi("Preferred language", "اللغة المفضلة")}:</span> {bi(customer.preferredLanguage === "ar" ? "Arabic" : "English", PREFERRED_LANGUAGE_AR[customer.preferredLanguage])}</p>}
+            {customer.notes && <p><span className="text-[var(--color-ink-muted)]">{bi("Notes", "ملاحظات")}:</span> {customer.notes}</p>}
           </div>
         </Card>
         <Card>

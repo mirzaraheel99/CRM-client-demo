@@ -392,9 +392,9 @@ export default function JobCardDetail() {
         </div>
       </Modal>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr_280px] gap-5 items-start animate-rise-in" style={{ animationDelay: "40ms" }}>
+      <div className="grid grid-cols-1 xl:grid-cols-[260px_minmax(0,1fr)_280px] gap-5 items-start animate-rise-in" style={{ animationDelay: "40ms" }}>
         {/* Left panel */}
-        <Card className="space-y-4 lg:sticky lg:top-4 lg:max-h-[85vh] lg:overflow-y-auto lg:overscroll-contain">
+        <Card className="space-y-4 xl:sticky xl:top-4 xl:max-h-[85vh] xl:overflow-y-auto xl:overscroll-contain">
           <div>
             <p className="text-xs text-[var(--color-ink-muted)] mb-1">{bi("Customer", "العميل")}</p>
             <p className="text-sm font-medium">{customer ? <Link to={`/customers/${customer.id}`} className="text-[var(--color-brand-1)] hover:underline">{customer.name}</Link> : "-"}</p>
@@ -912,7 +912,7 @@ export default function JobCardDetail() {
         </Card>
 
         {/* Right panel */}
-        <div className="space-y-4 lg:sticky lg:top-4 lg:max-h-[85vh] lg:overflow-y-auto lg:overscroll-contain">
+        <div className="space-y-4 xl:sticky xl:top-4 xl:max-h-[85vh] xl:overflow-y-auto xl:overscroll-contain">
           <Card interactive className="space-y-3">
             <CardHeader title={bi("Customer Tracking", "تتبع العميل")} subtitle={bi("Self-service link — no login required", "رابط ذاتي — بدون تسجيل دخول")} />
             <TrackingShare jobId={serviceOrder?.id ?? job.id} />

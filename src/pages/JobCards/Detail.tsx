@@ -653,11 +653,11 @@ export default function JobCardDetail() {
                         {rp.returnStatus !== "returned_to_customer" && (
                           <div className="flex gap-2 mt-2">
                             {!rp.customerNotifiedAt && (
-                              <Button size="sm" variant="secondary" onClick={() => { notifyCustomerOfRemovedPart(rp.id); toast("Customer notified about removed part."); }}>
+                              <Button size="sm" variant="secondary" onClick={() => showResult(notifyCustomerOfRemovedPart(rp.id))}>
                                 {bi("Notify Customer", "إبلاغ العميل")}
                               </Button>
                             )}
-                            <Button size="sm" onClick={() => { confirmPartReturned(rp.id, "You"); toast("Marked as returned to customer."); }}>
+                            <Button size="sm" onClick={() => showResult(confirmPartReturned(rp.id))}>
                               <CheckCircle2 size={13} /> {bi("Confirm Returned", "تأكيد الإرجاع")}
                             </Button>
                           </div>
@@ -688,12 +688,10 @@ export default function JobCardDetail() {
                     <Button
                       variant="secondary"
                       disabled={!removedDesc.trim()}
-                      onClick={() => {
-                        logRemovedPart(job.id, removedDesc.trim(), removedSerial.trim() || undefined, "You");
+                      onClick={() => showResult(logRemovedPart(job.id, removedDesc.trim(), removedSerial.trim() || undefined), () => {
                         setRemovedDesc("");
                         setRemovedSerial("");
-                        toast("Removed part logged.");
-                      }}
+                      })}
                     >
                       {bi("Log Removed Part", "تسجيل قطعة مُزالة")}
                     </Button>

@@ -1,6 +1,6 @@
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard, ClipboardList, Users, PackageSearch, Tag, Boxes,
+  LayoutDashboard, ClipboardList, Users, PackageSearch, Tag, Boxes, PackageCheck,
   UserCog, GitBranch, MessageSquare, BarChart3, Smartphone, Sun, Moon,
   Languages, ChevronDown, Wrench, Menu, RotateCcw, Radar, X, Search, Settings as SettingsIcon, LogOut,
 } from "lucide-react";
@@ -25,6 +25,7 @@ const NAV: { to: string; labelKey: Parameters<typeof t>[1]; icon: ReactNode; rol
   { to: "/appliances", labelKey: "appliances", icon: <PackageSearch size={18} /> },
   { to: "/brands", labelKey: "brands", icon: <Tag size={18} />, roles: ["admin", "manager"] },
   { to: "/inventory", labelKey: "inventory", icon: <Boxes size={18} /> },
+  { to: "/asset-custody", labelKey: "assetCustody", icon: <PackageCheck size={18} /> },
   { to: "/technicians", labelKey: "technicians", icon: <UserCog size={18} />, roles: ["admin", "manager", "supervisor"] },
   { to: "/workflow", labelKey: "workflow", icon: <GitBranch size={18} />, roles: ["admin", "manager"] },
   { to: "/communications", labelKey: "communications", icon: <MessageSquare size={18} /> },

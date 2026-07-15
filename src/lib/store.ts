@@ -145,9 +145,9 @@ interface DemoState {
   sendMaintenanceReminder: (applianceId: string) => ActionResult;
   recordPayment: (jobcardId: string, method: PaymentMethod, amount: number, installments?: number, source?: "internal" | "customer") => PaymentResult;
 
-  logRemovedPart: (jobcardId: string, description: string, serialNo: string | undefined, removedBy: string) => RemovedPart;
-  notifyCustomerOfRemovedPart: (removedPartId: string) => void;
-  confirmPartReturned: (removedPartId: string, confirmedBy: string) => void;
+  logRemovedPart: (jobcardId: string, description: string, serialNo: string | undefined) => Promise<ActionResult>;
+  notifyCustomerOfRemovedPart: (removedPartId: string) => Promise<ActionResult>;
+  confirmPartReturned: (removedPartId: string) => Promise<ActionResult>;
 
   resetDemoData: () => void;
 }
@@ -179,6 +179,7 @@ const initialSlice = () => ({
   serviceOrders: [] as ServiceOrder[],
   jobCards: [] as JobCard[],
   stageHistory: [] as JobCardStageHistory[],
+  removedParts: [] as RemovedPart[],
   attachments: clone(seed.ATTACHMENTS),
   partsUsed: clone(seed.PARTS_USED),
   estimateLineItems: clone(seed.ESTIMATE_LINE_ITEMS),
@@ -186,7 +187,6 @@ const initialSlice = () => ({
   communicationLogs: clone(seed.COMMUNICATION_LOGS),
   workflows: clone(seed.WORKFLOWS),
   payments: clone(seed.PAYMENTS),
-  removedParts: clone(seed.REMOVED_PARTS),
 });
 
 const STAGE_TEMPLATE: Partial<Record<StageName, string>> = {
@@ -326,7 +326,7 @@ export const useStore = create<DemoState>()(
       hydrate: async () => {
         set({ hydrating: true });
         try {
-          const [branches, customers, brands, technicians, appliances, serviceOrders, jobCards] = await Promise.all([
+          const [branches, customers, brands, technicians, appliances, serviceOrders, jobCards, removedParts] = await Promise.all([
             api.get<Branch[]>("/api/branches"),
             api.get<Customer[]>("/api/customers"),
             api.get<Brand[]>("/api/brands"),
@@ -334,11 +334,12 @@ export const useStore = create<DemoState>()(
             api.get<Appliance[]>("/api/appliances"),
             api.get<ServiceOrder[]>("/api/service-orders"),
             api.get<(JobCard & { stageHistory?: JobCardStageHistory[] })[]>("/api/job-cards"),
+            api.get<RemovedPart[]>("/api/removed-parts"),
           ]);
           const stageHistory = jobCards.flatMap((job) => job.stageHistory ?? []);
           set({
             branches, customers, brands, technicians, appliances, serviceOrders,
-            jobCards, stageHistory,
+            jobCards, stageHistory, removedParts,
             hydrated: true, hydrating: false,
           });
         } catch {
@@ -900,10 +901,10 @@ export const useStore = create<DemoState>()(
 
       resetDemoData: () => {
         counter = COUNTER_START;
-        const { branches, customers, brands, technicians, appliances, serviceOrders, jobCards, stageHistory } = get();
+        const { branches, customers, brands, technicians, appliances, serviceOrders, jobCards, stageHistory, removedParts } = get();
         set({
           ...initialSlice(),
-          branches, customers, brands, technicians, appliances, serviceOrders, jobCards, stageHistory,
+          branches, customers, brands, technicians, appliances, serviceOrders, jobCards, stageHistory, removedParts,
           theme: "light",
           lang: "en",
           sidebarCollapsed: false,
@@ -912,36 +913,41 @@ export const useStore = create<DemoState>()(
         });
       },
 
-      logRemovedPart: (jobcardId, description, serialNo, removedBy) => {
-        const part: RemovedPart = {
-          id: nextId("rp"),
-          jobcardId,
-          description,
-          serialNo,
-          removedAt: new Date().toISOString(),
-          removedBy,
-          returnStatus: "pending",
-        };
-        set((s) => ({ removedParts: [part, ...s.removedParts] }));
-        return part;
+      logRemovedPart: async (jobcardId, description, serialNo) => {
+        if (!canPerform(get().role, "add_part")) return result(false, "Your role cannot log removed parts.");
+        if (!description.trim()) return result(false, "Describe the removed part.");
+        try {
+          await api.post(`/api/job-cards/${jobcardId}/removed-parts`, { description: description.trim(), serialNo });
+          const removedParts = await api.get<RemovedPart[]>("/api/removed-parts");
+          set({ removedParts });
+          return result(true, "Removed part logged.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to log removed part.");
+        }
       },
 
-      notifyCustomerOfRemovedPart: (removedPartId) => {
-        set((s) => ({
-          removedParts: s.removedParts.map((p) =>
-            p.id === removedPartId ? { ...p, customerNotifiedAt: new Date().toISOString() } : p
-          ),
-        }));
+      notifyCustomerOfRemovedPart: async (removedPartId) => {
+        if (!canPerform(get().role, "add_part")) return result(false, "Your role cannot notify customers about removed parts.");
+        try {
+          await api.patch(`/api/removed-parts/${removedPartId}/notify`);
+          const removedParts = await api.get<RemovedPart[]>("/api/removed-parts");
+          set({ removedParts });
+          return result(true, "Customer notified about removed part.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to notify customer.");
+        }
       },
 
-      confirmPartReturned: (removedPartId, confirmedBy) => {
-        set((s) => ({
-          removedParts: s.removedParts.map((p) =>
-            p.id === removedPartId
-              ? { ...p, returnStatus: "returned_to_customer", returnConfirmedAt: new Date().toISOString(), returnConfirmedBy: confirmedBy }
-              : p
-          ),
-        }));
+      confirmPartReturned: async (removedPartId) => {
+        if (!canPerform(get().role, "add_part")) return result(false, "Your role cannot confirm returned parts.");
+        try {
+          await api.patch(`/api/removed-parts/${removedPartId}/confirm-returned`);
+          const removedParts = await api.get<RemovedPart[]>("/api/removed-parts");
+          set({ removedParts });
+          return result(true, "Marked as returned to customer.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to confirm return.");
+        }
       },
     }),
     {
@@ -970,7 +976,6 @@ export const useStore = create<DemoState>()(
         communicationLogs: state.communicationLogs,
         workflows: state.workflows,
         payments: state.payments,
-        removedParts: state.removedParts,
       }),
     }
   )

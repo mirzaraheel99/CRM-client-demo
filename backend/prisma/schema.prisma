@@ -254,6 +254,7 @@ model JobCard {
   assetHandedOverBy String?
 
   stageHistory JobCardStageHistory[]
+  removedParts RemovedPart[]
 
   @@index([currentStage])
 }
@@ -267,4 +268,25 @@ model JobCardStageHistory {
   timestamp  DateTime @default(now())
   notes      String
   stageRefNo String?
+}
+
+// Custody chain for a part removed from a customer's unit during repair
+// (e.g. a faulty compressor) — this exists to settle "you never gave our
+// old part back" disputes, so it needs to be real, persisted evidence,
+// not browser-only state.
+model RemovedPart {
+  id                String    @id @default(cuid())
+  jobcardId         String
+  jobCard           JobCard   @relation(fields: [jobcardId], references: [id])
+  description       String
+  serialNo          String?
+  removedAt         DateTime  @default(now())
+  removedBy         String
+  customerNotifiedAt DateTime?
+  returnStatus      String    @default("pending")
+  returnConfirmedAt DateTime?
+  returnConfirmedBy String?
+
+  @@index([jobcardId])
+  @@index([returnStatus])
 }

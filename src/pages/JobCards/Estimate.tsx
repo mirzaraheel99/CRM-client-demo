@@ -26,9 +26,10 @@ const ESTIMATE_KIND_TONE: Record<EstimateLineKind, "neutral" | "brand" | "warnin
   discount: "good",
 };
 
-function showResult(action: ActionResult, onSuccess?: () => void) {
-  toast(action.message, action.ok ? "success" : "error");
-  if (action.ok) onSuccess?.();
+async function showResult(action: ActionResult | Promise<ActionResult>, onSuccess?: () => void) {
+  const outcome = await action;
+  toast(outcome.message, outcome.ok ? "success" : "error");
+  if (outcome.ok) onSuccess?.();
 }
 
 function hijriDate(iso: string): string {

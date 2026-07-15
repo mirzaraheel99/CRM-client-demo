@@ -16,9 +16,9 @@ export default function Brands() {
   const [addFormTab, setAddFormTab] = useState("Details");
   const [form, setForm] = useState({ name: "", nameAr: "", warrantyMonths: 12, rules: "" });
 
-  function submit() {
+  async function submit() {
     if (!form.name.trim()) return;
-    addBrand({ ...form, nameAr: form.nameAr.trim() || undefined });
+    await addBrand({ ...form, nameAr: form.nameAr.trim() || undefined });
     setForm({ name: "", nameAr: "", warrantyMonths: 12, rules: "" });
     setAddFormTab("Details");
     setOpen(false);

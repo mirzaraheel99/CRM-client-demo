@@ -18,8 +18,8 @@ export function printEstimate({
   brand?: Brand;
   estimateLines: JobCardEstimateLine[];
   inventoryItems: InventoryItem[];
-  onApprove?: () => ActionResult;
-  onDecline?: () => ActionResult;
+  onApprove?: () => Promise<ActionResult>;
+  onDecline?: () => Promise<ActionResult>;
 }) {
   const KIND_LABEL: Record<JobCardEstimateLine["kind"], string> = { labor: "Labor", part: "", other: "Other", discount: "Discount" };
   const lineRows = estimateLines
@@ -157,9 +157,9 @@ export function printEstimate({
     const approveBtn = win.document.getElementById("fixflow-approve-btn") as HTMLButtonElement | null;
     const declineBtn = win.document.getElementById("fixflow-decline-btn") as HTMLButtonElement | null;
     const status = win.document.getElementById("fixflow-decision-status");
-    const handleDecision = (action: (() => ActionResult) | undefined) => {
+    const handleDecision = async (action: (() => Promise<ActionResult>) | undefined) => {
       if (!action) return;
-      const outcome = action();
+      const outcome = await action();
       if (status) status.textContent = outcome.message;
       if (outcome.ok) {
         approveBtn?.setAttribute("disabled", "true");

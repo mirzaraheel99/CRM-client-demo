@@ -116,6 +116,23 @@ export default async function jobCardRoutes(fastify: FastifyInstance) {
   );
 
   fastify.patch(
+    "/api/job-cards/:id/final-amount",
+    { preHandler: [fastify.authenticate, fastify.requirePermission("finalize_job")] },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const body = z.object({ finalAmount: z.number().positive() }).safeParse(request.body);
+      if (!body.success) return reply.code(400).send({ ok: false, message: "Final amount must be greater than zero." });
+      const jobCard = await prisma.jobCard.findUnique({ where: { id } });
+      if (!jobCard) return reply.code(404).send({ ok: false, message: "Job card not found." });
+      if (jobCard.jobType !== "non_warranty") return reply.code(400).send({ ok: false, message: "Warranty jobs do not require customer payment." });
+      if ((jobCard.estimateAmount ?? 0) > 0 && body.data.finalAmount > (jobCard.estimateAmount ?? 0)) {
+        return reply.code(400).send({ ok: false, message: "Final amount cannot exceed the customer-approved estimate." });
+      }
+      return prisma.jobCard.update({ where: { id }, data: { finalAmount: body.data.finalAmount } });
+    }
+  );
+
+  fastify.patch(
     "/api/job-cards/:id/customer-approval",
     { preHandler: [fastify.authenticate, fastify.requirePermission("record_customer_approval")] },
     async (request, reply) => {

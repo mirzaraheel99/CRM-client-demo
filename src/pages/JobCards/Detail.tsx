@@ -152,7 +152,7 @@ export default function JobCardDetail() {
     setAddProductTab("Basic");
   }
 
-  function submitAddProduct() {
+  async function submitAddProduct() {
     if (!job || !serviceOrder) return;
     let applianceId = addProductForm.applianceId;
     let jobType: JobType;
@@ -164,7 +164,7 @@ export default function JobCardDetail() {
       const brand = brands.find((candidate) => candidate.id === newProductForm.brandId)!;
       const months = (Date.now() - new Date(newProductForm.purchaseDate).getTime()) / (1000 * 60 * 60 * 24 * 30);
       const warrantyStatus = months < brand.warrantyMonths ? "In Warranty" as const : "Out of Warranty" as const;
-      const created = addAppliance({ ...applianceFormToInput(newProductForm), warrantyStatus });
+      const created = await addAppliance({ ...applianceFormToInput(newProductForm), warrantyStatus });
       applianceId = created.id;
       jobType = warrantyStatus === "In Warranty" ? "warranty" : "non_warranty";
     } else {
@@ -176,7 +176,7 @@ export default function JobCardDetail() {
       jobType = appliance.warrantyStatus === "In Warranty" ? "warranty" : "non_warranty";
     }
     if (addProductForm.jobTypeOverride !== "auto") jobType = addProductForm.jobTypeOverride;
-    const outcome = addProductToOrder({
+    const outcome = await addProductToOrder({
       serviceOrderId: serviceOrder.id,
       applianceId,
       jobType,
@@ -253,9 +253,10 @@ export default function JobCardDetail() {
     return sendCommunication(job.id, "whatsapp", text);
   }
 
-  function showResult(action: ActionResult, onSuccess?: () => void) {
-    toast(action.message, action.ok ? "success" : "error");
-    if (action.ok) onSuccess?.();
+  async function showResult(action: ActionResult | Promise<ActionResult>, onSuccess?: () => void) {
+    const outcome = await action;
+    toast(outcome.message, outcome.ok ? "success" : "error");
+    if (outcome.ok) onSuccess?.();
   }
 
   function uploadPhoto(stageName: StageName, file: File) {

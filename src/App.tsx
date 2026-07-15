@@ -29,7 +29,12 @@ const Login = lazy(() => import("./pages/Login"));
 function ShellRoutes() {
   const role = useStore((state) => state.role);
   const currentUser = useStore((state) => state.currentUser);
+  const sessionChecked = useStore((state) => state.sessionChecked);
   const location = useLocation();
+
+  if (!sessionChecked) {
+    return <TrackingLoading />;
+  }
 
   if (!currentUser) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
@@ -77,6 +82,10 @@ function TrackingLoading() {
 
 export default function App() {
   const { theme, lang } = useStore();
+
+  useEffect(() => {
+    void useStore.getState().bootstrap();
+  }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);

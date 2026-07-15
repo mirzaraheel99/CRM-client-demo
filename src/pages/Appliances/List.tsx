@@ -63,11 +63,11 @@ export default function ApplianceList() {
   const currentPage = Math.min(page, Math.max(1, Math.ceil(rows.length / PAGE_SIZE)));
   const pagedRows = rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  function submit() {
+  async function submit() {
     if (!form.brandId || !form.model.trim() || !form.serialNo.trim() || !form.purchaseDate) return;
     const brand = brands.find((candidate) => candidate.id === form.brandId)!;
     const months = (Date.now() - new Date(form.purchaseDate).getTime()) / (1000 * 60 * 60 * 24 * 30);
-    const appliance = addAppliance({
+    const appliance = await addAppliance({
       ...applianceFormToInput(form),
       warrantyStatus: months < brand.warrantyMonths ? "In Warranty" : "Out of Warranty",
     });

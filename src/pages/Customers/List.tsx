@@ -99,10 +99,10 @@ export default function CustomerList() {
   const currentPage = Math.min(page, Math.max(1, Math.ceil(rows.length / PAGE_SIZE)));
   const pagedRows = rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  function submit() {
+  async function submit() {
     if (!form.firstName.trim() || !form.familyName.trim() || !form.phone.trim()) return;
     const existing = customers.find((customer) => customer.phone.replace(/\D/g, "") === form.phone.replace(/\D/g, ""));
-    const saved = addCustomer({
+    const saved = await addCustomer({
       ...form,
       grandfatherName: form.grandfatherName || undefined,
       firstNameAr: form.firstNameAr.trim() || undefined,

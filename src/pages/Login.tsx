@@ -21,14 +21,17 @@ export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   if (currentUser) {
     return <Navigate to={location.state?.from ?? "/"} replace />;
   }
 
-  function submit(event: React.FormEvent) {
+  async function submit(event: React.FormEvent) {
     event.preventDefault();
-    const outcome = login(username, password);
+    setSubmitting(true);
+    const outcome = await login(username, password);
+    setSubmitting(false);
     if (!outcome.ok) { setError(outcome.message); return; }
     setError("");
     navigate(location.state?.from ?? "/", { replace: true });
@@ -60,8 +63,8 @@ export default function Login() {
             <Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" />
           </Field>
           {error && <p className="text-[11px] text-[var(--color-status-serious)]">{error}</p>}
-          <Button type="submit" className="w-full justify-center" disabled={!username.trim() || !password.trim()}>
-            <LogIn size={14} /> {bi("Sign in", "تسجيل الدخول")}
+          <Button type="submit" className="w-full justify-center" disabled={!username.trim() || !password.trim() || submitting}>
+            <LogIn size={14} /> {submitting ? bi("Signing in...", "جارٍ تسجيل الدخول...") : bi("Sign in", "تسجيل الدخول")}
           </Button>
         </form>
 

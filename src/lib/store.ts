@@ -3,9 +3,8 @@ import { persist } from "zustand/middleware";
 import * as seed from "./seed";
 import { canAdvanceCurrentStage, canPerform, setActionRole, resetActionRoles, type DemoAction } from "./permissions";
 import { MESSAGE_TEMPLATES, renderTemplate } from "./templates";
-import { stageBlockers } from "./workflow";
 import { formatDate } from "./utils";
-import { nextStageRefNo } from "./stageRefNo";
+import { api, ApiError, getToken, setToken } from "./api";
 import type {
   ActionResult, Customer, Appliance, ApplianceTelemetry, Brand, Technician, InventoryItem, InventoryLocation,
   InventoryStock, InventoryTransaction, JobCard, JobCardStageHistory,
@@ -46,8 +45,11 @@ interface DemoState {
   payments: Payment[];
   removedParts: RemovedPart[];
 
-  users: DemoUser[];
-  currentUser: DemoUser | null;
+  currentUser: (Omit<DemoUser, "password">) | null;
+  token: string | null;
+  hydrated: boolean;
+  hydrating: boolean;
+  sessionChecked: boolean;
   role: Role;
   selectedBranchId: string | "all";
   theme: "light" | "dark";
@@ -63,16 +65,18 @@ interface DemoState {
   setLang: (lang: "en" | "ar") => void;
   toggleSidebar: () => void;
   setAliasFieldsEnabled: (enabled: boolean) => ActionResult;
-  login: (username: string, password: string) => ActionResult;
+  login: (username: string, password: string) => Promise<ActionResult>;
   logout: () => void;
+  bootstrap: () => Promise<void>;
+  hydrate: () => Promise<void>;
   updateRolePermission: (action: DemoAction, targetRole: Role, allowed: boolean) => ActionResult;
   resetRolePermissions: () => ActionResult;
 
-  addCustomer: (customer: Omit<Customer, "id" | "documentNo" | "createdAt" | "whatsappVerified" | "name">) => Customer;
+  addCustomer: (customer: Omit<Customer, "id" | "documentNo" | "createdAt" | "whatsappVerified" | "name">) => Promise<Customer>;
   verifyWhatsapp: (customerId: string) => void;
-  addAppliance: (appliance: Omit<Appliance, "id" | "documentNo">) => Appliance;
-  addBrand: (brand: Omit<Brand, "id">) => Brand;
-  addTechnician: (technician: Omit<Technician, "id">) => Technician;
+  addAppliance: (appliance: Omit<Appliance, "id" | "documentNo">) => Promise<Appliance>;
+  addBrand: (brand: Omit<Brand, "id">) => Promise<Brand>;
+  addTechnician: (technician: Omit<Technician, "id">) => Promise<Technician>;
   addInventoryItem: (item: Omit<InventoryItem, "id">) => InventoryItem;
   addInventoryTransaction: (transaction: Omit<InventoryTransaction, "id" | "timestamp">) => ActionResult;
 
@@ -90,35 +94,35 @@ interface DemoState {
     preferredDate?: string;
     preferredTimeSlot?: string;
     buyerVatNumber?: string;
-  }) => ServiceOrderResult;
+  }) => Promise<ServiceOrderResult>;
   addProductToOrder: (input: {
     serviceOrderId: string;
     applianceId: string;
     jobType: JobCard["jobType"];
     problemDescription: string;
     technicianId?: string | null;
-  }) => JobResult;
+  }) => Promise<JobResult>;
   createJobCard: (input: {
     customerId: string;
     applianceId: string;
     jobType: JobCard["jobType"];
     problemDescription: string;
     branchId: string;
-  }) => JobResult;
-  advanceStage: (jobcardId: string, stage: StageName, notes: string, changedBy: string) => ActionResult;
-  assignTechnician: (jobcardId: string, technicianId: string) => ActionResult;
-  setDiagnosis: (jobcardId: string, notes: string) => ActionResult;
-  addEstimateLine: (jobcardId: string, input: { kind: EstimateLineKind; label: string; descriptionAr?: string; catNo?: string; notes?: string; itemId?: string; qty: number; unitPrice: number; discountAmount?: number }) => ActionResult;
-  updateEstimateLine: (lineId: string, patch: { qty?: number; unitPrice?: number; label?: string; descriptionAr?: string; catNo?: string; notes?: string; discountAmount?: number }) => ActionResult;
-  removeEstimateLine: (lineId: string) => ActionResult;
-  setEstimateValidUntil: (jobcardId: string, date: string) => ActionResult;
-  setEstimateHeader: (jobcardId: string, patch: { preparedBy?: string; termsOfPayment?: string; poNumber?: string; notes?: string; previousQuoteNo?: string; customerRequest?: string; deliveryLeadTime?: string; subject?: string }) => ActionResult;
-  approveCustomer: (jobcardId: string, approved: boolean, source?: "internal" | "customer") => ActionResult;
-  setRepairNotes: (jobcardId: string, notes: string) => ActionResult;
-  setQaApproved: (jobcardId: string, approved: boolean) => ActionResult;
-  setFinalAmount: (jobcardId: string, amount: number) => ActionResult;
-  captureCustomerSignature: (jobcardId: string, signature: string) => ActionResult;
-  confirmAssetHandover: (jobcardId: string, confirmedBy: string) => ActionResult;
+  }) => Promise<JobResult>;
+  advanceStage: (jobcardId: string, stage: StageName, notes: string, changedBy: string) => Promise<ActionResult>;
+  assignTechnician: (jobcardId: string, technicianId: string) => Promise<ActionResult>;
+  setDiagnosis: (jobcardId: string, notes: string) => Promise<ActionResult>;
+  addEstimateLine: (jobcardId: string, input: { kind: EstimateLineKind; label: string; descriptionAr?: string; catNo?: string; notes?: string; itemId?: string; qty: number; unitPrice: number; discountAmount?: number }) => Promise<ActionResult>;
+  updateEstimateLine: (lineId: string, patch: { qty?: number; unitPrice?: number; label?: string; descriptionAr?: string; catNo?: string; notes?: string; discountAmount?: number }) => Promise<ActionResult>;
+  removeEstimateLine: (lineId: string) => Promise<ActionResult>;
+  setEstimateValidUntil: (jobcardId: string, date: string) => Promise<ActionResult>;
+  setEstimateHeader: (jobcardId: string, patch: { preparedBy?: string; termsOfPayment?: string; poNumber?: string; notes?: string; previousQuoteNo?: string; customerRequest?: string; deliveryLeadTime?: string; subject?: string }) => Promise<ActionResult>;
+  approveCustomer: (jobcardId: string, approved: boolean, source?: "internal" | "customer") => Promise<ActionResult>;
+  setRepairNotes: (jobcardId: string, notes: string) => Promise<ActionResult>;
+  setQaApproved: (jobcardId: string, approved: boolean) => Promise<ActionResult>;
+  setFinalAmount: (jobcardId: string, amount: number) => Promise<ActionResult>;
+  captureCustomerSignature: (jobcardId: string, signature: string) => Promise<ActionResult>;
+  confirmAssetHandover: (jobcardId: string, confirmedBy: string) => Promise<ActionResult>;
   savePurchaseBill: (jobcardId: string, bill: Omit<PurchaseBill, "id" | "jobcardId">) => ActionResult;
   addPartUsed: (jobcardId: string, itemId: string, qty: number) => ActionResult;
   removePartUsed: (partUsedId: string) => ActionResult;
@@ -145,20 +149,25 @@ function clone<T>(value: T): T {
   return structuredClone(value);
 }
 
+// Branches, customers, brands, appliances, technicians, service orders, and
+// job cards are now real, server-persisted data (fetched via hydrate() after
+// login) rather than mock seed data, so they start empty here. Everything
+// else below has no backend yet (Phase 2), so it keeps running on the
+// original browser-only mock seed exactly as before.
 const initialSlice = () => ({
-  branches: clone(seed.BRANCHES),
-  customers: clone(seed.CUSTOMERS),
-  brands: clone(seed.BRANDS),
-  appliances: clone(seed.APPLIANCES),
+  branches: [] as Branch[],
+  customers: [] as Customer[],
+  brands: [] as Brand[],
+  appliances: [] as Appliance[],
   applianceTelemetry: clone(seed.APPLIANCE_TELEMETRY),
-  technicians: clone(seed.TECHNICIANS),
+  technicians: [] as Technician[],
   inventoryItems: clone(seed.INVENTORY_ITEMS),
   inventoryLocations: clone(seed.INVENTORY_LOCATIONS),
   inventoryStock: clone(seed.INVENTORY_STOCK),
   inventoryTransactions: clone(seed.INVENTORY_TRANSACTIONS),
-  serviceOrders: clone(seed.SERVICE_ORDERS),
-  jobCards: clone(seed.JOB_CARDS),
-  stageHistory: clone(seed.STAGE_HISTORY),
+  serviceOrders: [] as ServiceOrder[],
+  jobCards: [] as JobCard[],
+  stageHistory: [] as JobCardStageHistory[],
   attachments: clone(seed.ATTACHMENTS),
   partsUsed: clone(seed.PARTS_USED),
   estimateLineItems: clone(seed.ESTIMATE_LINE_ITEMS),
@@ -168,19 +177,6 @@ const initialSlice = () => ({
   payments: clone(seed.PAYMENTS),
   removedParts: clone(seed.REMOVED_PARTS),
 });
-
-const STAGE_TO_STATUS: Record<StageName, JobCard["status"]> = {
-  Received: "Received",
-  "Warranty Validation": "In Diagnosis",
-  Diagnosis: "In Diagnosis",
-  Estimate: "Waiting Approval",
-  "Customer Approval": "Waiting Approval",
-  "OEM Approval": "Waiting Approval",
-  Repair: "In Repair",
-  QA: "QA",
-  "Ready for Handover": "Ready",
-  Delivered: "Delivered",
-};
 
 const STAGE_TEMPLATE: Partial<Record<StageName, string>> = {
   Received: "received",
@@ -225,14 +221,6 @@ function buildTriggeredLogs(state: DemoState, job: JobCard, stageName: StageName
   }));
 }
 
-function syncTechnicianStatuses(technicians: Technician[], jobs: JobCard[]) {
-  const activeTechnicianIds = new Set(jobs.filter((job) => job.status !== "Delivered" && job.technicianId).map((job) => job.technicianId));
-  return technicians.map((technician) => ({
-    ...technician,
-    status: activeTechnicianIds.has(technician.id) ? "On Job" as const : "Available" as const,
-  }));
-}
-
 function canEditEstimate(job: JobCard): boolean {
   return job.currentStage === "Estimate" || job.currentStage === "Customer Approval" || (job.currentStage === "Diagnosis" && Boolean(job.diagnosisNotes));
 }
@@ -264,8 +252,11 @@ export const useStore = create<DemoState>()(
   persist(
     (set, get) => ({
       ...initialSlice(),
-      users: clone(seed.USERS),
       currentUser: null,
+      token: null,
+      hydrated: false,
+      hydrating: false,
+      sessionChecked: false,
       role: "admin",
       selectedBranchId: "all",
       theme: "light",
@@ -279,14 +270,60 @@ export const useStore = create<DemoState>()(
       setBranch: (selectedBranchId) => set({ selectedBranchId }),
       setTheme: (theme) => set({ theme }),
       setLang: (lang) => set({ lang }),
-      login: (username, password) => {
-        const state = get();
-        const user = state.users.find((candidate) => candidate.username.trim().toLowerCase() === username.trim().toLowerCase());
-        if (!user || user.password !== password) return result(false, "Incorrect username or password.");
-        set({ currentUser: user, role: user.role, selectedBranchId: user.branchId });
-        return result(true, `Welcome back, ${user.name}.`);
+      login: async (username, password) => {
+        try {
+          const response = await api.post<{ ok: boolean; message: string; token: string; user: Omit<DemoUser, "password"> }>(
+            "/api/auth/login",
+            { username: username.trim(), password }
+          );
+          setToken(response.token);
+          set({ token: response.token, role: response.user.role, selectedBranchId: response.user.branchId });
+          await get().hydrate();
+          set({ currentUser: response.user });
+          return result(true, response.message);
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Unable to sign in. Check your connection and try again.");
+        }
       },
-      logout: () => set({ currentUser: null }),
+      logout: () => {
+        setToken(null);
+        set({ ...initialSlice(), currentUser: null, token: null, hydrated: false });
+      },
+      bootstrap: async () => {
+        const token = getToken();
+        if (!token) { set({ sessionChecked: true }); return; }
+        set({ token });
+        try {
+          const user = await api.get<Omit<DemoUser, "password">>("/api/auth/me");
+          await get().hydrate();
+          set({ currentUser: user, role: user.role, selectedBranchId: user.branchId, sessionChecked: true });
+        } catch {
+          setToken(null);
+          set({ token: null, currentUser: null, sessionChecked: true });
+        }
+      },
+      hydrate: async () => {
+        set({ hydrating: true });
+        try {
+          const [branches, customers, brands, technicians, appliances, serviceOrders, jobCards] = await Promise.all([
+            api.get<Branch[]>("/api/branches"),
+            api.get<Customer[]>("/api/customers"),
+            api.get<Brand[]>("/api/brands"),
+            api.get<Technician[]>("/api/technicians"),
+            api.get<Appliance[]>("/api/appliances"),
+            api.get<ServiceOrder[]>("/api/service-orders"),
+            api.get<(JobCard & { stageHistory?: JobCardStageHistory[] })[]>("/api/job-cards"),
+          ]);
+          const stageHistory = jobCards.flatMap((job) => job.stageHistory ?? []);
+          set({
+            branches, customers, brands, technicians, appliances, serviceOrders,
+            jobCards, stageHistory,
+            hydrated: true, hydrating: false,
+          });
+        } catch {
+          set({ hydrating: false });
+        }
+      },
       toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
       setAliasFieldsEnabled: (enabled) => {
         const state = get();
@@ -310,40 +347,27 @@ export const useStore = create<DemoState>()(
         return result(true, "Role permissions reset to defaults.");
       },
 
-      addCustomer: (input) => {
-        const existing = get().customers.find((customer) => customer.phone.replace(/\D/g, "") === input.phone.replace(/\D/g, ""));
-        if (existing) return existing;
-        const name = [input.firstName, input.fatherName, input.grandfatherName, input.familyName].filter((part) => part?.trim()).join(" ");
-        const arabicParts = [input.firstNameAr, input.fatherNameAr, input.grandfatherNameAr, input.familyNameAr].filter((part) => part?.trim());
-        const nameAr = arabicParts.length ? arabicParts.join(" ") : input.nameAr;
-        const customer: Customer = {
-          ...input,
-          name,
-          nameAr,
-          id: nextId("cust"),
-          documentNo: `CUST-${String(get().customers.length + 1).padStart(5, "0")}`,
-          createdAt: new Date().toISOString(),
-          whatsappVerified: false,
-        };
-        set((state) => ({ customers: [customer, ...state.customers] }));
+      addCustomer: async (input) => {
+        const customer = await api.post<Customer>("/api/customers", input);
+        await get().hydrate();
         return customer;
       },
       verifyWhatsapp: (customerId) => {
         set((state) => ({ customers: state.customers.map((customer) => customer.id === customerId ? { ...customer, whatsappVerified: true } : customer) }));
       },
-      addAppliance: (input) => {
-        const appliance: Appliance = { ...input, id: nextId("app"), documentNo: `AST-${String(get().appliances.length + 1).padStart(5, "0")}` };
-        set((state) => ({ appliances: [appliance, ...state.appliances] }));
+      addAppliance: async (input) => {
+        const appliance = await api.post<Appliance>("/api/appliances", input);
+        await get().hydrate();
         return appliance;
       },
-      addBrand: (input) => {
-        const brand: Brand = { ...input, id: nextId("brand") };
-        set((state) => ({ brands: [brand, ...state.brands] }));
+      addBrand: async (input) => {
+        const brand = await api.post<Brand>("/api/brands", input);
+        await get().hydrate();
         return brand;
       },
-      addTechnician: (input) => {
-        const technician: Technician = { ...input, id: nextId("tech") };
-        set((state) => ({ technicians: [technician, ...state.technicians] }));
+      addTechnician: async (input) => {
+        const technician = await api.post<Technician>("/api/technicians", input);
+        await get().hydrate();
         return technician;
       },
       addInventoryItem: (input) => {
@@ -381,214 +405,82 @@ export const useStore = create<DemoState>()(
         return result(true, "Inventory transaction recorded.");
       },
 
-      createServiceOrder: ({ customerId, branchId, lines, shortAddressCode, buildingNo, unitNo, district, postalCode, additionalNo, requestSource, preferredDate, preferredTimeSlot, buyerVatNumber }) => {
-        const state = get();
-        if (!canPerform(state.role, "create_job")) return { ...result(false, "Your role cannot create service orders.") };
-        const customer = state.customers.find((candidate) => candidate.id === customerId);
-        if (!customer) return { ...result(false, "Choose a valid customer.") };
-        if (branchId !== customer.branchId) return { ...result(false, "Receiving branch must match the customer branch. Transfer the customer before opening this job.") };
-        if (!lines.length) return { ...result(false, "Add at least one product to the service order.") };
-        if (new Set(lines.map((line) => line.applianceId)).size !== lines.length) return { ...result(false, "Each product can appear only once in the same service order.") };
-        for (const line of lines) {
-          const appliance = state.appliances.find((candidate) => candidate.id === line.applianceId);
-          if (!appliance) return { ...result(false, "Choose a valid product for every sequence.") };
-          if (line.problemDescription.trim().length < 4) return { ...result(false, "Describe the reported problem for every product.") };
-          if (line.technicianId) {
-            const technician = state.technicians.find((candidate) => candidate.id === line.technicianId);
-            if (!technician) return { ...result(false, "Choose a valid technician for every assigned sequence.") };
-            if (technician.branchId !== branchId) return { ...result(false, "Assigned technician must belong to the receiving branch.") };
-            if (!technician.skills.includes(appliance.category)) return { ...result(false, `${technician.name} is not qualified for ${appliance.category}.`) };
-            if (technician.status === "Off Duty") return { ...result(false, `${technician.name} is off duty.`) };
-          }
+      createServiceOrder: async ({ customerId, branchId, lines, shortAddressCode, buildingNo, unitNo, district, postalCode, additionalNo, requestSource, preferredDate, preferredTimeSlot, buyerVatNumber }) => {
+        if (!canPerform(get().role, "create_job")) return result(false, "Your role cannot create service orders.");
+        try {
+          const response = await api.post<{ ok: boolean; message: string; serviceOrder: ServiceOrder; jobCards: JobCard[] }>(
+            "/api/service-orders",
+            { customerId, branchId, lines, shortAddressCode, buildingNo, unitNo, district, postalCode, additionalNo, requestSource, preferredDate, preferredTimeSlot, buyerVatNumber }
+          );
+          await get().hydrate();
+          return { ok: true, message: response.message, serviceOrder: response.serviceOrder, jobs: response.jobCards };
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to create the service order.");
         }
-
-        const now = new Date().toISOString();
-        const orderIndex = state.serviceOrders.length + 1;
-        const documentNo = `SO-${new Date(now).getFullYear()}-${String(orderIndex).padStart(5, "0")}`;
-        const serviceOrder: ServiceOrder = {
-          id: nextId("order"), documentNo, customerId, branchId, createdAt: now, updatedAt: now,
-          shortAddressCode: shortAddressCode || undefined,
-          buildingNo: buildingNo || undefined,
-          unitNo: unitNo || undefined,
-          district: district || undefined,
-          postalCode: postalCode || undefined,
-          additionalNo: additionalNo || undefined,
-          requestSource,
-          preferredDate: preferredDate || undefined,
-          preferredTimeSlot: preferredTimeSlot || undefined,
-          buyerVatNumber: buyerVatNumber || undefined,
-        };
-        const jobs = lines.map<JobCard>((line, index) => {
-          const sequenceNo = index + 1;
-          const lineDocumentNo = `${documentNo}-${String(sequenceNo).padStart(2, "0")}`;
-          return {
-            id: nextId("job"),
-            serviceOrderId: serviceOrder.id,
-            sequenceNo,
-            documentNo: lineDocumentNo,
-            invoiceNo: `INV-${lineDocumentNo}`,
-            customerId,
-            applianceId: line.applianceId,
-            technicianId: line.technicianId ?? null,
-            branchId,
-            jobType: line.jobType,
-            status: "Received",
-            currentStage: "Received",
-            problemDescription: line.problemDescription.trim(),
-            estimateAmount: null,
-            finalAmount: null,
-            createdAt: new Date(new Date(now).getTime() + index).toISOString(),
-            updatedAt: new Date(new Date(now).getTime() + index).toISOString(),
-            scheduledAt: line.technicianId ? new Date(new Date(now).setDate(new Date(now).getDate() + 1)).toISOString() : null,
-            customerApproved: null,
-            diagnosisNotes: null,
-            repairNotes: null,
-            qaApproved: false,
-            customerSignature: null,
-            assetHandedOver: false,
-          };
-        });
-        const history = jobs.reduce<JobCardStageHistory[]>((acc, job) => {
-          const entry: JobCardStageHistory = { id: nextId("hist"), jobcardId: job.id, stageName: "Received", changedBy: "Front Desk", timestamp: job.createdAt, notes: `Product sequence ${String(job.sequenceNo).padStart(2, "0")} received at counter.`, stageRefNo: nextStageRefNo([...state.stageHistory, ...acc], "Received") };
-          return [...acc, entry];
-        }, []);
-        const logs = jobs.flatMap((job) => buildTriggeredLogs(state, job, "Received", job.createdAt));
-        set((current) => ({
-          serviceOrders: [serviceOrder, ...current.serviceOrders],
-          jobCards: [...jobs, ...current.jobCards],
-          stageHistory: [...history, ...current.stageHistory],
-          communicationLogs: [...logs, ...current.communicationLogs],
-          technicians: syncTechnicianStatuses(current.technicians, [...jobs, ...current.jobCards]),
-        }));
-        scheduleCommunicationReceipts(logs);
-        return { ...result(true, `Service order ${documentNo} created with ${jobs.length} product ${jobs.length === 1 ? "sequence" : "sequences"}.`), serviceOrder, jobs };
       },
 
-      addProductToOrder: ({ serviceOrderId, applianceId, jobType, problemDescription, technicianId }) => {
-        const state = get();
-        if (!canPerform(state.role, "create_job")) return result(false, "Your role cannot add products to service orders.");
-        const serviceOrder = state.serviceOrders.find((candidate) => candidate.id === serviceOrderId);
-        if (!serviceOrder) return result(false, "Service order not found.");
-        const appliance = state.appliances.find((candidate) => candidate.id === applianceId);
-        if (!appliance) return result(false, "Choose a valid product.");
-        const existingLines = state.jobCards.filter((line) => line.serviceOrderId === serviceOrderId);
-        if (existingLines.some((line) => line.applianceId === applianceId)) return result(false, "This product is already part of this service order.");
-        if (problemDescription.trim().length < 4) return result(false, "Describe the reported problem.");
-        if (technicianId) {
-          const technician = state.technicians.find((candidate) => candidate.id === technicianId);
-          if (!technician) return result(false, "Choose a valid technician.");
-          if (technician.branchId !== serviceOrder.branchId) return result(false, "Assigned technician must belong to the receiving branch.");
-          if (!technician.skills.includes(appliance.category)) return result(false, `${technician.name} is not qualified for ${appliance.category}.`);
-          if (technician.status === "Off Duty") return result(false, `${technician.name} is off duty.`);
+      addProductToOrder: async ({ serviceOrderId, applianceId, jobType, problemDescription, technicianId }) => {
+        if (!canPerform(get().role, "create_job")) return result(false, "Your role cannot add products to service orders.");
+        try {
+          const response = await api.post<{ ok: boolean; message: string; jobCard: JobCard }>(
+            `/api/service-orders/${serviceOrderId}/lines`,
+            { applianceId, jobType, problemDescription, technicianId }
+          );
+          await get().hydrate();
+          return { ok: true, message: response.message, job: response.jobCard };
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to add the product.");
         }
-
-        const now = new Date().toISOString();
-        const sequenceNo = existingLines.length + 1;
-        const lineDocumentNo = `${serviceOrder.documentNo}-${String(sequenceNo).padStart(2, "0")}`;
-        const job: JobCard = {
-          id: nextId("job"),
-          serviceOrderId,
-          sequenceNo,
-          documentNo: lineDocumentNo,
-          invoiceNo: `INV-${lineDocumentNo}`,
-          customerId: serviceOrder.customerId,
-          applianceId,
-          technicianId: technicianId ?? null,
-          branchId: serviceOrder.branchId,
-          jobType,
-          status: "Received",
-          currentStage: "Received",
-          problemDescription: problemDescription.trim(),
-          estimateAmount: null,
-          finalAmount: null,
-          createdAt: now,
-          updatedAt: now,
-          scheduledAt: technicianId ? new Date(new Date(now).setDate(new Date(now).getDate() + 1)).toISOString() : null,
-          customerApproved: null,
-          diagnosisNotes: null,
-          repairNotes: null,
-          qaApproved: false,
-          customerSignature: null,
-          assetHandedOver: false,
-        };
-        const history: JobCardStageHistory = { id: nextId("hist"), jobcardId: job.id, stageName: "Received", changedBy: "Front Desk", timestamp: now, notes: `Product sequence ${String(sequenceNo).padStart(2, "0")} received at counter.`, stageRefNo: nextStageRefNo(state.stageHistory, "Received") };
-        const logs = buildTriggeredLogs(state, job, "Received", now);
-        set((current) => ({
-          jobCards: [job, ...current.jobCards],
-          stageHistory: [history, ...current.stageHistory],
-          communicationLogs: [...logs, ...current.communicationLogs],
-          technicians: syncTechnicianStatuses(current.technicians, [job, ...current.jobCards]),
-          serviceOrders: current.serviceOrders.map((order) => order.id === serviceOrderId ? { ...order, updatedAt: now } : order),
-        }));
-        scheduleCommunicationReceipts(logs);
-        return { ...result(true, `${lineDocumentNo} added to ${serviceOrder.documentNo}.`), job };
       },
 
-      createJobCard: ({ customerId, applianceId, jobType, problemDescription, branchId }) => {
-        const created = get().createServiceOrder({ customerId, branchId, lines: [{ applianceId, jobType, problemDescription }] });
+      createJobCard: async ({ customerId, applianceId, jobType, problemDescription, branchId }) => {
+        const created = await get().createServiceOrder({ customerId, branchId, lines: [{ applianceId, jobType, problemDescription }] });
         return { ok: created.ok, message: created.message, job: created.jobs?.[0] };
       },
 
-      advanceStage: (jobcardId, targetStage, notes, changedBy) => {
+      advanceStage: async (jobcardId, _targetStage, notes) => {
         const state = get();
         const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
         if (!job) return result(false, "Job card not found.");
         if (!canAdvanceCurrentStage(state.role, job.currentStage)) return result(false, `${state.role.replace("_", " ")} cannot complete ${job.currentStage}.`);
-        const workflow = state.workflows.find((candidate) => candidate.active && candidate.jobType === job.jobType);
-        const currentIndex = workflow?.steps.findIndex((step) => step.stepName === job.currentStage) ?? -1;
-        const nextStep = currentIndex >= 0 ? workflow?.steps[currentIndex + 1] : undefined;
-        if (!nextStep || nextStep.stepName !== targetStage) return result(false, "Workflow changed. Refresh the job before advancing.");
-        const blockers = stageBlockers(job, {
-          payments: state.payments.filter((payment) => payment.jobcardId === job.id),
-          purchaseBill: state.purchaseBills.find((bill) => bill.jobcardId === job.id),
-        });
-        if (blockers.length) return result(false, `Complete first: ${blockers.join(", ")}.`);
-
-        const now = new Date().toISOString();
-        const updatedJob: JobCard = { ...job, currentStage: targetStage, status: STAGE_TO_STATUS[targetStage], updatedAt: now };
-        const history: JobCardStageHistory = { id: nextId("hist"), jobcardId, stageName: targetStage, changedBy, timestamp: now, notes, stageRefNo: nextStageRefNo(state.stageHistory, targetStage) };
-        const logs = buildTriggeredLogs(state, updatedJob, targetStage, now);
-        const jobs = state.jobCards.map((candidate) => candidate.id === jobcardId ? updatedJob : candidate);
-        set({
-          jobCards: jobs,
-          stageHistory: [history, ...state.stageHistory],
-          communicationLogs: [...logs, ...state.communicationLogs],
-          technicians: syncTechnicianStatuses(state.technicians, jobs),
-        });
-        scheduleCommunicationReceipts(logs);
-        return result(true, `Advanced to ${targetStage}.`);
+        try {
+          const response = await api.post<{ ok: boolean; message: string; jobCard: JobCard }>(`/api/job-cards/${jobcardId}/advance-stage`, { notes });
+          await get().hydrate();
+          const logs = buildTriggeredLogs(get(), response.jobCard, response.jobCard.currentStage, new Date().toISOString());
+          if (logs.length) {
+            set((current) => ({ communicationLogs: [...logs, ...current.communicationLogs] }));
+            scheduleCommunicationReceipts(logs);
+          }
+          return result(true, response.message);
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to advance the job card.");
+        }
       },
 
-      assignTechnician: (jobcardId, technicianId) => {
-        const state = get();
-        if (!canPerform(state.role, "assign_technician")) return result(false, "Your role cannot assign technicians.");
-        const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
-        const technician = state.technicians.find((candidate) => candidate.id === technicianId);
-        const appliance = state.appliances.find((candidate) => candidate.id === job?.applianceId);
-        if (!job || !technician || !appliance) return result(false, "Job, technician, or appliance was not found.");
-        if (job.status === "Delivered") return result(false, "Delivered jobs cannot be reassigned.");
-        if (technician.branchId !== job.branchId) return result(false, "Technician must belong to the job branch.");
-        if (!technician.skills.includes(appliance.category)) return result(false, `Technician is not qualified for ${appliance.category}.`);
-        if (technician.status === "Off Duty") return result(false, "Technician is off duty.");
-        const scheduled = new Date();
-        scheduled.setDate(scheduled.getDate() + 1);
-        scheduled.setHours(9, 0, 0, 0);
-        const jobs = state.jobCards.map((candidate) => candidate.id === jobcardId ? { ...candidate, technicianId, scheduledAt: candidate.scheduledAt ?? scheduled.toISOString(), updatedAt: new Date().toISOString() } : candidate);
-        set({ jobCards: jobs, technicians: syncTechnicianStatuses(state.technicians, jobs) });
-        return result(true, `Assigned to ${technician.name}.`);
+      assignTechnician: async (jobcardId, technicianId) => {
+        if (!canPerform(get().role, "assign_technician")) return result(false, "Your role cannot assign technicians.");
+        try {
+          await api.patch(`/api/job-cards/${jobcardId}/technician`, { technicianId });
+          const technicianName = get().technicians.find((t) => t.id === technicianId)?.name ?? "technician";
+          await get().hydrate();
+          return result(true, `Assigned to ${technicianName}.`);
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to assign technician.");
+        }
       },
 
-      setDiagnosis: (jobcardId, notes) => {
-        const state = get();
-        if (!canPerform(state.role, "set_diagnosis")) return result(false, "Your role cannot record diagnosis notes.");
+      setDiagnosis: async (jobcardId, notes) => {
+        if (!canPerform(get().role, "set_diagnosis")) return result(false, "Your role cannot record diagnosis notes.");
         if (!notes.trim()) return result(false, "Diagnosis notes are required.");
-        const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
-        if (!job) return result(false, "Job card not found.");
-        if (job.currentStage !== "Diagnosis") return result(false, "Diagnosis notes can only be changed during Diagnosis.");
-        set({ jobCards: state.jobCards.map((job) => job.id === jobcardId ? { ...job, diagnosisNotes: notes.trim(), updatedAt: new Date().toISOString() } : job) });
-        return result(true, "Diagnosis notes saved.");
+        try {
+          await api.patch(`/api/job-cards/${jobcardId}/diagnosis`, { diagnosisNotes: notes.trim() });
+          await get().hydrate();
+          return result(true, "Diagnosis notes saved.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to save diagnosis notes.");
+        }
       },
-      addEstimateLine: (jobcardId, input) => {
+      addEstimateLine: async (jobcardId, input) => {
         const state = get();
         if (!canPerform(state.role, "set_estimate")) return result(false, "Your role cannot set estimates.");
         const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
@@ -617,9 +509,12 @@ export const useStore = create<DemoState>()(
           communicationLogs: [...logs, ...state.communicationLogs],
         });
         scheduleCommunicationReceipts(logs);
+        try {
+          await api.patch(`/api/job-cards/${jobcardId}/estimate`, { estimateAmount: total });
+        } catch { /* estimate total sync is best-effort; local line items remain the source of truth */ }
         return result(true, `Added "${line.label}" to the estimate.`);
       },
-      updateEstimateLine: (lineId, patch) => {
+      updateEstimateLine: async (lineId, patch) => {
         const state = get();
         if (!canPerform(state.role, "set_estimate")) return result(false, "Your role cannot edit estimates.");
         const line = state.estimateLineItems.find((candidate) => candidate.id === lineId);
@@ -652,9 +547,12 @@ export const useStore = create<DemoState>()(
           estimateLineItems: lines,
           jobCards: state.jobCards.map((candidate) => candidate.id === job.id ? updatedJob : candidate),
         });
+        try {
+          await api.patch(`/api/job-cards/${job.id}/estimate`, { estimateAmount: total });
+        } catch { /* estimate total sync is best-effort; local line items remain the source of truth */ }
         return result(true, "Estimate line updated.");
       },
-      removeEstimateLine: (lineId) => {
+      removeEstimateLine: async (lineId) => {
         const state = get();
         if (!canPerform(state.role, "set_estimate")) return result(false, "Your role cannot edit estimates.");
         const line = state.estimateLineItems.find((candidate) => candidate.id === lineId);
@@ -672,17 +570,25 @@ export const useStore = create<DemoState>()(
           estimateLineItems: lines,
           jobCards: state.jobCards.map((candidate) => candidate.id === job.id ? updatedJob : candidate),
         });
+        try {
+          await api.patch(`/api/job-cards/${job.id}/estimate`, { estimateAmount: total });
+        } catch { /* estimate total sync is best-effort; local line items remain the source of truth */ }
         return result(true, "Removed line item from the estimate.");
       },
-      setEstimateValidUntil: (jobcardId, date) => {
+      setEstimateValidUntil: async (jobcardId, date) => {
         const state = get();
         if (!canPerform(state.role, "set_estimate")) return result(false, "Your role cannot edit estimates.");
         const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
         if (!job) return result(false, "Job card not found.");
         set({ jobCards: state.jobCards.map((candidate) => candidate.id === jobcardId ? { ...candidate, estimateValidUntil: date || undefined } : candidate) });
+        try {
+          await api.patch(`/api/job-cards/${jobcardId}/estimate`, { estimateValidUntil: date || undefined });
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to save estimate validity.");
+        }
         return result(true, "Estimate validity updated.");
       },
-      setEstimateHeader: (jobcardId, patch) => {
+      setEstimateHeader: async (jobcardId, patch) => {
         const state = get();
         if (!canPerform(state.role, "set_estimate")) return result(false, "Your role cannot edit estimates.");
         const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
@@ -701,9 +607,18 @@ export const useStore = create<DemoState>()(
             updatedAt: new Date().toISOString(),
           } : candidate),
         });
+        try {
+          await api.patch(`/api/job-cards/${jobcardId}/estimate`, {
+            estimatePreparedBy: patch.preparedBy, estimateTermsOfPayment: patch.termsOfPayment, estimatePoNumber: patch.poNumber,
+            estimateNotes: patch.notes, estimatePreviousQuoteNo: patch.previousQuoteNo, estimateCustomerRequest: patch.customerRequest,
+            estimateDeliveryLeadTime: patch.deliveryLeadTime, estimateSubject: patch.subject,
+          });
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to save estimate details.");
+        }
         return result(true, "Estimate details updated.");
       },
-      approveCustomer: (jobcardId, approved, source = "internal") => {
+      approveCustomer: async (jobcardId, approved, source = "internal") => {
         const state = get();
         if (source === "internal" && !canPerform(state.role, "record_customer_approval")) return result(false, "Your role cannot record customer approval.");
         const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
@@ -726,28 +641,45 @@ export const useStore = create<DemoState>()(
           communicationLogs: [...logs, ...state.communicationLogs],
         });
         scheduleCommunicationReceipts(logs);
+        if (source === "internal") {
+          try {
+            await api.patch(`/api/job-cards/${jobcardId}/customer-approval`, { approved });
+          } catch (err) {
+            return result(false, err instanceof ApiError ? err.message : "Failed to record customer approval.");
+          }
+        }
         return result(true, approved ? "Customer approval recorded." : "Customer decline recorded.");
       },
-      setRepairNotes: (jobcardId, notes) => {
+      setRepairNotes: async (jobcardId, notes) => {
         const state = get();
         if (!canPerform(state.role, "set_repair_notes")) return result(false, "Your role cannot record repair notes.");
         if (!notes.trim()) return result(false, "Repair notes are required.");
         const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
         if (!job) return result(false, "Job card not found.");
         if (job.currentStage !== "Repair") return result(false, "Repair notes can only be changed during Repair.");
-        set({ jobCards: state.jobCards.map((job) => job.id === jobcardId ? { ...job, repairNotes: notes.trim(), updatedAt: new Date().toISOString() } : job) });
-        return result(true, "Repair notes saved.");
+        try {
+          await api.patch(`/api/job-cards/${jobcardId}/repair-notes`, { repairNotes: notes.trim() });
+          await get().hydrate();
+          return result(true, "Repair notes saved.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to save repair notes.");
+        }
       },
-      setQaApproved: (jobcardId, approved) => {
+      setQaApproved: async (jobcardId, approved) => {
         const state = get();
         if (!canPerform(state.role, "approve_qa")) return result(false, "Supervisor, Manager, or Admin approval is required.");
         const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
         if (!job) return result(false, "Job card not found.");
         if (job.currentStage !== "QA") return result(false, "QA can only be approved during the QA stage.");
-        set({ jobCards: state.jobCards.map((job) => job.id === jobcardId ? { ...job, qaApproved: approved, updatedAt: new Date().toISOString() } : job) });
-        return result(true, approved ? "QA approved." : "QA approval removed.");
+        try {
+          await api.patch(`/api/job-cards/${jobcardId}/qa-approve`, { qaApproved: approved });
+          await get().hydrate();
+          return result(true, approved ? "QA approved." : "QA approval removed.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to update QA approval.");
+        }
       },
-      setFinalAmount: (jobcardId, amount) => {
+      setFinalAmount: async (jobcardId, amount) => {
         const state = get();
         if (!canPerform(state.role, "finalize_job")) return result(false, "Your role cannot finalize charges.");
         const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
@@ -759,29 +691,43 @@ export const useStore = create<DemoState>()(
         if (amount < partsTotal) return result(false, `Final amount cannot be below the ${partsTotal.toLocaleString()} SAR parts total.`);
         if ((job.estimateAmount ?? 0) > 0 && amount > (job.estimateAmount ?? 0)) return result(false, "Final amount cannot exceed the customer-approved estimate.");
         if (state.payments.some((payment) => payment.jobcardId === jobcardId && payment.status === "paid")) return result(false, "Final amount cannot change after payment.");
-        set({ jobCards: state.jobCards.map((candidate) => candidate.id === jobcardId ? { ...candidate, finalAmount: amount, updatedAt: new Date().toISOString() } : candidate) });
-        return result(true, `Final amount set to SAR ${amount.toLocaleString()}.`);
+        try {
+          await api.patch(`/api/job-cards/${jobcardId}/final-amount`, { finalAmount: amount });
+          await get().hydrate();
+          return result(true, `Final amount set to SAR ${amount.toLocaleString()}.`);
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to set final amount.");
+        }
       },
-      captureCustomerSignature: (jobcardId, signature) => {
+      captureCustomerSignature: async (jobcardId, signature) => {
         const state = get();
         if (!canPerform(state.role, "capture_signature")) return result(false, "Your role cannot capture handover signatures.");
         if (!signature.trim()) return result(false, "Customer name or signature is required.");
         const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
         if (!job) return result(false, "Job card not found.");
         if (job.currentStage !== "Ready for Handover") return result(false, "Customer signature is captured at Ready for Handover.");
-        set({ jobCards: state.jobCards.map((job) => job.id === jobcardId ? { ...job, customerSignature: signature.trim(), updatedAt: new Date().toISOString() } : job) });
-        return result(true, "Customer signature captured.");
+        try {
+          await api.patch(`/api/job-cards/${jobcardId}/signature`, { customerSignature: signature.trim() });
+          await get().hydrate();
+          return result(true, "Customer signature captured.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to capture signature.");
+        }
       },
-      confirmAssetHandover: (jobcardId, confirmedBy) => {
+      confirmAssetHandover: async (jobcardId, confirmedBy) => {
         const state = get();
         if (!canPerform(state.role, "capture_signature")) return result(false, "Your role cannot confirm asset handover.");
         if (!confirmedBy.trim()) return result(false, "Confirming staff member is required.");
         const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
         if (!job) return result(false, "Job card not found.");
         if (job.currentStage !== "Ready for Handover") return result(false, "Asset handover is confirmed at Ready for Handover.");
-        const now = new Date().toISOString();
-        set({ jobCards: state.jobCards.map((candidate) => candidate.id === jobcardId ? { ...candidate, assetHandedOver: true, assetHandedOverAt: now, assetHandedOverBy: confirmedBy.trim(), updatedAt: now } : candidate) });
-        return result(true, "Asset handover confirmed.");
+        try {
+          await api.patch(`/api/job-cards/${jobcardId}/asset-handover`, {});
+          await get().hydrate();
+          return result(true, "Asset handover confirmed.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to confirm asset handover.");
+        }
       },
       savePurchaseBill: (jobcardId, input) => {
         const state = get();
@@ -933,10 +879,10 @@ export const useStore = create<DemoState>()(
 
       resetDemoData: () => {
         counter = COUNTER_START;
+        const { branches, customers, brands, technicians, appliances, serviceOrders, jobCards, stageHistory } = get();
         set({
           ...initialSlice(),
-          role: "admin",
-          selectedBranchId: "all",
+          branches, customers, brands, technicians, appliances, serviceOrders, jobCards, stageHistory,
           theme: "light",
           lang: "en",
           sidebarCollapsed: false,
@@ -977,12 +923,43 @@ export const useStore = create<DemoState>()(
         }));
       },
     }),
-    { name: "crm-demo-store-v3", version: 3 }
+    {
+      name: "crm-demo-store-v3",
+      version: 3,
+      // Only Phase 2 (still browser-only) demo state and UI prefs persist
+      // across reloads. Auth and Phase 1 entities (customers, job cards,
+      // etc.) are real server data now — bootstrap()/hydrate() always
+      // re-fetch them fresh rather than trusting a local cache.
+      partialize: (state) => ({
+        theme: state.theme,
+        lang: state.lang,
+        sidebarCollapsed: state.sidebarCollapsed,
+        aliasFieldsEnabled: state.aliasFieldsEnabled,
+        permissionsVersion: state.permissionsVersion,
+        maintenanceRemindersSent: state.maintenanceRemindersSent,
+        inventoryItems: state.inventoryItems,
+        inventoryLocations: state.inventoryLocations,
+        inventoryStock: state.inventoryStock,
+        inventoryTransactions: state.inventoryTransactions,
+        applianceTelemetry: state.applianceTelemetry,
+        attachments: state.attachments,
+        partsUsed: state.partsUsed,
+        estimateLineItems: state.estimateLineItems,
+        purchaseBills: state.purchaseBills,
+        communicationLogs: state.communicationLogs,
+        workflows: state.workflows,
+        payments: state.payments,
+        removedParts: state.removedParts,
+      }),
+    }
   )
 );
 
 if (typeof window !== "undefined") {
   window.addEventListener("storage", (event) => {
     if (event.key === "crm-demo-store-v3") void useStore.persist.rehydrate();
+  });
+  window.addEventListener("auth:unauthorized", () => {
+    useStore.getState().logout();
   });
 }

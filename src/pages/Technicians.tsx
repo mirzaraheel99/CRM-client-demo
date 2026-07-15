@@ -34,9 +34,9 @@ export default function Technicians() {
     setForm((f) => ({ ...f, skills: f.skills.includes(s) ? f.skills.filter((x) => x !== s) : [...f.skills, s] }));
   }
 
-  function submit() {
+  async function submit() {
     if (!form.name.trim() || !form.phone.trim() || !form.branchId || form.skills.length === 0) return;
-    addTechnician({ ...form, nameAr: form.nameAr.trim() || undefined });
+    await addTechnician({ ...form, nameAr: form.nameAr.trim() || undefined });
     setForm({ name: "", nameAr: "", phone: "", zone: "Zone A", skills: [], branchId: defaultBranchId, status: "Available", avatarColor: "#2a78d6" });
     setAddFormTab("Details");
     setOpen(false);

@@ -95,10 +95,10 @@ export default function NewJobCard() {
 
   const selectedExistingCustomer = customerId && customerId !== NEW_CUSTOMER ? customers.find((candidate) => candidate.id === customerId) : undefined;
 
-  function submit() {
+  async function submit() {
     if (!canSubmit) return;
     const customer = customerId === NEW_CUSTOMER
-      ? addCustomer({
+      ? await addCustomer({
         ...newCustomer,
         grandfatherName: newCustomer.grandfatherName || undefined,
         firstNameAr: newCustomer.firstNameAr.trim() || undefined,
@@ -119,7 +119,7 @@ export default function NewJobCard() {
     const preparedLines: Parameters<typeof createServiceOrder>[0]["lines"] = [];
     for (const line of lines) {
       const appliance = line.applianceId === NEW_PRODUCT
-        ? addAppliance({
+        ? await addAppliance({
           ...applianceFormToInput(line.newProduct),
           warrantyStatus: warrantyStatus(line.newProduct),
         })
@@ -137,7 +137,7 @@ export default function NewJobCard() {
       });
     }
 
-    const result = createServiceOrder({
+    const result = await createServiceOrder({
       customerId: customer.id,
       branchId,
       lines: preparedLines,

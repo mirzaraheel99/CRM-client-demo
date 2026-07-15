@@ -116,4 +116,78 @@ export default async function serviceOrderRoutes(fastify: FastifyInstance) {
       return { ok: true, message: `Service order ${documentNo} created with ${result.jobCards.length} product sequence(s).`, ...result };
     }
   );
+
+  fastify.post(
+    "/api/service-orders/:id/lines",
+    { preHandler: [fastify.authenticate, fastify.requirePermission("create_job")] },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const parsed = lineSchema.safeParse(request.body);
+      if (!parsed.success) return reply.code(400).send({ ok: false, message: parsed.error.issues[0]?.message ?? "Invalid input." });
+      const line = parsed.data;
+
+      const serviceOrder = await prisma.serviceOrder.findUnique({ where: { id } });
+      if (!serviceOrder) return reply.code(404).send({ ok: false, message: "Service order not found." });
+
+      const appliance = await prisma.appliance.findUnique({ where: { id: line.applianceId } });
+      if (!appliance) return reply.code(400).send({ ok: false, message: "Choose a valid product." });
+
+      const existingLines = await prisma.jobCard.findMany({ where: { serviceOrderId: id } });
+      if (existingLines.some((existing) => existing.applianceId === line.applianceId)) {
+        return reply.code(400).send({ ok: false, message: "This product is already part of this service order." });
+      }
+
+      if (line.technicianId) {
+        const technician = await prisma.technician.findUnique({ where: { id: line.technicianId } });
+        if (!technician) return reply.code(400).send({ ok: false, message: "Choose a valid technician." });
+        if (technician.branchId !== serviceOrder.branchId) {
+          return reply.code(400).send({ ok: false, message: "Assigned technician must belong to the receiving branch." });
+        }
+        if (!technician.skills.includes(appliance.category)) {
+          return reply.code(400).send({ ok: false, message: `${technician.name} is not qualified for ${appliance.category}.` });
+        }
+        if (technician.status === "Off Duty") return reply.code(400).send({ ok: false, message: `${technician.name} is off duty.` });
+      }
+
+      const now = new Date();
+      const sequenceNo = existingLines.length + 1;
+      const lineDocumentNo = `${serviceOrder.documentNo}-${String(sequenceNo).padStart(2, "0")}`;
+
+      const result = await prisma.$transaction(async (tx) => {
+        const jobCard = await tx.jobCard.create({
+          data: {
+            serviceOrderId: id,
+            sequenceNo,
+            documentNo: lineDocumentNo,
+            invoiceNo: `INV-${lineDocumentNo}`,
+            customerId: serviceOrder.customerId,
+            applianceId: line.applianceId,
+            technicianId: line.technicianId || undefined,
+            branchId: serviceOrder.branchId,
+            jobType: line.jobType,
+            status: "Received",
+            currentStage: "Received",
+            problemDescription: line.problemDescription.trim(),
+          },
+        });
+        const stageRefNo = await nextStageRefNo(
+          (stageName) => tx.jobCardStageHistory.count({ where: { stageName } }),
+          "Received"
+        );
+        await tx.jobCardStageHistory.create({
+          data: {
+            jobcardId: jobCard.id,
+            stageName: "Received",
+            changedBy: request.currentUser!.name,
+            notes: `Product sequence ${String(sequenceNo).padStart(2, "0")} received at counter.`,
+            stageRefNo,
+          },
+        });
+        await tx.serviceOrder.update({ where: { id }, data: { updatedAt: now } });
+        return jobCard;
+      });
+
+      return { ok: true, message: `${lineDocumentNo} added to ${serviceOrder.documentNo}.`, jobCard: result };
+    }
+  );
 }

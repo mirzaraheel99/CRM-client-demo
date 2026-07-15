@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Plus, Trash2, Printer, MessageCircle, CheckCircle2, XCircle } from "lucide-react";
 import { useStore } from "../../lib/store";
 import { Card, CardHeader, Button, Select, Input, Field, Badge, Textarea } from "../../components/ui";
 import { JobStatusBadge } from "../../components/StatusBadge";
-import { formatCurrency, formatDate } from "../../lib/utils";
+import { formatCurrency, formatDate, cx } from "../../lib/utils";
 import { printEstimate } from "../../lib/print";
 import { MESSAGE_TEMPLATES, renderTemplate } from "../../lib/templates";
 import { toast } from "../../lib/toast";
@@ -55,6 +55,7 @@ export default function EstimatePage() {
   const brand = brands.find((b) => b.id === appliance?.brandId);
   const jobEstimateLines = estimateLineItems.filter((line) => line.jobcardId === id);
 
+  const kindTabRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const [newLineKind, setNewLineKind] = useState<EstimateLineKind>("labor");
   const [newLineLabel, setNewLineLabel] = useState("");
   const [newLineDescriptionAr, setNewLineDescriptionAr] = useState("");
@@ -352,15 +353,61 @@ export default function EstimatePage() {
         {jobEstimateLines.length === 0 && <p className="text-sm text-[var(--color-ink-muted)]">{bi("No line items yet.", "لا توجد بنود بعد.")}</p>}
 
         {canAddLine && (
-          <div className="space-y-3 rounded-lg border [border-color:var(--color-border)] bg-[var(--color-surface-1)] p-3">
+          <form
+            className="space-y-3 rounded-lg border [border-color:var(--color-border)] bg-[var(--color-surface-1)] p-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const item = newLineKind === "part" ? inventoryItems.find((candidate) => candidate.id === newLineItemId) : undefined;
+              const label = newLineKind === "part" ? (item?.name ?? "Part") : newLineLabel;
+              const enteredPrice = Number(newLineUnitPrice);
+              const unitPrice = newLineKind === "discount" ? -Math.abs(enteredPrice) : enteredPrice;
+              showResult(
+                addEstimateLine(job.id, {
+                  kind: newLineKind, label, catNo: newLineCatNo || undefined, descriptionAr: newLineKind === "part" ? (item?.nameAr) : (newLineDescriptionAr || undefined),
+                  itemId: newLineKind === "part" ? (newLineItemId || undefined) : undefined, qty: Number(newLineQty), unitPrice,
+                  discountAmount: newLineKind !== "discount" && newLineDiscount ? Number(newLineDiscount) : undefined,
+                  notes: newLineNotes || undefined,
+                }),
+                () => { setNewLineLabel(""); setNewLineDescriptionAr(""); setNewLineCatNo(""); setNewLineItemId(""); setNewLineQty("1"); setNewLineUnitPrice(""); setNewLineDiscount(""); setNewLineNotes(""); }
+              );
+            }}
+          >
             <p className="text-xs font-semibold text-[var(--color-ink-secondary)]">{bi("Add line item", "إضافة بند")}</p>
-            <div className="grid gap-2 sm:grid-cols-[100px_130px_1fr_70px_110px_110px_auto] sm:items-end">
+
+            <Field label={bi("Type", "النوع")}>
+              <div role="radiogroup" aria-label={bi("Line item type", "نوع البند")} className="inline-flex flex-wrap gap-1 rounded-lg border p-1 [border-color:var(--color-border)] bg-[var(--color-surface-2)]">
+                {ESTIMATE_LINE_KINDS.map((kind, index) => (
+                  <button
+                    key={kind}
+                    ref={(el) => { kindTabRefs.current[index] = el; }}
+                    type="button"
+                    role="radio"
+                    aria-checked={newLineKind === kind}
+                    tabIndex={newLineKind === kind ? 0 : -1}
+                    onClick={() => { setNewLineKind(kind); setNewLineLabel(""); setNewLineItemId(""); setNewLineUnitPrice(""); setNewLineDiscount(""); }}
+                    onKeyDown={(event) => {
+                      if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+                      event.preventDefault();
+                      const delta = event.key === "ArrowRight" ? 1 : -1;
+                      const nextIndex = (index + delta + ESTIMATE_LINE_KINDS.length) % ESTIMATE_LINE_KINDS.length;
+                      const nextKind = ESTIMATE_LINE_KINDS[nextIndex];
+                      setNewLineKind(nextKind);
+                      setNewLineLabel(""); setNewLineItemId(""); setNewLineUnitPrice(""); setNewLineDiscount("");
+                      kindTabRefs.current[nextIndex]?.focus();
+                    }}
+                    className={cx(
+                      "rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand-1)]/40",
+                      newLineKind === kind ? "bg-[var(--color-brand-1)] text-white" : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink-primary)]"
+                    )}
+                  >
+                    {ESTIMATE_KIND_LABEL[kind]}
+                  </button>
+                ))}
+              </div>
+            </Field>
+
+            <div className="grid gap-2 sm:grid-cols-[100px_1fr_70px_110px_110px_auto] sm:items-end">
               <Field label={bi("Cat No", "رقم الصنف")}><Input value={newLineCatNo} onChange={(event) => setNewLineCatNo(event.target.value)} placeholder="—" /></Field>
-              <Field label={bi("Type", "النوع")}>
-                <Select value={newLineKind} onChange={(event) => { setNewLineKind(event.target.value as EstimateLineKind); setNewLineLabel(""); setNewLineItemId(""); setNewLineUnitPrice(""); setNewLineDiscount(""); }}>
-                  {ESTIMATE_LINE_KINDS.map((kind) => <option key={kind} value={kind}>{ESTIMATE_KIND_LABEL[kind]}</option>)}
-                </Select>
-              </Field>
               {newLineKind === "part" ? (
                 <Field label={bi("Part", "القطعة")}>
                   <Select value={newLineItemId} onChange={(event) => { const item = inventoryItems.find((candidate) => candidate.id === event.target.value); setNewLineItemId(event.target.value); setNewLineUnitPrice(item ? String(item.unitPrice) : ""); setNewLineCatNo(item?.partNo ?? ""); setNewLineDescriptionAr(item?.nameAr ?? ""); }}>
@@ -382,24 +429,7 @@ export default function EstimatePage() {
               {newLineKind !== "discount" && (
                 <Field label={bi("Line discount (SAR)", "خصم البند (ريال)")}><Input type="number" min="0" value={newLineDiscount} onChange={(event) => setNewLineDiscount(event.target.value)} placeholder="0" /></Field>
               )}
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  const item = newLineKind === "part" ? inventoryItems.find((candidate) => candidate.id === newLineItemId) : undefined;
-                  const label = newLineKind === "part" ? (item?.name ?? "Part") : newLineLabel;
-                  const enteredPrice = Number(newLineUnitPrice);
-                  const unitPrice = newLineKind === "discount" ? -Math.abs(enteredPrice) : enteredPrice;
-                  showResult(
-                    addEstimateLine(job.id, {
-                      kind: newLineKind, label, catNo: newLineCatNo || undefined, descriptionAr: newLineKind === "part" ? (item?.nameAr) : (newLineDescriptionAr || undefined),
-                      itemId: newLineKind === "part" ? (newLineItemId || undefined) : undefined, qty: Number(newLineQty), unitPrice,
-                      discountAmount: newLineKind !== "discount" && newLineDiscount ? Number(newLineDiscount) : undefined,
-                      notes: newLineNotes || undefined,
-                    }),
-                    () => { setNewLineLabel(""); setNewLineDescriptionAr(""); setNewLineCatNo(""); setNewLineItemId(""); setNewLineQty("1"); setNewLineUnitPrice(""); setNewLineDiscount(""); setNewLineNotes(""); }
-                  );
-                }}
-              >
+              <Button type="submit" variant="secondary">
                 <Plus size={14} /> {bi("Add", "إضافة")}
               </Button>
             </div>
@@ -407,7 +437,7 @@ export default function EstimatePage() {
               <Field label={bi("Arabic description (optional)", "الوصف بالعربية (اختياري)")}><Input dir="rtl" value={newLineDescriptionAr} onChange={(event) => setNewLineDescriptionAr(event.target.value)} /></Field>
             )}
             <Field label={bi("Note (optional)", "ملاحظة (اختياري)")}><Input value={newLineNotes} onChange={(event) => setNewLineNotes(event.target.value)} placeholder={bi("Visible on the printed estimate", "تظهر في التقدير المطبوع")} /></Field>
-          </div>
+          </form>
         )}
       </Card>
 

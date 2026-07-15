@@ -37,6 +37,9 @@ export default async function jobCardRoutes(fastify: FastifyInstance) {
       const { id } = request.params as { id: string };
       const body = z.object({ diagnosisNotes: z.string().min(1) }).safeParse(request.body);
       if (!body.success) return reply.code(400).send({ ok: false, message: "Diagnosis notes are required." });
+      const jobCard = await prisma.jobCard.findUnique({ where: { id } });
+      if (!jobCard) return reply.code(404).send({ ok: false, message: "Job card not found." });
+      if (jobCard.currentStage !== "Diagnosis") return reply.code(400).send({ ok: false, message: "Diagnosis notes can only be changed during Diagnosis." });
       return prisma.jobCard.update({ where: { id }, data: { diagnosisNotes: body.data.diagnosisNotes.trim() } });
     }
   );
@@ -48,6 +51,9 @@ export default async function jobCardRoutes(fastify: FastifyInstance) {
       const { id } = request.params as { id: string };
       const body = z.object({ repairNotes: z.string().min(1) }).safeParse(request.body);
       if (!body.success) return reply.code(400).send({ ok: false, message: "Repair notes are required." });
+      const jobCard = await prisma.jobCard.findUnique({ where: { id } });
+      if (!jobCard) return reply.code(404).send({ ok: false, message: "Job card not found." });
+      if (jobCard.currentStage !== "Repair") return reply.code(400).send({ ok: false, message: "Repair notes can only be changed during Repair." });
       return prisma.jobCard.update({ where: { id }, data: { repairNotes: body.data.repairNotes.trim() } });
     }
   );
@@ -59,6 +65,9 @@ export default async function jobCardRoutes(fastify: FastifyInstance) {
       const { id } = request.params as { id: string };
       const body = z.object({ qaApproved: z.boolean() }).safeParse(request.body);
       if (!body.success) return reply.code(400).send({ ok: false, message: "Invalid input." });
+      const jobCard = await prisma.jobCard.findUnique({ where: { id } });
+      if (!jobCard) return reply.code(404).send({ ok: false, message: "Job card not found." });
+      if (jobCard.currentStage !== "QA") return reply.code(400).send({ ok: false, message: "QA can only be approved during the QA stage." });
       return prisma.jobCard.update({ where: { id }, data: { qaApproved: body.data.qaApproved } });
     }
   );
@@ -70,6 +79,9 @@ export default async function jobCardRoutes(fastify: FastifyInstance) {
       const { id } = request.params as { id: string };
       const body = z.object({ customerSignature: z.string().min(1) }).safeParse(request.body);
       if (!body.success) return reply.code(400).send({ ok: false, message: "Signature data is required." });
+      const jobCard = await prisma.jobCard.findUnique({ where: { id } });
+      if (!jobCard) return reply.code(404).send({ ok: false, message: "Job card not found." });
+      if (jobCard.currentStage !== "Ready for Handover") return reply.code(400).send({ ok: false, message: "Customer signature is captured at Ready for Handover." });
       return prisma.jobCard.update({ where: { id }, data: { customerSignature: body.data.customerSignature } });
     }
   );
@@ -79,6 +91,9 @@ export default async function jobCardRoutes(fastify: FastifyInstance) {
     { preHandler: [fastify.authenticate, fastify.requirePermission("finalize_job")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
+      const jobCard = await prisma.jobCard.findUnique({ where: { id } });
+      if (!jobCard) return reply.code(404).send({ ok: false, message: "Job card not found." });
+      if (jobCard.currentStage !== "Ready for Handover") return reply.code(400).send({ ok: false, message: "Asset handover is confirmed at Ready for Handover." });
       return prisma.jobCard.update({
         where: { id },
         data: { assetHandedOver: true, assetHandedOverAt: new Date(), assetHandedOverBy: request.currentUser!.name },
@@ -124,6 +139,7 @@ export default async function jobCardRoutes(fastify: FastifyInstance) {
       if (!body.success) return reply.code(400).send({ ok: false, message: "Final amount must be greater than zero." });
       const jobCard = await prisma.jobCard.findUnique({ where: { id } });
       if (!jobCard) return reply.code(404).send({ ok: false, message: "Job card not found." });
+      if (jobCard.currentStage !== "Ready for Handover") return reply.code(400).send({ ok: false, message: "Final charges are confirmed at Ready for Handover." });
       if (jobCard.jobType !== "non_warranty") return reply.code(400).send({ ok: false, message: "Warranty jobs do not require customer payment." });
       if ((jobCard.estimateAmount ?? 0) > 0 && body.data.finalAmount > (jobCard.estimateAmount ?? 0)) {
         return reply.code(400).send({ ok: false, message: "Final amount cannot exceed the customer-approved estimate." });
@@ -139,6 +155,10 @@ export default async function jobCardRoutes(fastify: FastifyInstance) {
       const { id } = request.params as { id: string };
       const body = z.object({ approved: z.boolean() }).safeParse(request.body);
       if (!body.success) return reply.code(400).send({ ok: false, message: "Invalid input." });
+      const jobCard = await prisma.jobCard.findUnique({ where: { id } });
+      if (!jobCard) return reply.code(404).send({ ok: false, message: "Job card not found." });
+      if (jobCard.currentStage !== "Customer Approval") return reply.code(400).send({ ok: false, message: "Customer approval is only available at the approval stage." });
+      if ((jobCard.estimateAmount ?? 0) <= 0) return reply.code(400).send({ ok: false, message: "Set the estimate before recording approval." });
       return prisma.jobCard.update({ where: { id }, data: { customerApproved: body.data.approved } });
     }
   );
@@ -150,8 +170,12 @@ export default async function jobCardRoutes(fastify: FastifyInstance) {
       const { id } = request.params as { id: string };
       const body = z.object({ technicianId: z.string().min(1) }).safeParse(request.body);
       if (!body.success) return reply.code(400).send({ ok: false, message: "Choose a valid technician." });
+      const jobCard = await prisma.jobCard.findUnique({ where: { id } });
+      if (!jobCard) return reply.code(404).send({ ok: false, message: "Job card not found." });
+      if (jobCard.status === "Delivered") return reply.code(400).send({ ok: false, message: "Delivered jobs cannot be reassigned." });
       const technician = await prisma.technician.findUnique({ where: { id: body.data.technicianId } });
       if (!technician) return reply.code(400).send({ ok: false, message: "Choose a valid technician." });
+      if (technician.branchId !== jobCard.branchId) return reply.code(400).send({ ok: false, message: "Technician must belong to the job branch." });
       return prisma.jobCard.update({ where: { id }, data: { technicianId: technician.id } });
     }
   );

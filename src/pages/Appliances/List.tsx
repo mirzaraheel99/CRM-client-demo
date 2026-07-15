@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { PackageSearch, Search, Wifi } from "lucide-react";
 import { useStore } from "../../lib/store";
 import { Badge, Button, Card, EmptyState, Input, Modal, Pagination, Select, SortableTh, Tabs } from "../../components/ui";
-import { ApplianceBasicFields, ApplianceArabicFields, ApplianceComplianceFields, AppliancePurchaseFields, ApplianceSiteFields } from "../../components/ApplianceFields";
+import { ApplianceBasicFields, ApplianceComplianceFields, AppliancePurchaseFields, ApplianceSiteFields } from "../../components/ApplianceFields";
 import { emptyApplianceForm, applianceFormToInput, APPLIANCE_CATEGORIES } from "../../lib/applianceForm";
 import { formatDate } from "../../lib/utils";
 import { toast } from "../../lib/toast";
@@ -16,10 +16,9 @@ import type { Appliance, ApplianceCategory } from "../../lib/types";
 const PAGE_SIZE = 15;
 type SortKey = "document" | "model" | "category" | "brand" | "serial" | "purchased";
 
-const FORM_TABS = ["Basic", "Arabic", "Purchase", "Compliance", "Site"];
+const FORM_TABS = ["Basic", "Purchase", "Compliance", "Site"];
 const FORM_TAB_LABELS: Record<string, string> = {
   Basic: bi("Basic", "أساسي"),
-  Arabic: bi("Arabic Name", "الاسم بالعربية"),
   Purchase: bi("Purchase & Warranty", "الشراء والضمان"),
   Compliance: bi("Compliance & Specs", "المطابقة والمواصفات"),
   Site: bi("Site & Photo", "الموقع والصورة"),
@@ -152,9 +151,8 @@ export default function ApplianceList() {
       <Modal open={open} onClose={() => setOpen(false)} title={bi("Add Product", "إضافة منتج")} width="lg">
         <div className="space-y-4">
           <p className="text-xs text-[var(--color-ink-muted)]">Products are registered independently. Select the customer when creating the service order.</p>
-          <Tabs tabs={aliasFieldsEnabled ? FORM_TABS : FORM_TABS.filter((tab) => tab !== "Arabic")} active={formTab} onChange={setFormTab} labels={FORM_TAB_LABELS} />
-          {formTab === "Basic" && <ApplianceBasicFields value={form} onChange={(patch) => setForm({ ...form, ...patch })} brands={brands} />}
-          {formTab === "Arabic" && aliasFieldsEnabled && <ApplianceArabicFields value={form} onChange={(patch) => setForm({ ...form, ...patch })} />}
+          <Tabs tabs={FORM_TABS} active={formTab} onChange={setFormTab} labels={FORM_TAB_LABELS} />
+          {formTab === "Basic" && <ApplianceBasicFields value={form} onChange={(patch) => setForm({ ...form, ...patch })} brands={brands} aliasFieldsEnabled={aliasFieldsEnabled} />}
           {formTab === "Purchase" && <AppliancePurchaseFields value={form} onChange={(patch) => setForm({ ...form, ...patch })} />}
           {formTab === "Compliance" && <ApplianceComplianceFields value={form} onChange={(patch) => setForm({ ...form, ...patch })} />}
           {formTab === "Site" && <ApplianceSiteFields value={form} onChange={(patch) => setForm({ ...form, ...patch })} />}

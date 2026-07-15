@@ -6,7 +6,7 @@ import { Card, CardHeader, Tabs, Button, Select, Textarea, Input, Field, Badge, 
 import { JobStatusBadge, JobTypeBadge } from "../../components/StatusBadge";
 import { PartsGrid } from "../../components/PartsGrid";
 import { TrackingShare } from "../../components/TrackingShare";
-import { ApplianceBasicFields, ApplianceArabicFields, AppliancePurchaseFields, ApplianceComplianceFields, ApplianceSiteFields } from "../../components/ApplianceFields";
+import { ApplianceBasicFields, AppliancePurchaseFields, ApplianceComplianceFields, ApplianceSiteFields } from "../../components/ApplianceFields";
 import { emptyApplianceForm, applianceFormToInput, type ApplianceFormState } from "../../lib/applianceForm";
 import { formatCurrency, formatDate, formatDateTime, formatSequence, relativeTime } from "../../lib/utils";
 import { inventoryStockByBranch, totalStockByItem } from "../../lib/selectors";
@@ -23,10 +23,9 @@ import { STAGE_NAME_AR, CHANNEL_AR, COMM_STATUS_AR, REQUEST_SOURCE_AR, bi } from
 import type { StageName, Channel, ActionResult, JobType } from "../../lib/types";
 
 const NEW_PRODUCT_OPTION = "__new_product__";
-const ADD_PRODUCT_TABS = ["Basic", "Arabic", "Purchase", "Compliance", "Site"];
+const ADD_PRODUCT_TABS = ["Basic", "Purchase", "Compliance", "Site"];
 const ADD_PRODUCT_TAB_LABELS: Record<string, string> = {
   Basic: bi("Basic", "أساسي"),
-  Arabic: bi("Arabic Name", "الاسم بالعربية"),
   Purchase: bi("Purchase & Warranty", "الشراء والضمان"),
   Compliance: bi("Compliance & Specs", "المطابقة والمواصفات"),
   Site: bi("Site & Photo", "الموقع والصورة"),
@@ -329,9 +328,8 @@ export default function JobCardDetail() {
 
           {addProductForm.applianceId === NEW_PRODUCT_OPTION && (
             <div className="space-y-4 rounded-md bg-black/[0.03] p-3 dark:bg-white/[0.05]">
-              <Tabs tabs={aliasFieldsEnabled ? ADD_PRODUCT_TABS : ADD_PRODUCT_TABS.filter((tab) => tab !== "Arabic")} active={addProductTab} onChange={setAddProductTab} labels={ADD_PRODUCT_TAB_LABELS} />
-              {addProductTab === "Basic" && <ApplianceBasicFields value={newProductForm} onChange={(patch) => setNewProductForm({ ...newProductForm, ...patch })} brands={brands} />}
-              {addProductTab === "Arabic" && aliasFieldsEnabled && <ApplianceArabicFields value={newProductForm} onChange={(patch) => setNewProductForm({ ...newProductForm, ...patch })} />}
+              <Tabs tabs={ADD_PRODUCT_TABS} active={addProductTab} onChange={setAddProductTab} labels={ADD_PRODUCT_TAB_LABELS} />
+              {addProductTab === "Basic" && <ApplianceBasicFields value={newProductForm} onChange={(patch) => setNewProductForm({ ...newProductForm, ...patch })} brands={brands} aliasFieldsEnabled={aliasFieldsEnabled} />}
               {addProductTab === "Purchase" && <AppliancePurchaseFields value={newProductForm} onChange={(patch) => setNewProductForm({ ...newProductForm, ...patch })} />}
               {addProductTab === "Compliance" && <ApplianceComplianceFields value={newProductForm} onChange={(patch) => setNewProductForm({ ...newProductForm, ...patch })} />}
               {addProductTab === "Site" && <ApplianceSiteFields value={newProductForm} onChange={(patch) => setNewProductForm({ ...newProductForm, ...patch })} />}

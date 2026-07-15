@@ -9,7 +9,7 @@ type FieldGroupProps = {
   onChange: (patch: Partial<ApplianceFormState>) => void;
 };
 
-export function ApplianceBasicFields({ value, onChange, brands }: FieldGroupProps & { brands: Brand[] }) {
+export function ApplianceBasicFields({ value, onChange, brands, aliasFieldsEnabled }: FieldGroupProps & { brands: Brand[]; aliasFieldsEnabled?: boolean }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <Field label={bi("Brand", "العلامة التجارية")}>
@@ -23,21 +23,15 @@ export function ApplianceBasicFields({ value, onChange, brands }: FieldGroupProp
           {APPLIANCE_CATEGORIES.map((item) => <option key={item} value={item}>{bi(item, APPLIANCE_CATEGORY_AR[item])}</option>)}
         </Select>
       </Field>
-      <Field label={bi("Model", "الطراز")}><Input value={value.model} onChange={(event) => onChange({ model: event.target.value })} /></Field>
+      <Field label={bi("Model", "الطراز")}>
+        <div className="flex gap-2">
+          <Input value={value.model} onChange={(event) => onChange({ model: event.target.value })} />
+          {aliasFieldsEnabled && <Input dir="rtl" className="w-2/5 shrink-0" placeholder={bi("Arabic", "عربي")} value={value.modelAr} onChange={(event) => onChange({ modelAr: event.target.value })} />}
+        </div>
+      </Field>
       <Field label={bi("Serial number / unit number", "الرقم التسلسلي / رقم الوحدة")}><Input value={value.serialNo} onChange={(event) => onChange({ serialNo: event.target.value })} /></Field>
       {value.category === "Mobile" && <Field label={bi("IMEI", "الآيمي")}><Input value={value.imeiNo} onChange={(event) => onChange({ imeiNo: event.target.value })} /></Field>}
       <Field label={bi("Purchase date", "تاريخ الشراء")}><Input type="date" value={value.purchaseDate} onChange={(event) => onChange({ purchaseDate: event.target.value })} /></Field>
-    </div>
-  );
-}
-
-export function ApplianceArabicFields({ value, onChange }: FieldGroupProps) {
-  return (
-    <div className="space-y-3">
-      <p className="text-xs text-[var(--color-ink-muted)]">{bi("For staff who read/write Arabic only — enter the product model here instead of the Basic tab.", "لموظفي الاستقبال الذين يقرؤون ويكتبون العربية فقط - أدخل طراز المنتج هنا بدلاً من تبويب الأساسي.")}</p>
-      <Field label={bi("Model", "الطراز")}>
-        <Input dir="rtl" value={value.modelAr} onChange={(event) => onChange({ modelAr: event.target.value })} placeholder="الطراز بالعربية" />
-      </Field>
     </div>
   );
 }

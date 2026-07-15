@@ -1,26 +1,18 @@
 import { useState } from "react";
 import { useStore } from "../lib/store";
-import { Card, CardHeader, Button, Input, Field, Modal, Textarea, Tabs } from "../components/ui";
+import { Card, CardHeader, Button, Input, Field, Modal, Textarea } from "../components/ui";
 import { toast } from "../lib/toast";
 import { bi } from "../lib/domainAr";
-
-const ADD_BRAND_TABS = ["Details", "Arabic"];
-const ADD_BRAND_TAB_LABELS: Record<string, string> = {
-  Details: bi("Details", "التفاصيل"),
-  Arabic: bi("Arabic Name", "الاسم بالعربية"),
-};
 
 export default function Brands() {
   const { brands, appliances, addBrand, aliasFieldsEnabled } = useStore();
   const [open, setOpen] = useState(false);
-  const [addFormTab, setAddFormTab] = useState("Details");
   const [form, setForm] = useState({ name: "", nameAr: "", warrantyMonths: 12, rules: "" });
 
   async function submit() {
     if (!form.name.trim()) return;
     await addBrand({ ...form, nameAr: form.nameAr.trim() || undefined });
     setForm({ name: "", nameAr: "", warrantyMonths: 12, rules: "" });
-    setAddFormTab("Details");
     setOpen(false);
     toast(`${form.name} added to brands.`);
   }
@@ -48,26 +40,16 @@ export default function Brands() {
 
       <Modal open={open} onClose={() => setOpen(false)} title={bi("Add Brand", "إضافة علامة تجارية")}>
         <div className="space-y-3">
-          {aliasFieldsEnabled && <Tabs tabs={ADD_BRAND_TABS} active={addFormTab} onChange={setAddFormTab} labels={ADD_BRAND_TAB_LABELS} />}
-
-          {(!aliasFieldsEnabled || addFormTab === "Details") && (
-            <div className="space-y-3">
-              <Field label={bi("Brand name", "اسم العلامة التجارية")}><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
-              <Field label={bi("Warranty (months)", "الضمان (بالأشهر)")}>
-                <Input type="number" value={form.warrantyMonths} onChange={(e) => setForm({ ...form, warrantyMonths: Number(e.target.value) })} />
-              </Field>
-              <Field label={bi("Warranty rules", "شروط الضمان")}><Textarea rows={3} value={form.rules} onChange={(e) => setForm({ ...form, rules: e.target.value })} /></Field>
+          <Field label={bi("Brand name", "اسم العلامة التجارية")}>
+            <div className="flex gap-2">
+              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              {aliasFieldsEnabled && <Input dir="rtl" className="w-2/5 shrink-0" placeholder={bi("Arabic", "عربي")} value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} />}
             </div>
-          )}
-
-          {aliasFieldsEnabled && addFormTab === "Arabic" && (
-            <div className="space-y-3">
-              <p className="text-xs text-[var(--color-ink-muted)]">{bi("For staff who read/write Arabic only — enter the brand name here instead of the Details tab.", "لموظفي الاستقبال الذين يقرؤون ويكتبون العربية فقط - أدخل اسم العلامة التجارية هنا بدلاً من تبويب التفاصيل.")}</p>
-              <Field label={bi("Brand name", "اسم العلامة التجارية")}>
-                <Input dir="rtl" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} placeholder="الاسم بالعربية" />
-              </Field>
-            </div>
-          )}
+          </Field>
+          <Field label={bi("Warranty (months)", "الضمان (بالأشهر)")}>
+            <Input type="number" value={form.warrantyMonths} onChange={(e) => setForm({ ...form, warrantyMonths: Number(e.target.value) })} />
+          </Field>
+          <Field label={bi("Warranty rules", "شروط الضمان")}><Textarea rows={3} value={form.rules} onChange={(e) => setForm({ ...form, rules: e.target.value })} /></Field>
 
           <Button className="w-full justify-center" onClick={submit}>{bi("Save Brand", "حفظ العلامة التجارية")}</Button>
         </div>

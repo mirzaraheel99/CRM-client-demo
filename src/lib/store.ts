@@ -325,27 +325,39 @@ export const useStore = create<DemoState>()(
       },
       hydrate: async () => {
         set({ hydrating: true });
-        try {
-          const [branches, customers, brands, technicians, appliances, serviceOrders, jobCards, removedParts, estimateLineItems] = await Promise.all([
-            api.get<Branch[]>("/api/branches"),
-            api.get<Customer[]>("/api/customers"),
-            api.get<Brand[]>("/api/brands"),
-            api.get<Technician[]>("/api/technicians"),
-            api.get<Appliance[]>("/api/appliances"),
-            api.get<ServiceOrder[]>("/api/service-orders"),
-            api.get<(JobCard & { stageHistory?: JobCardStageHistory[] })[]>("/api/job-cards"),
-            api.get<RemovedPart[]>("/api/removed-parts"),
-            api.get<JobCardEstimateLine[]>("/api/estimate-lines"),
-          ]);
-          const stageHistory = jobCards.flatMap((job) => job.stageHistory ?? []);
-          set({
-            branches, customers, brands, technicians, appliances, serviceOrders,
-            jobCards, stageHistory, removedParts, estimateLineItems,
-            hydrated: true, hydrating: false,
-          });
-        } catch {
-          set({ hydrating: false });
-        }
+        const state = get();
+        // Each entity is fetched independently (not Promise.all) so that one
+        // missing/failing endpoint — e.g. a backend that hasn't picked up a
+        // brand-new route yet — can't blank out every other already-working
+        // entity on screen. Any entity that fails to load keeps whatever it
+        // already had rather than being wiped to empty.
+        const fetchOr = async <T>(path: string, fallback: T): Promise<T> => {
+          try {
+            return await api.get<T>(path);
+          } catch (err) {
+            console.error(`hydrate: failed to load ${path}`, err);
+            return fallback;
+          }
+        };
+        const [branches, customers, brands, technicians, appliances, serviceOrders, jobCardsRaw, removedParts, estimateLineItems] = await Promise.all([
+          fetchOr<Branch[]>("/api/branches", state.branches),
+          fetchOr<Customer[]>("/api/customers", state.customers),
+          fetchOr<Brand[]>("/api/brands", state.brands),
+          fetchOr<Technician[]>("/api/technicians", state.technicians),
+          fetchOr<Appliance[]>("/api/appliances", state.appliances),
+          fetchOr<ServiceOrder[]>("/api/service-orders", state.serviceOrders),
+          fetchOr<(JobCard & { stageHistory?: JobCardStageHistory[] })[]>("/api/job-cards", state.jobCards),
+          fetchOr<RemovedPart[]>("/api/removed-parts", state.removedParts),
+          fetchOr<JobCardEstimateLine[]>("/api/estimate-lines", state.estimateLineItems),
+        ]);
+        const stageHistory = jobCardsRaw.some((job) => "stageHistory" in job)
+          ? jobCardsRaw.flatMap((job) => job.stageHistory ?? [])
+          : state.stageHistory;
+        set({
+          branches, customers, brands, technicians, appliances, serviceOrders,
+          jobCards: jobCardsRaw, stageHistory, removedParts, estimateLineItems,
+          hydrated: true, hydrating: false,
+        });
       },
       toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
       setAliasFieldsEnabled: (enabled) => {

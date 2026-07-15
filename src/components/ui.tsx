@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { forwardRef, useEffect, useState, type ReactNode } from "react";
 import { Check, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { cx } from "../lib/utils";
 import { useCountUp } from "../lib/useCountUp";
@@ -263,9 +263,10 @@ export function Avatar({ name, color, size = 32 }: { name: string; color?: strin
   );
 }
 
-export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
+export const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(function Input(props, ref) {
   return (
     <input
+      ref={ref}
       {...props}
       className={cx(
         "w-full rounded-lg border bg-[var(--color-surface-2)] px-3 py-2 text-sm outline-none [border-color:var(--color-border)] transition-[border-color,box-shadow] duration-150 focus:border-[var(--color-brand-1)] focus:ring-4 focus:ring-[var(--color-brand-1)]/[0.12]",
@@ -273,11 +274,12 @@ export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
       )}
     />
   );
-}
+});
 
-export function Select({ children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) {
+export const Select = forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>(function Select({ children, ...props }, ref) {
   return (
     <select
+      ref={ref}
       {...props}
       className={cx(
         "w-full rounded-lg border bg-[var(--color-surface-2)] px-3 py-2 text-sm outline-none [border-color:var(--color-border)] transition-[border-color,box-shadow] duration-150 focus:border-[var(--color-brand-1)] focus:ring-4 focus:ring-[var(--color-brand-1)]/[0.12]",
@@ -287,7 +289,7 @@ export function Select({ children, ...props }: React.SelectHTMLAttributes<HTMLSe
       {children}
     </select>
   );
-}
+});
 
 export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (

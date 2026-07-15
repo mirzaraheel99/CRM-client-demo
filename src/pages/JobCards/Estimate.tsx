@@ -56,6 +56,7 @@ export default function EstimatePage() {
   const jobEstimateLines = estimateLineItems.filter((line) => line.jobcardId === id);
 
   const kindTabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const primaryFieldRef = useRef<HTMLInputElement | HTMLSelectElement | null>(null);
   const [newLineKind, setNewLineKind] = useState<EstimateLineKind>("labor");
   const [newLineLabel, setNewLineLabel] = useState("");
   const [newLineDescriptionAr, setNewLineDescriptionAr] = useState("");
@@ -368,11 +369,17 @@ export default function EstimatePage() {
                   discountAmount: newLineKind !== "discount" && newLineDiscount ? Number(newLineDiscount) : undefined,
                   notes: newLineNotes || undefined,
                 }),
-                () => { setNewLineLabel(""); setNewLineDescriptionAr(""); setNewLineCatNo(""); setNewLineItemId(""); setNewLineQty("1"); setNewLineUnitPrice(""); setNewLineDiscount(""); setNewLineNotes(""); }
+                () => {
+                  setNewLineLabel(""); setNewLineDescriptionAr(""); setNewLineCatNo(""); setNewLineItemId(""); setNewLineQty("1"); setNewLineUnitPrice(""); setNewLineDiscount(""); setNewLineNotes("");
+                  // Keep focus in the entry row after every add — like Excel, hitting
+                  // Enter on one line should drop you straight into the next one
+                  // instead of forcing a reach for the mouse.
+                  primaryFieldRef.current?.focus();
+                }
               );
             }}
           >
-            <p className="text-xs font-semibold text-[var(--color-ink-secondary)]">{bi("Add line item", "إضافة بند")}</p>
+            <p className="text-xs font-semibold text-[var(--color-ink-secondary)]">{bi("Add line item — press Enter to add and keep going", "إضافة بند — اضغط Enter للإضافة والمتابعة")}</p>
 
             <Field label={bi("Type", "النوع")}>
               <div role="radiogroup" aria-label={bi("Line item type", "نوع البند")} className="inline-flex flex-wrap gap-1 rounded-lg border p-1 [border-color:var(--color-border)] bg-[var(--color-surface-2)]">
@@ -410,7 +417,7 @@ export default function EstimatePage() {
               <Field label={bi("Cat No", "رقم الصنف")}><Input value={newLineCatNo} onChange={(event) => setNewLineCatNo(event.target.value)} placeholder="—" /></Field>
               {newLineKind === "part" ? (
                 <Field label={bi("Part", "القطعة")}>
-                  <Select value={newLineItemId} onChange={(event) => { const item = inventoryItems.find((candidate) => candidate.id === event.target.value); setNewLineItemId(event.target.value); setNewLineUnitPrice(item ? String(item.unitPrice) : ""); setNewLineCatNo(item?.partNo ?? ""); setNewLineDescriptionAr(item?.nameAr ?? ""); }}>
+                  <Select ref={(el) => { primaryFieldRef.current = el; }} value={newLineItemId} onChange={(event) => { const item = inventoryItems.find((candidate) => candidate.id === event.target.value); setNewLineItemId(event.target.value); setNewLineUnitPrice(item ? String(item.unitPrice) : ""); setNewLineCatNo(item?.partNo ?? ""); setNewLineDescriptionAr(item?.nameAr ?? ""); }}>
                     <option value="">{bi("Choose part...", "اختر قطعة...")}</option>
                     {inventoryItems.map((item) => <option key={item.id} value={item.id}>{item.name}{item.nameAr ? ` · ${item.nameAr}` : ""}</option>)}
                   </Select>
@@ -418,6 +425,7 @@ export default function EstimatePage() {
               ) : (
                 <Field label={bi("Description", "الوصف")}>
                   <Input
+                    ref={(el) => { primaryFieldRef.current = el; }}
                     value={newLineLabel}
                     onChange={(event) => setNewLineLabel(event.target.value)}
                     placeholder={newLineKind === "labor" ? "e.g. Diagnostic & labor charge" : newLineKind === "discount" ? "e.g. Loyalty discount" : "e.g. Transport / callout fee"}

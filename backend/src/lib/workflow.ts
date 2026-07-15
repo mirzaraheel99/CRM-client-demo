@@ -60,6 +60,18 @@ export function nextStage(job: JobCard): string | null {
   return order[idx + 1];
 }
 
+// Fields tied to an earlier stage can be revisited after the job has moved
+// on (e.g. amending diagnosis notes after repair uncovers something new).
+// This tells the caller whether the job has actually moved past that stage,
+// so it knows whether the edit needs an audit-trail note.
+export function isPastStage(job: JobCard, stageName: string): boolean {
+  const order = job.jobType === "warranty" ? STAGE_ORDER_WARRANTY : STAGE_ORDER_NON_WARRANTY;
+  const currentIdx = order.indexOf(job.currentStage);
+  const stageIdx = order.indexOf(stageName);
+  if (currentIdx === -1 || stageIdx === -1) return false;
+  return currentIdx > stageIdx;
+}
+
 export function canAdvanceCurrentStage(role: string, stage: string): boolean {
   if (role === "manager" || role === "admin") return true;
   if (role === "supervisor") return true;

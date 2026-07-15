@@ -107,7 +107,10 @@ export default function EstimatePage() {
   }
 
   const editable = canPerform(role, "set_estimate");
-  const canAddLine = editable && (job.currentStage === "Estimate" || job.currentStage === "Customer Approval" || (job.currentStage === "Diagnosis" && job.diagnosisNotes));
+  // Estimates can be built or amended at any stage once diagnosis notes exist —
+  // revisiting one after repair, QA, etc. is expected, e.g. when repair turns
+  // up an additional need.
+  const canAddLine = editable && Boolean(job.diagnosisNotes?.trim());
   const estimateNo = `EST-${job.documentNo}`;
 
   function sendEstimateWhatsapp(): ActionResult {

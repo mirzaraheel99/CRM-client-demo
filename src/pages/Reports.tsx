@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { CalendarDays, CircleDollarSign, Clock3, Download, Gauge, Wrench } from "lucide-react";
 import { useStore } from "../lib/store";
 import { Card, CardHeader, Tabs, Button, Badge, Select } from "../components/ui";
@@ -184,6 +185,8 @@ export default function Reports() {
         .sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp)),
     [stageHistory, registerStage]
   );
+  const registerJobMap = useMemo(() => new Map(jobCards.map((job) => [job.id, job])), [jobCards]);
+  const registerCustomerMap = useMemo(() => new Map(customers.map((c) => [c.id, c])), [customers]);
 
   const paymentsByMethod = useMemo(() => {
     const map = new Map<string, number>();
@@ -341,15 +344,28 @@ export default function Reports() {
                   </tr>
                 </thead>
                 <tbody>
-                  {registerEntries.map((h) => (
-                    <tr key={h.id} className="border-b last:border-0 [border-color:var(--color-border)]">
-                      <td className="py-2.5"><Badge tone="brand">{h.stageRefNo}</Badge></td>
-                      <td className="py-2.5 font-medium">{h.jobcardId}</td>
-                      <td className="py-2.5 text-[var(--color-ink-secondary)]">{h.changedBy}</td>
-                      <td className="py-2.5 text-[var(--color-ink-muted)]">{formatDateTime(h.timestamp)}</td>
-                      <td className="py-2.5 text-[var(--color-ink-secondary)]">{h.notes}</td>
-                    </tr>
-                  ))}
+                  {registerEntries.map((h) => {
+                    const job = registerJobMap.get(h.jobcardId);
+                    const customer = job ? registerCustomerMap.get(job.customerId) : undefined;
+                    return (
+                      <tr key={h.id} className="border-b last:border-0 [border-color:var(--color-border)]">
+                        <td className="py-2.5">
+                          <Link to={`/jobcards/${h.jobcardId}`} className="inline-block hover:opacity-80" title={bi("Open job card", "فتح بطاقة العمل")}>
+                            <Badge tone="brand">{h.stageRefNo}</Badge>
+                          </Link>
+                        </td>
+                        <td className="py-2.5 font-medium">
+                          <Link to={`/jobcards/${h.jobcardId}`} className="text-[var(--color-brand-1)] hover:underline">
+                            {job?.documentNo ?? h.jobcardId}
+                          </Link>
+                          {customer && <span className="ml-1.5 font-normal text-[var(--color-ink-muted)]">· {customer.name}</span>}
+                        </td>
+                        <td className="py-2.5 text-[var(--color-ink-secondary)]">{h.changedBy}</td>
+                        <td className="py-2.5 text-[var(--color-ink-muted)]">{formatDateTime(h.timestamp)}</td>
+                        <td className="py-2.5 text-[var(--color-ink-secondary)]">{h.notes}</td>
+                      </tr>
+                    );
+                  })}
                   {registerEntries.length === 0 && (
                     <tr><td colSpan={5} className="py-8 text-center text-[var(--color-ink-muted)]">No {registerStage.toLowerCase()} entries recorded yet.</td></tr>
                   )}

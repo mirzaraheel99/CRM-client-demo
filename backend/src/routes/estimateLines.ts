@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
+import { recordAmendmentIfPast } from "../lib/audit.js";
 
 const lineInput = z.object({
   kind: z.enum(["labor", "part", "other", "discount"]),
@@ -37,6 +38,7 @@ export default async function estimateLineRoutes(fastify: FastifyInstance) {
       if (!body.success) return reply.code(400).send({ ok: false, message: "Invalid estimate line." });
       const jobCard = await prisma.jobCard.findUnique({ where: { id } });
       if (!jobCard) return reply.code(404).send({ ok: false, message: "Job card not found." });
+      await recordAmendmentIfPast(jobCard, "Estimate", request.currentUser!.name, "Estimate line item");
       return prisma.estimateLine.create({
         data: { jobcardId: id, ...body.data, totalPrice: computeTotal(body.data) },
       });
@@ -52,6 +54,8 @@ export default async function estimateLineRoutes(fastify: FastifyInstance) {
       if (!body.success) return reply.code(400).send({ ok: false, message: "Invalid estimate line." });
       const existing = await prisma.estimateLine.findUnique({ where: { id } });
       if (!existing) return reply.code(404).send({ ok: false, message: "Estimate line not found." });
+      const jobCard = await prisma.jobCard.findUnique({ where: { id: existing.jobcardId } });
+      if (jobCard) await recordAmendmentIfPast(jobCard, "Estimate", request.currentUser!.name, "Estimate line item");
       const merged = {
         qty: body.data.qty ?? existing.qty,
         unitPrice: body.data.unitPrice ?? existing.unitPrice,
@@ -71,6 +75,8 @@ export default async function estimateLineRoutes(fastify: FastifyInstance) {
       const { id } = request.params as { id: string };
       const existing = await prisma.estimateLine.findUnique({ where: { id } });
       if (!existing) return reply.code(404).send({ ok: false, message: "Estimate line not found." });
+      const jobCard = await prisma.jobCard.findUnique({ where: { id: existing.jobcardId } });
+      if (jobCard) await recordAmendmentIfPast(jobCard, "Estimate", request.currentUser!.name, "Estimate line item removed");
       await prisma.estimateLine.delete({ where: { id } });
       return { ok: true };
     }

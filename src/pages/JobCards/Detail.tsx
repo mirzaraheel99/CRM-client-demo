@@ -88,6 +88,10 @@ export default function JobCardDetail() {
   const [signatureInput, setSignatureInput] = useState("");
   const [billForm, setBillForm] = useState({ billNo: "", billDate: new Date().toISOString().slice(0, 10), vendorName: "" });
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
+  // null = "show the live current stage"; set when the user clicks a completed
+  // step in the workflow timeline to amend it (e.g. repair turned up something
+  // that means diagnosis notes need updating).
+  const [viewedStage, setViewedStage] = useState<StageName | null>(null);
 
   const job = jobCards.find((candidate) => candidate.id === id && (selectedBranchId === "all" || candidate.branchId === selectedBranchId));
   const serviceOrder = serviceOrders.find((candidate) => candidate.id === job?.serviceOrderId);
@@ -117,6 +121,10 @@ export default function JobCardDetail() {
     if (job) applyTemplate("received");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job?.id]);
+
+  useEffect(() => {
+    setViewedStage(null);
+  }, [job?.id, job?.currentStage]);
 
   useEffect(() => {
     setDiagnosisInput(job?.diagnosisNotes ?? "");
@@ -208,6 +216,9 @@ export default function JobCardDetail() {
   const nextStep = workflow && currentStepIdx >= 0 ? workflow.steps[currentStepIdx + 1] : undefined;
   const requirements = stageRequirements(job, { payments: jobPayments, purchaseBill: bill });
   const accessBlocker = stageAccessBlocker(job, role);
+  const activeStage: StageName = viewedStage ?? job.currentStage;
+  const isViewingPastStage = activeStage !== job.currentStage;
+  const viewedStepIdx = workflow?.steps.findIndex((s) => s.stepName === activeStage) ?? -1;
   const blockers = requirements.filter((requirement) => !requirement.met).map((requirement) => requirement.label);
   const eligibleTechnicians = technicians.filter((candidate) => candidate.branchId === job.branchId && candidate.status !== "Off Duty" && (!appliance || candidate.skills.includes(appliance.category)));
   const canEditParts = canPerform(role, "add_part") && (job.currentStage === "Diagnosis" || job.currentStage === "Repair");
@@ -752,11 +763,18 @@ export default function JobCardDetail() {
             <TrackingShare jobId={serviceOrder?.id ?? job.id} />
           </Card>
 
-          {job.currentStage !== "Delivered" && (
+          {activeStage !== "Delivered" && (
             <Card className="space-y-3">
-              <CardHeader title={bi(job.currentStage, STAGE_NAME_AR[job.currentStage])} subtitle={bi("Complete the stage requirements below", "أكمل متطلبات المرحلة أدناه")} />
+              <CardHeader title={bi(activeStage, STAGE_NAME_AR[activeStage])} subtitle={isViewingPastStage ? bi("Amending a completed stage", "تعديل مرحلة مكتملة") : bi("Complete the stage requirements below", "أكمل متطلبات المرحلة أدناه")} />
 
-              {requirements.length > 0 && (
+              {isViewingPastStage && (
+                <div className="flex items-center justify-between gap-2 rounded-md bg-[var(--color-status-warning)]/10 px-2.5 py-1.5 text-xs text-[var(--color-status-warning)]">
+                  <span>{bi("You're editing a stage the job has already moved past. The change will be logged.", "أنت تعدّل مرحلة تجاوزتها بطاقة العمل بالفعل. سيتم تسجيل هذا التغيير.")}</span>
+                  <button onClick={() => setViewedStage(null)} className="shrink-0 font-medium underline hover:no-underline">{bi("Back to current", "العودة للحالية")}</button>
+                </div>
+              )}
+
+              {!isViewingPastStage && requirements.length > 0 && (
                 <div className="space-y-1.5">
                   {requirements.map((requirement) => (
                     <div key={requirement.label} className="flex items-start gap-2 text-xs">
@@ -767,7 +785,7 @@ export default function JobCardDetail() {
                 </div>
               )}
 
-              {job.currentStage === "Warranty Validation" && canPerform(role, "create_job") && (
+              {activeStage === "Warranty Validation" && canPerform(role, "create_job") && (
                 <div className="space-y-2 border-t pt-3 [border-color:var(--color-border)]">
                   <Field label={bi("Purchase bill number", "رقم فاتورة الشراء")}><Input value={billForm.billNo} onChange={(event) => setBillForm({ ...billForm, billNo: event.target.value })} /></Field>
                   <Field label={bi("Vendor", "المورد")}><Input value={billForm.vendorName} onChange={(event) => setBillForm({ ...billForm, vendorName: event.target.value })} /></Field>
@@ -776,14 +794,14 @@ export default function JobCardDetail() {
                 </div>
               )}
 
-              {job.currentStage === "Diagnosis" && canPerform(role, "set_diagnosis") && (
+              {activeStage === "Diagnosis" && canPerform(role, "set_diagnosis") && (
                 <div className="space-y-2 border-t pt-3 [border-color:var(--color-border)]">
                   <Textarea rows={4} value={diagnosisInput} onChange={(event) => setDiagnosisInput(event.target.value)} placeholder="Record fault, checks, and likely cause..." />
-                  <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(setDiagnosis(job.id, diagnosisInput))}>{bi("Save Diagnosis", "حفظ التشخيص")}</Button>
+                  <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(setDiagnosis(job.id, diagnosisInput))}>{bi(isViewingPastStage ? "Save Amended Diagnosis" : "Save Diagnosis", isViewingPastStage ? "حفظ التشخيص المعدّل" : "حفظ التشخيص")}</Button>
                 </div>
               )}
 
-              {job.currentStage === "Estimate" && canPerform(role, "set_estimate") && (
+              {activeStage === "Estimate" && canPerform(role, "set_estimate") && (
                 <div className="space-y-2 border-t pt-3 [border-color:var(--color-border)]">
                   <p className="text-xs text-[var(--color-ink-muted)]">{bi("Current estimate", "التقدير الحالي")}</p>
                   <p className="font-medium tabular-nums">{formatCurrency(job.estimateAmount)}</p>
@@ -791,27 +809,27 @@ export default function JobCardDetail() {
                 </div>
               )}
 
-              {job.currentStage === "Customer Approval" && job.customerApproved !== true && canPerform(role, "record_customer_approval") && (
+              {activeStage === "Customer Approval" && (isViewingPastStage || job.customerApproved !== true) && canPerform(role, "record_customer_approval") && (
                 <div className="grid grid-cols-2 gap-2 border-t pt-3 [border-color:var(--color-border)]">
                   <Button onClick={() => showResult(approveCustomer(job.id, true))}><CheckCircle2 size={14} /> {bi("Approve", "موافقة")}</Button>
-                  {job.customerApproved == null && <Button variant="danger" onClick={() => showResult(approveCustomer(job.id, false))}><XCircle size={14} /> {bi("Decline", "رفض")}</Button>}
+                  {(isViewingPastStage || job.customerApproved == null) && <Button variant="danger" onClick={() => showResult(approveCustomer(job.id, false))}><XCircle size={14} /> {bi("Decline", "رفض")}</Button>}
                 </div>
               )}
 
-              {job.currentStage === "Repair" && canPerform(role, "set_repair_notes") && (
+              {activeStage === "Repair" && canPerform(role, "set_repair_notes") && (
                 <div className="space-y-2 border-t pt-3 [border-color:var(--color-border)]">
                   <Textarea rows={4} value={repairInput} onChange={(event) => setRepairInput(event.target.value)} placeholder="Record work completed and parts fitted..." />
-                  <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(setRepairNotes(job.id, repairInput))}>{bi("Save Repair Notes", "حفظ ملاحظات الإصلاح")}</Button>
+                  <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(setRepairNotes(job.id, repairInput))}>{bi(isViewingPastStage ? "Save Amended Repair Notes" : "Save Repair Notes", isViewingPastStage ? "حفظ ملاحظات الإصلاح المعدّلة" : "حفظ ملاحظات الإصلاح")}</Button>
                 </div>
               )}
 
-              {job.currentStage === "QA" && canPerform(role, "approve_qa") && (
+              {activeStage === "QA" && canPerform(role, "approve_qa") && (
                 <div className="border-t pt-3 [border-color:var(--color-border)]">
                   <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(setQaApproved(job.id, true))}><CheckCircle2 size={14} /> {bi("Approve QA", "اعتماد فحص الجودة")}</Button>
                 </div>
               )}
 
-              {job.currentStage === "Ready for Handover" && (
+              {activeStage === "Ready for Handover" && (
                 <div className="space-y-3 border-t pt-3 [border-color:var(--color-border)]">
                   {job.jobType === "non_warranty" && canPerform(role, "finalize_job") && (
                     <div className="space-y-2">
@@ -861,7 +879,18 @@ export default function JobCardDetail() {
 
           <Card className="space-y-3">
             <CardHeader title={bi("Workflow", "سير العمل")} subtitle={workflow ? `${workflow.steps.length}-step ${job.jobType.replace("_", " ")} flow` : undefined} />
-            {workflow && <WorkflowStepper steps={workflow.steps} currentIdx={currentStepIdx} orientation="vertical" />}
+            {workflow && (
+              <WorkflowStepper
+                steps={workflow.steps}
+                currentIdx={currentStepIdx}
+                orientation="vertical"
+                viewedIdx={viewedStepIdx}
+                onStepClick={(stepName) => setViewedStage(stepName === job.currentStage ? null : (stepName as StageName))}
+              />
+            )}
+            {isViewingPastStage && (
+              <p className="text-[11px] text-[var(--color-ink-muted)]">{bi("Click a completed step above to amend it, or the current step to return.", "انقر على مرحلة مكتملة أعلاه لتعديلها، أو المرحلة الحالية للعودة.")}</p>
+            )}
             {nextStep ? (
               <div className="border-t pt-3 [border-color:var(--color-border)] space-y-2">
                 <p className="text-xs text-[var(--color-ink-muted)]">{bi("Next", "التالي")}: <span className="font-medium text-[var(--color-ink-secondary)]">{bi(nextStep.stepName, STAGE_NAME_AR[nextStep.stepName as StageName])}</span></p>

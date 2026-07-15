@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { nextStageRefNo } from "../lib/stageRefNo.js";
 import { stageBlockers, nextStage, canAdvanceCurrentStage, statusForStage } from "../lib/workflow.js";
+import { recordAmendmentIfPast } from "../lib/audit.js";
 
 const jobCardInclude = {
   customer: true,
@@ -39,7 +40,7 @@ export default async function jobCardRoutes(fastify: FastifyInstance) {
       if (!body.success) return reply.code(400).send({ ok: false, message: "Diagnosis notes are required." });
       const jobCard = await prisma.jobCard.findUnique({ where: { id } });
       if (!jobCard) return reply.code(404).send({ ok: false, message: "Job card not found." });
-      if (jobCard.currentStage !== "Diagnosis") return reply.code(400).send({ ok: false, message: "Diagnosis notes can only be changed during Diagnosis." });
+      await recordAmendmentIfPast(jobCard, "Diagnosis", request.currentUser!.name, "Diagnosis notes");
       return prisma.jobCard.update({ where: { id }, data: { diagnosisNotes: body.data.diagnosisNotes.trim() } });
     }
   );
@@ -53,7 +54,7 @@ export default async function jobCardRoutes(fastify: FastifyInstance) {
       if (!body.success) return reply.code(400).send({ ok: false, message: "Repair notes are required." });
       const jobCard = await prisma.jobCard.findUnique({ where: { id } });
       if (!jobCard) return reply.code(404).send({ ok: false, message: "Job card not found." });
-      if (jobCard.currentStage !== "Repair") return reply.code(400).send({ ok: false, message: "Repair notes can only be changed during Repair." });
+      await recordAmendmentIfPast(jobCard, "Repair", request.currentUser!.name, "Repair notes");
       return prisma.jobCard.update({ where: { id }, data: { repairNotes: body.data.repairNotes.trim() } });
     }
   );
@@ -67,7 +68,7 @@ export default async function jobCardRoutes(fastify: FastifyInstance) {
       if (!body.success) return reply.code(400).send({ ok: false, message: "Invalid input." });
       const jobCard = await prisma.jobCard.findUnique({ where: { id } });
       if (!jobCard) return reply.code(404).send({ ok: false, message: "Job card not found." });
-      if (jobCard.currentStage !== "QA") return reply.code(400).send({ ok: false, message: "QA can only be approved during the QA stage." });
+      await recordAmendmentIfPast(jobCard, "QA", request.currentUser!.name, "QA approval");
       return prisma.jobCard.update({ where: { id }, data: { qaApproved: body.data.qaApproved } });
     }
   );
@@ -81,7 +82,7 @@ export default async function jobCardRoutes(fastify: FastifyInstance) {
       if (!body.success) return reply.code(400).send({ ok: false, message: "Signature data is required." });
       const jobCard = await prisma.jobCard.findUnique({ where: { id } });
       if (!jobCard) return reply.code(404).send({ ok: false, message: "Job card not found." });
-      if (jobCard.currentStage !== "Ready for Handover") return reply.code(400).send({ ok: false, message: "Customer signature is captured at Ready for Handover." });
+      await recordAmendmentIfPast(jobCard, "Ready for Handover", request.currentUser!.name, "Customer signature");
       return prisma.jobCard.update({ where: { id }, data: { customerSignature: body.data.customerSignature } });
     }
   );
@@ -93,7 +94,7 @@ export default async function jobCardRoutes(fastify: FastifyInstance) {
       const { id } = request.params as { id: string };
       const jobCard = await prisma.jobCard.findUnique({ where: { id } });
       if (!jobCard) return reply.code(404).send({ ok: false, message: "Job card not found." });
-      if (jobCard.currentStage !== "Ready for Handover") return reply.code(400).send({ ok: false, message: "Asset handover is confirmed at Ready for Handover." });
+      await recordAmendmentIfPast(jobCard, "Ready for Handover", request.currentUser!.name, "Asset handover confirmation");
       return prisma.jobCard.update({
         where: { id },
         data: { assetHandedOver: true, assetHandedOverAt: new Date(), assetHandedOverBy: request.currentUser!.name },
@@ -122,6 +123,9 @@ export default async function jobCardRoutes(fastify: FastifyInstance) {
         })
         .safeParse(request.body);
       if (!body.success) return reply.code(400).send({ ok: false, message: "Invalid input." });
+      const jobCard = await prisma.jobCard.findUnique({ where: { id } });
+      if (!jobCard) return reply.code(404).send({ ok: false, message: "Job card not found." });
+      await recordAmendmentIfPast(jobCard, "Estimate", request.currentUser!.name, "Estimate details");
       const { estimateValidUntil, ...rest } = body.data;
       return prisma.jobCard.update({
         where: { id },
@@ -139,11 +143,11 @@ export default async function jobCardRoutes(fastify: FastifyInstance) {
       if (!body.success) return reply.code(400).send({ ok: false, message: "Final amount must be greater than zero." });
       const jobCard = await prisma.jobCard.findUnique({ where: { id } });
       if (!jobCard) return reply.code(404).send({ ok: false, message: "Job card not found." });
-      if (jobCard.currentStage !== "Ready for Handover") return reply.code(400).send({ ok: false, message: "Final charges are confirmed at Ready for Handover." });
       if (jobCard.jobType !== "non_warranty") return reply.code(400).send({ ok: false, message: "Warranty jobs do not require customer payment." });
       if ((jobCard.estimateAmount ?? 0) > 0 && body.data.finalAmount > (jobCard.estimateAmount ?? 0)) {
         return reply.code(400).send({ ok: false, message: "Final amount cannot exceed the customer-approved estimate." });
       }
+      await recordAmendmentIfPast(jobCard, "Ready for Handover", request.currentUser!.name, "Final amount");
       return prisma.jobCard.update({ where: { id }, data: { finalAmount: body.data.finalAmount } });
     }
   );
@@ -157,8 +161,8 @@ export default async function jobCardRoutes(fastify: FastifyInstance) {
       if (!body.success) return reply.code(400).send({ ok: false, message: "Invalid input." });
       const jobCard = await prisma.jobCard.findUnique({ where: { id } });
       if (!jobCard) return reply.code(404).send({ ok: false, message: "Job card not found." });
-      if (jobCard.currentStage !== "Customer Approval") return reply.code(400).send({ ok: false, message: "Customer approval is only available at the approval stage." });
       if ((jobCard.estimateAmount ?? 0) <= 0) return reply.code(400).send({ ok: false, message: "Set the estimate before recording approval." });
+      await recordAmendmentIfPast(jobCard, "Customer Approval", request.currentUser!.name, "Customer approval decision");
       return prisma.jobCard.update({ where: { id }, data: { customerApproved: body.data.approved } });
     }
   );

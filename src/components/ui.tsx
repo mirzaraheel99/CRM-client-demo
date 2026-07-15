@@ -178,9 +178,10 @@ export function EmptyState({ title, subtitle, icon }: { title: string; subtitle?
 }
 
 export function WorkflowStepper({
-  steps, currentIdx, orientation = "horizontal",
+  steps, currentIdx, orientation = "horizontal", viewedIdx, onStepClick,
 }: {
   steps: { stepOrder: number; stepName: string }[]; currentIdx: number; orientation?: "horizontal" | "vertical";
+  viewedIdx?: number; onStepClick?: (stepName: string, index: number) => void;
 }) {
   if (orientation === "vertical") {
     return (
@@ -188,6 +189,9 @@ export function WorkflowStepper({
         {steps.map((s, i) => {
           const done = i < currentIdx;
           const active = i === currentIdx;
+          const viewed = viewedIdx !== undefined && i === viewedIdx;
+          const clickable = Boolean(onStepClick) && i <= currentIdx;
+          const Wrapper = clickable ? "button" : "div";
           return (
             <li key={s.stepOrder} className="flex gap-3">
               <div className="flex flex-col items-center">
@@ -205,12 +209,21 @@ export function WorkflowStepper({
                   <span className={cx("w-0.5 flex-1 min-h-[18px]", done ? "bg-[var(--color-status-good)]" : "bg-black/[0.08] dark:bg-white/10")} />
                 )}
               </div>
-              <div className={cx("pb-4", active ? "pt-0" : "")}>
+              <Wrapper
+                type={clickable ? "button" : undefined}
+                onClick={clickable ? () => onStepClick!(s.stepName, i) : undefined}
+                className={cx(
+                  "pb-4 text-left rounded-md -mx-1.5 px-1.5",
+                  active ? "pt-0" : "",
+                  clickable && "cursor-pointer hover:bg-black/[0.03] dark:hover:bg-white/[0.05]",
+                  viewed && "bg-[var(--color-brand-1)]/10"
+                )}
+              >
                 <p className={cx("text-sm leading-tight", active ? "font-semibold text-[var(--color-ink-primary)]" : done ? "text-[var(--color-ink-secondary)]" : "text-[var(--color-ink-muted)]")}>
                   {s.stepName}
                 </p>
                 <p className="text-xs leading-tight text-[var(--color-ink-muted)]" dir="rtl">{STAGE_NAME_AR[s.stepName as StageName] ?? ""}</p>
-              </div>
+              </Wrapper>
             </li>
           );
         })}

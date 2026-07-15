@@ -232,8 +232,11 @@ function buildTriggeredLogs(state: DemoState, job: JobCard, stageName: StageName
   }));
 }
 
+// Estimates can be built or amended at any stage once diagnosis notes exist
+// (the job has been looked at) — revisiting it after repair, QA, etc. is
+// expected, e.g. when repair turns up an additional need.
 function canEditEstimate(job: JobCard): boolean {
-  return job.currentStage === "Estimate" || job.currentStage === "Customer Approval" || (job.currentStage === "Diagnosis" && Boolean(job.diagnosisNotes));
+  return Boolean(job.diagnosisNotes?.trim());
 }
 
 function scheduleCommunicationReceipts(logs: CommunicationLog[], options: { allowFailure?: boolean } = {}) {
@@ -562,7 +565,7 @@ export const useStore = create<DemoState>()(
         if (!line) return result(false, "Estimate line not found.");
         const job = state.jobCards.find((candidate) => candidate.id === line.jobcardId);
         if (!job) return result(false, "Job card not found.");
-        if (!canEditEstimate(job)) return result(false, "Estimates can only be changed before repair begins.");
+        if (!canEditEstimate(job)) return result(false, "Record diagnosis notes before building an estimate.");
         const qty = patch.qty ?? line.qty;
         const unitPrice = patch.unitPrice ?? line.unitPrice;
         if (!Number.isFinite(qty) || qty <= 0) return result(false, "Quantity must be greater than zero.");
@@ -604,7 +607,7 @@ export const useStore = create<DemoState>()(
         if (!line) return result(false, "Estimate line not found.");
         const job = state.jobCards.find((candidate) => candidate.id === line.jobcardId);
         if (!job) return result(false, "Job card not found.");
-        if (!canEditEstimate(job)) return result(false, "Estimates can only be changed before repair begins.");
+        if (!canEditEstimate(job)) return result(false, "Record diagnosis notes before building an estimate.");
         const remaining = state.estimateLineItems.filter((candidate) => candidate.id !== lineId && candidate.jobcardId === job.id);
         const total = remaining.reduce((sum, candidate) => sum + candidate.totalPrice, 0);
         const partsUsedTotal = state.partsUsed.filter((part) => part.jobcardId === job.id).reduce((sum, part) => sum + part.totalPrice, 0);
@@ -674,7 +677,6 @@ export const useStore = create<DemoState>()(
         if (source === "internal" && !canPerform(state.role, "record_customer_approval")) return result(false, "Your role cannot record customer approval.");
         const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
         if (!job) return result(false, "Job card not found.");
-        if (job.currentStage !== "Customer Approval") return result(false, "Customer approval is only available at the approval stage.");
         if ((job.estimateAmount ?? 0) <= 0) return result(false, "Set the estimate before recording approval.");
         if (job.customerApproved === approved) return result(false, approved ? "Customer approval is already recorded." : "Customer decline is already recorded.");
         const now = new Date().toISOString();
@@ -707,7 +709,6 @@ export const useStore = create<DemoState>()(
         if (!notes.trim()) return result(false, "Repair notes are required.");
         const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
         if (!job) return result(false, "Job card not found.");
-        if (job.currentStage !== "Repair") return result(false, "Repair notes can only be changed during Repair.");
         try {
           await api.patch(`/api/job-cards/${jobcardId}/repair-notes`, { repairNotes: notes.trim() });
           await get().hydrate();
@@ -721,7 +722,6 @@ export const useStore = create<DemoState>()(
         if (!canPerform(state.role, "approve_qa")) return result(false, "Supervisor, Manager, or Admin approval is required.");
         const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
         if (!job) return result(false, "Job card not found.");
-        if (job.currentStage !== "QA") return result(false, "QA can only be approved during the QA stage.");
         try {
           await api.patch(`/api/job-cards/${jobcardId}/qa-approve`, { qaApproved: approved });
           await get().hydrate();
@@ -735,7 +735,6 @@ export const useStore = create<DemoState>()(
         if (!canPerform(state.role, "finalize_job")) return result(false, "Your role cannot finalize charges.");
         const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
         if (!job) return result(false, "Job card not found.");
-        if (job.currentStage !== "Ready for Handover") return result(false, "Final charges are confirmed at Ready for Handover.");
         if (job.jobType !== "non_warranty") return result(false, "Warranty jobs do not require customer payment.");
         const partsTotal = state.partsUsed.filter((part) => part.jobcardId === jobcardId).reduce((sum, part) => sum + part.totalPrice, 0);
         if (!Number.isFinite(amount) || amount <= 0) return result(false, "Final amount must be greater than zero.");
@@ -756,7 +755,6 @@ export const useStore = create<DemoState>()(
         if (!signature.trim()) return result(false, "Customer name or signature is required.");
         const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
         if (!job) return result(false, "Job card not found.");
-        if (job.currentStage !== "Ready for Handover") return result(false, "Customer signature is captured at Ready for Handover.");
         try {
           await api.patch(`/api/job-cards/${jobcardId}/signature`, { customerSignature: signature.trim() });
           await get().hydrate();
@@ -771,7 +769,6 @@ export const useStore = create<DemoState>()(
         if (!confirmedBy.trim()) return result(false, "Confirming staff member is required.");
         const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
         if (!job) return result(false, "Job card not found.");
-        if (job.currentStage !== "Ready for Handover") return result(false, "Asset handover is confirmed at Ready for Handover.");
         try {
           await api.patch(`/api/job-cards/${jobcardId}/asset-handover`, {});
           await get().hydrate();

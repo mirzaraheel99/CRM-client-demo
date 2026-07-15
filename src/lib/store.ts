@@ -314,9 +314,12 @@ export const useStore = create<DemoState>()(
         const existing = get().customers.find((customer) => customer.phone.replace(/\D/g, "") === input.phone.replace(/\D/g, ""));
         if (existing) return existing;
         const name = [input.firstName, input.fatherName, input.grandfatherName, input.familyName].filter((part) => part?.trim()).join(" ");
+        const arabicParts = [input.firstNameAr, input.fatherNameAr, input.grandfatherNameAr, input.familyNameAr].filter((part) => part?.trim());
+        const nameAr = arabicParts.length ? arabicParts.join(" ") : input.nameAr;
         const customer: Customer = {
           ...input,
           name,
+          nameAr,
           id: nextId("cust"),
           documentNo: `CUST-${String(get().customers.length + 1).padStart(5, "0")}`,
           createdAt: new Date().toISOString(),

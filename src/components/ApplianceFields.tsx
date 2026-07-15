@@ -9,7 +9,7 @@ type FieldGroupProps = {
   onChange: (patch: Partial<ApplianceFormState>) => void;
 };
 
-export function ApplianceBasicFields({ value, onChange, brands, showAlias = false }: FieldGroupProps & { brands: Brand[]; showAlias?: boolean }) {
+export function ApplianceBasicFields({ value, onChange, brands }: FieldGroupProps & { brands: Brand[] }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <Field label={bi("Brand", "العلامة التجارية")}>
@@ -24,14 +24,20 @@ export function ApplianceBasicFields({ value, onChange, brands, showAlias = fals
         </Select>
       </Field>
       <Field label={bi("Model", "الطراز")}><Input value={value.model} onChange={(event) => onChange({ model: event.target.value })} /></Field>
-      {showAlias && (
-        <Field label={bi("Arabic alias (optional)", "الاسم البديل بالعربية (اختياري)")}>
-          <Input dir="rtl" value={value.modelAr} onChange={(event) => onChange({ modelAr: event.target.value })} placeholder="الاسم بالعربية" />
-        </Field>
-      )}
       <Field label={bi("Serial number / unit number", "الرقم التسلسلي / رقم الوحدة")}><Input value={value.serialNo} onChange={(event) => onChange({ serialNo: event.target.value })} /></Field>
       {value.category === "Mobile" && <Field label={bi("IMEI", "الآيمي")}><Input value={value.imeiNo} onChange={(event) => onChange({ imeiNo: event.target.value })} /></Field>}
       <Field label={bi("Purchase date", "تاريخ الشراء")}><Input type="date" value={value.purchaseDate} onChange={(event) => onChange({ purchaseDate: event.target.value })} /></Field>
+    </div>
+  );
+}
+
+export function ApplianceArabicFields({ value, onChange }: FieldGroupProps) {
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-[var(--color-ink-muted)]">{bi("For staff who read/write Arabic only — enter the product model here instead of the Basic tab.", "لموظفي الاستقبال الذين يقرؤون ويكتبون العربية فقط - أدخل طراز المنتج هنا بدلاً من تبويب الأساسي.")}</p>
+      <Field label={bi("Model", "الطراز")}>
+        <Input dir="rtl" value={value.modelAr} onChange={(event) => onChange({ modelAr: event.target.value })} placeholder="الطراز بالعربية" />
+      </Field>
     </div>
   );
 }

@@ -47,6 +47,12 @@ export interface Customer {
   grandfatherName?: string;
   familyName: string;
   name: string;
+  // Arabic-script counterparts of the fields above, for staff who read/write
+  // Arabic only. `nameAr` is the composed Arabic full name, mirroring `name`.
+  firstNameAr?: string;
+  fatherNameAr?: string;
+  grandfatherNameAr?: string;
+  familyNameAr?: string;
   nameAr?: string;
   phone: string;
   homePhone?: string;

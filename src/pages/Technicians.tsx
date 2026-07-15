@@ -14,10 +14,17 @@ const TAB_LABELS: Record<string, string> = {
   "Allocation Calendar": bi("Allocation Calendar", "تقويم التوزيع"),
 };
 
+const ADD_TECH_TABS = ["Details", "Arabic"];
+const ADD_TECH_TAB_LABELS: Record<string, string> = {
+  Details: bi("Details", "التفاصيل"),
+  Arabic: bi("Arabic Name", "الاسم بالعربية"),
+};
+
 export default function Technicians() {
   const { technicians, jobCards, customers, branches, selectedBranchId, addTechnician, aliasFieldsEnabled } = useStore();
   const [tab, setTab] = useState(TABS[0]);
   const [open, setOpen] = useState(false);
+  const [addFormTab, setAddFormTab] = useState("Details");
   const defaultBranchId = selectedBranchId === "all" ? branches[0]?.id ?? "" : selectedBranchId;
   const [form, setForm] = useState({ name: "", nameAr: "", phone: "", zone: "Zone A", skills: [] as ApplianceCategory[], branchId: defaultBranchId, status: "Available" as const, avatarColor: "#2a78d6" });
   const scopedTechnicians = filterByBranch(technicians, selectedBranchId);
@@ -31,6 +38,7 @@ export default function Technicians() {
     if (!form.name.trim() || !form.phone.trim() || !form.branchId || form.skills.length === 0) return;
     addTechnician({ ...form, nameAr: form.nameAr.trim() || undefined });
     setForm({ name: "", nameAr: "", phone: "", zone: "Zone A", skills: [], branchId: defaultBranchId, status: "Available", avatarColor: "#2a78d6" });
+    setAddFormTab("Details");
     setOpen(false);
     toast(`${form.name} added to technicians.`);
   }
@@ -126,37 +134,48 @@ export default function Technicians() {
 
       <Modal open={open} onClose={() => setOpen(false)} title={bi("Add Technician", "إضافة فني")}>
         <div className="space-y-3">
-          <Field label={bi("Name", "الاسم")}><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
-          {aliasFieldsEnabled && (
-            <Field label={bi("Arabic alias (optional)", "الاسم البديل بالعربية (اختياري)")}>
-              <Input dir="rtl" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} placeholder="الاسم بالعربية" />
-            </Field>
-          )}
-          <Field label={bi("Phone", "الهاتف")}><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>
-          <Field label={bi("Zone", "المنطقة")}>
-            <Select value={form.zone} onChange={(e) => setForm({ ...form, zone: e.target.value })}>
-              <option>Zone A</option><option>Zone B</option><option>Zone C</option>
-            </Select>
-          </Field>
-          <Field label={bi("Branch", "الفرع")}>
-            <Select value={form.branchId} onChange={(e) => setForm({ ...form, branchId: e.target.value })}>
-              {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-            </Select>
-          </Field>
-          <Field label={bi("Skills", "المهارات")}>
-            <div className="flex flex-wrap gap-2">
-              {CATEGORIES.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => toggleSkill(c)}
-                  className={`rounded-full px-2.5 py-1 text-xs font-medium border transition-colors [border-color:var(--color-border)] ${form.skills.includes(c) ? "bg-[var(--color-brand-1)] text-white border-transparent" : "text-[var(--color-ink-secondary)]"}`}
-                >
-                  {bi(c, APPLIANCE_CATEGORY_AR[c])}
-                </button>
-              ))}
+          {aliasFieldsEnabled && <Tabs tabs={ADD_TECH_TABS} active={addFormTab} onChange={setAddFormTab} labels={ADD_TECH_TAB_LABELS} />}
+
+          {(!aliasFieldsEnabled || addFormTab === "Details") && (
+            <div className="space-y-3">
+              <Field label={bi("Name", "الاسم")}><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
+              <Field label={bi("Phone", "الهاتف")}><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>
+              <Field label={bi("Zone", "المنطقة")}>
+                <Select value={form.zone} onChange={(e) => setForm({ ...form, zone: e.target.value })}>
+                  <option>Zone A</option><option>Zone B</option><option>Zone C</option>
+                </Select>
+              </Field>
+              <Field label={bi("Branch", "الفرع")}>
+                <Select value={form.branchId} onChange={(e) => setForm({ ...form, branchId: e.target.value })}>
+                  {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+                </Select>
+              </Field>
+              <Field label={bi("Skills", "المهارات")}>
+                <div className="flex flex-wrap gap-2">
+                  {CATEGORIES.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => toggleSkill(c)}
+                      className={`rounded-full px-2.5 py-1 text-xs font-medium border transition-colors [border-color:var(--color-border)] ${form.skills.includes(c) ? "bg-[var(--color-brand-1)] text-white border-transparent" : "text-[var(--color-ink-secondary)]"}`}
+                    >
+                      {bi(c, APPLIANCE_CATEGORY_AR[c])}
+                    </button>
+                  ))}
+                </div>
+              </Field>
             </div>
-          </Field>
+          )}
+
+          {aliasFieldsEnabled && addFormTab === "Arabic" && (
+            <div className="space-y-3">
+              <p className="text-xs text-[var(--color-ink-muted)]">{bi("For staff who read/write Arabic only — enter the technician's name here instead of the Details tab.", "لموظفي الاستقبال الذين يقرؤون ويكتبون العربية فقط - أدخل اسم الفني هنا بدلاً من تبويب التفاصيل.")}</p>
+              <Field label={bi("Name", "الاسم")}>
+                <Input dir="rtl" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} placeholder="الاسم بالعربية" />
+              </Field>
+            </div>
+          )}
+
           <Button className="w-full justify-center" onClick={submit}>{bi("Save Technician", "حفظ الفني")}</Button>
         </div>
       </Modal>

@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { PackagePlus, Plus, Trash2 } from "lucide-react";
 import { useStore } from "../../lib/store";
 import { Card, CardHeader, Field, Select, Textarea, Button, Badge, Input } from "../../components/ui";
-import { ApplianceBasicFields, AppliancePurchaseFields, ApplianceComplianceFields, ApplianceSiteFields } from "../../components/ApplianceFields";
+import { ApplianceBasicFields, ApplianceArabicFields, AppliancePurchaseFields, ApplianceComplianceFields, ApplianceSiteFields } from "../../components/ApplianceFields";
 import { emptyApplianceForm, applianceFormToInput, type ApplianceFormState } from "../../lib/applianceForm";
 import { JobTypeBadge } from "../../components/StatusBadge";
 import { toast } from "../../lib/toast";
@@ -48,7 +48,7 @@ export default function NewJobCard() {
   const initialApplianceId = searchParams.get("applianceId") ?? "";
   const [customerId, setCustomerId] = useState(initialCustomerId);
   const [branchId, setBranchId] = useState(initialCustomer?.branchId ?? (selectedBranchId === "all" ? branches[0]?.id ?? "" : selectedBranchId));
-  const [newCustomer, setNewCustomer] = useState({ firstName: "", fatherName: "", grandfatherName: "", familyName: "", nameAr: "", phone: "", homePhone: "", whatsapp: "", email: "", address: "" });
+  const [newCustomer, setNewCustomer] = useState({ firstName: "", fatherName: "", grandfatherName: "", familyName: "", firstNameAr: "", fatherNameAr: "", grandfatherNameAr: "", familyNameAr: "", phone: "", homePhone: "", whatsapp: "", email: "", address: "" });
   const [lines, setLines] = useState<IntakeLine[]>([emptyLine(initialApplianceId)]);
   const [orderDetails, setOrderDetails] = useState({
     shortAddressCode: "", buildingNo: "", unitNo: "", district: "", postalCode: "", additionalNo: "",
@@ -101,7 +101,10 @@ export default function NewJobCard() {
       ? addCustomer({
         ...newCustomer,
         grandfatherName: newCustomer.grandfatherName || undefined,
-        nameAr: newCustomer.nameAr.trim() || undefined,
+        firstNameAr: newCustomer.firstNameAr.trim() || undefined,
+        fatherNameAr: newCustomer.fatherNameAr.trim() || undefined,
+        grandfatherNameAr: newCustomer.grandfatherNameAr.trim() || undefined,
+        familyNameAr: newCustomer.familyNameAr.trim() || undefined,
         homePhone: newCustomer.homePhone || undefined,
         whatsapp: newCustomer.whatsapp.trim() || newCustomer.phone,
         branchId,
@@ -184,11 +187,20 @@ export default function NewJobCard() {
               <Field label={bi("Father's name", "اسم الأب")}><Input value={newCustomer.fatherName} onChange={(event) => setNewCustomer({ ...newCustomer, fatherName: event.target.value })} /></Field>
               <Field label={bi("Grandfather's name (optional)", "اسم الجد (اختياري)")}><Input value={newCustomer.grandfatherName} onChange={(event) => setNewCustomer({ ...newCustomer, grandfatherName: event.target.value })} /></Field>
               <Field label={bi("Family name", "اسم العائلة")}><Input value={newCustomer.familyName} onChange={(event) => setNewCustomer({ ...newCustomer, familyName: event.target.value })} /></Field>
-              {aliasFieldsEnabled && (
-                <Field label={bi("Arabic alias (optional)", "الاسم البديل بالعربية (اختياري)")}>
-                  <Input dir="rtl" value={newCustomer.nameAr} onChange={(event) => setNewCustomer({ ...newCustomer, nameAr: event.target.value })} placeholder="الاسم بالعربية" />
-                </Field>
-              )}
+            </div>
+            {aliasFieldsEnabled && (
+              <div className="space-y-2 border-t pt-3 [border-color:var(--color-border)]">
+                <p className="text-xs font-medium text-[var(--color-ink-secondary)]">{bi("Arabic Name", "الاسم بالعربية")}</p>
+                <p className="text-xs text-[var(--color-ink-muted)]">{bi("For staff who read/write Arabic only — enter the customer's name here instead of the fields above.", "لموظفي الاستقبال الذين يقرؤون ويكتبون العربية فقط - أدخل اسم العميل هنا بدلاً من الحقول أعلاه.")}</p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label={bi("First name", "الاسم الأول")}><Input dir="rtl" value={newCustomer.firstNameAr} onChange={(event) => setNewCustomer({ ...newCustomer, firstNameAr: event.target.value })} /></Field>
+                  <Field label={bi("Father's name", "اسم الأب")}><Input dir="rtl" value={newCustomer.fatherNameAr} onChange={(event) => setNewCustomer({ ...newCustomer, fatherNameAr: event.target.value })} /></Field>
+                  <Field label={bi("Grandfather's name (optional)", "اسم الجد (اختياري)")}><Input dir="rtl" value={newCustomer.grandfatherNameAr} onChange={(event) => setNewCustomer({ ...newCustomer, grandfatherNameAr: event.target.value })} /></Field>
+                  <Field label={bi("Family name", "اسم العائلة")}><Input dir="rtl" value={newCustomer.familyNameAr} onChange={(event) => setNewCustomer({ ...newCustomer, familyNameAr: event.target.value })} /></Field>
+                </div>
+              </div>
+            )}
+            <div className="grid gap-4 border-t pt-3 [border-color:var(--color-border)] sm:grid-cols-2">
               <Field label={bi("Mobile phone", "الجوال")}><Input value={newCustomer.phone} onChange={(event) => setNewCustomer({ ...newCustomer, phone: event.target.value })} placeholder="+966..." /></Field>
               <Field label={bi("Home phone (optional)", "الهاتف المنزلي (اختياري)")}><Input value={newCustomer.homePhone} onChange={(event) => setNewCustomer({ ...newCustomer, homePhone: event.target.value })} placeholder="+9661..." /></Field>
               <Field label={bi("WhatsApp", "واتساب")}><Input value={newCustomer.whatsapp} onChange={(event) => setNewCustomer({ ...newCustomer, whatsapp: event.target.value })} placeholder="Defaults to mobile" /></Field>
@@ -289,7 +301,13 @@ export default function NewJobCard() {
                       <p className="text-sm font-medium">{bi("Register exact product unit", "تسجيل وحدة المنتج بالتحديد")}</p>
                       <Badge tone="brand">{bi("New Product No. after save", "رقم منتج جديد بعد الحفظ")}</Badge>
                     </div>
-                    <ApplianceBasicFields value={line.newProduct} onChange={(patch) => patchNewProduct(line.key, patch)} brands={brands} showAlias={aliasFieldsEnabled} />
+                    <ApplianceBasicFields value={line.newProduct} onChange={(patch) => patchNewProduct(line.key, patch)} brands={brands} />
+                    {aliasFieldsEnabled && (
+                      <div className="border-t pt-3 [border-color:var(--color-border)]">
+                        <p className="mb-2 text-xs font-semibold text-[var(--color-ink-secondary)]">{bi("Arabic Name", "الاسم بالعربية")}</p>
+                        <ApplianceArabicFields value={line.newProduct} onChange={(patch) => patchNewProduct(line.key, patch)} />
+                      </div>
+                    )}
                     <div className="border-t pt-3 [border-color:var(--color-border)]">
                       <p className="mb-2 text-xs font-semibold text-[var(--color-ink-secondary)]">{bi("Purchase & warranty", "الشراء والضمان")}</p>
                       <AppliancePurchaseFields value={line.newProduct} onChange={(patch) => patchNewProduct(line.key, patch)} />

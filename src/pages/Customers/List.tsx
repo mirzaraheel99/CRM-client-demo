@@ -14,9 +14,10 @@ import type { Customer, CustomerType, Gender, PreferredLanguage } from "../../li
 type SortKey = "document" | "name" | "phone" | "orders" | "jobs" | "since";
 const PAGE_SIZE = 15;
 
-const FORM_TABS = ["Name", "Contact", "Additional"];
+const FORM_TABS = ["Name", "Arabic", "Contact", "Additional"];
 const FORM_TAB_LABELS: Record<string, string> = {
   Name: bi("Name & Type", "الاسم والنوع"),
+  Arabic: bi("Arabic Name", "الاسم بالعربية"),
   Contact: bi("Contact", "بيانات الاتصال"),
   Additional: bi("Additional Details", "تفاصيل إضافية"),
 };
@@ -27,7 +28,10 @@ function emptyCustomerForm(branchId: string) {
     fatherName: "",
     grandfatherName: "",
     familyName: "",
-    nameAr: "",
+    firstNameAr: "",
+    fatherNameAr: "",
+    grandfatherNameAr: "",
+    familyNameAr: "",
     customerType: "individual" as CustomerType,
     companyName: "",
     crNumber: "",
@@ -101,7 +105,10 @@ export default function CustomerList() {
     const saved = addCustomer({
       ...form,
       grandfatherName: form.grandfatherName || undefined,
-      nameAr: form.nameAr.trim() || undefined,
+      firstNameAr: form.firstNameAr.trim() || undefined,
+      fatherNameAr: form.fatherNameAr.trim() || undefined,
+      grandfatherNameAr: form.grandfatherNameAr.trim() || undefined,
+      familyNameAr: form.familyNameAr.trim() || undefined,
       homePhone: form.homePhone || undefined,
       whatsapp: form.whatsapp.trim() || form.phone,
       nationalId: form.nationalId || undefined,
@@ -151,7 +158,7 @@ export default function CustomerList() {
 
       <Modal open={open} onClose={() => setOpen(false)} title={bi("Add Customer", "إضافة عميل")} width="lg">
         <div className="space-y-4">
-          <Tabs tabs={FORM_TABS} active={formTab} onChange={setFormTab} labels={FORM_TAB_LABELS} />
+          <Tabs tabs={aliasFieldsEnabled ? FORM_TABS : FORM_TABS.filter((tab) => tab !== "Arabic")} active={formTab} onChange={setFormTab} labels={FORM_TAB_LABELS} />
 
           {formTab === "Name" && (
             <div className="space-y-3">
@@ -168,17 +175,24 @@ export default function CustomerList() {
                 <Field label={bi("Grandfather's name (optional)", "اسم الجد (اختياري)")}><Input value={form.grandfatherName} onChange={(event) => setForm({ ...form, grandfatherName: event.target.value })} /></Field>
                 <Field label={bi("Family name", "اسم العائلة")}><Input value={form.familyName} onChange={(event) => setForm({ ...form, familyName: event.target.value })} /></Field>
               </div>
-              {aliasFieldsEnabled && (
-                <Field label={bi("Arabic alias (optional)", "الاسم البديل بالعربية (اختياري)")}>
-                  <Input dir="rtl" value={form.nameAr} onChange={(event) => setForm({ ...form, nameAr: event.target.value })} placeholder="الاسم بالعربية" />
-                </Field>
-              )}
               {form.customerType === "corporate" && (
                 <div className="grid gap-3 rounded-md bg-black/[0.03] p-3 dark:bg-white/[0.05] sm:grid-cols-2">
                   <Field label={bi("Company name", "اسم الشركة")}><Input value={form.companyName} onChange={(event) => setForm({ ...form, companyName: event.target.value })} /></Field>
                   <Field label={bi("CR number", "رقم السجل التجاري")}><Input value={form.crNumber} onChange={(event) => setForm({ ...form, crNumber: event.target.value })} /></Field>
                 </div>
               )}
+            </div>
+          )}
+
+          {formTab === "Arabic" && aliasFieldsEnabled && (
+            <div className="space-y-3">
+              <p className="text-xs text-[var(--color-ink-muted)]">{bi("For staff who read/write Arabic only — enter the customer's name here instead of the English fields.", "لموظفي الاستقبال الذين يقرؤون ويكتبون العربية فقط - أدخل اسم العميل هنا بدلاً من الحقول الإنجليزية.")}</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label={bi("First name", "الاسم الأول")}><Input dir="rtl" value={form.firstNameAr} onChange={(event) => setForm({ ...form, firstNameAr: event.target.value })} /></Field>
+                <Field label={bi("Father's name", "اسم الأب")}><Input dir="rtl" value={form.fatherNameAr} onChange={(event) => setForm({ ...form, fatherNameAr: event.target.value })} /></Field>
+                <Field label={bi("Grandfather's name (optional)", "اسم الجد (اختياري)")}><Input dir="rtl" value={form.grandfatherNameAr} onChange={(event) => setForm({ ...form, grandfatherNameAr: event.target.value })} /></Field>
+                <Field label={bi("Family name", "اسم العائلة")}><Input dir="rtl" value={form.familyNameAr} onChange={(event) => setForm({ ...form, familyNameAr: event.target.value })} /></Field>
+              </div>
             </div>
           )}
 

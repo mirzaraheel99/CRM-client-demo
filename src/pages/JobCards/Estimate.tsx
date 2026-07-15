@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Plus, Trash2, Printer, MessageCircle, CheckCircle2, XCircle } from "lucide-react";
 import { useStore } from "../../lib/store";
-import { Card, CardHeader, Button, Select, Input, Field, Badge, Textarea } from "../../components/ui";
+import { Card, CardHeader, Button, Input, Field, Badge, Textarea } from "../../components/ui";
 import { JobStatusBadge } from "../../components/StatusBadge";
 import { formatCurrency, formatDate, cx } from "../../lib/utils";
 import { printEstimate } from "../../lib/print";
@@ -235,34 +235,101 @@ export default function EstimatePage() {
         </Field>
       </Card>
 
-      <Card className="space-y-4">
-        <CardHeader title={bi("Line items", "بنود التقدير")} />
+      <Card className="space-y-3">
+        <CardHeader title={bi("Line items", "بنود التقدير")} subtitle={canAddLine ? bi("Fill a row and press Enter — it saves and drops you into the next blank row.", "املأ صفاً واضغط Enter — يُحفظ وينتقل بك إلى الصف الفارغ التالي.") : undefined} />
 
-        {jobEstimateLines.length > 0 && (
-          <div className="overflow-x-auto rounded-lg border [border-color:var(--color-border)]">
-            <table className="w-full min-w-[900px] text-sm">
+        {canAddLine && (
+          <div role="radiogroup" aria-label={bi("Line item type", "نوع البند")} className="inline-flex flex-wrap gap-1 rounded-lg border p-1 [border-color:var(--color-border)] bg-[var(--color-surface-2)]">
+            {ESTIMATE_LINE_KINDS.map((kind, index) => (
+              <button
+                key={kind}
+                ref={(el) => { kindTabRefs.current[index] = el; }}
+                type="button"
+                role="radio"
+                aria-checked={newLineKind === kind}
+                tabIndex={newLineKind === kind ? 0 : -1}
+                onClick={() => { setNewLineKind(kind); setNewLineLabel(""); setNewLineItemId(""); setNewLineUnitPrice(""); setNewLineDiscount(""); }}
+                onKeyDown={(event) => {
+                  if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+                  event.preventDefault();
+                  const delta = event.key === "ArrowRight" ? 1 : -1;
+                  const nextIndex = (index + delta + ESTIMATE_LINE_KINDS.length) % ESTIMATE_LINE_KINDS.length;
+                  const nextKind = ESTIMATE_LINE_KINDS[nextIndex];
+                  setNewLineKind(nextKind);
+                  setNewLineLabel(""); setNewLineItemId(""); setNewLineUnitPrice(""); setNewLineDiscount("");
+                  kindTabRefs.current[nextIndex]?.focus();
+                }}
+                className={cx(
+                  "rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand-1)]/40",
+                  newLineKind === kind ? "bg-[var(--color-brand-1)] text-white" : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink-primary)]"
+                )}
+              >
+                {ESTIMATE_KIND_LABEL[kind]}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {(jobEstimateLines.length > 0 || canAddLine) && (
+          <form
+            className="overflow-x-auto rounded-lg border [border-color:var(--color-border)]"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!canAddLine) return;
+              const item = newLineKind === "part" ? inventoryItems.find((candidate) => candidate.id === newLineItemId) : undefined;
+              const label = newLineKind === "part" ? (item?.name ?? "Part") : newLineLabel;
+              if (!label.trim() || !newLineUnitPrice) { primaryFieldRef.current?.focus(); return; }
+              const enteredPrice = Number(newLineUnitPrice);
+              const unitPrice = newLineKind === "discount" ? -Math.abs(enteredPrice) : enteredPrice;
+              showResult(
+                addEstimateLine(job.id, {
+                  kind: newLineKind, label, catNo: newLineCatNo || undefined, descriptionAr: newLineKind === "part" ? (item?.nameAr) : (newLineDescriptionAr || undefined),
+                  itemId: newLineKind === "part" ? (newLineItemId || undefined) : undefined, qty: Number(newLineQty), unitPrice,
+                  discountAmount: newLineKind !== "discount" && newLineDiscount ? Number(newLineDiscount) : undefined,
+                  notes: newLineNotes || undefined,
+                }),
+                () => {
+                  setNewLineLabel(""); setNewLineDescriptionAr(""); setNewLineCatNo(""); setNewLineItemId(""); setNewLineQty("1"); setNewLineUnitPrice(""); setNewLineDiscount(""); setNewLineNotes("");
+                  // Keep focus in the entry row after every add — like a spreadsheet,
+                  // hitting Enter on one line should drop you straight into the next
+                  // blank row instead of forcing a reach for the mouse.
+                  primaryFieldRef.current?.focus();
+                }
+              );
+            }}
+          >
+            <table className="w-full min-w-[1000px] text-sm">
               <thead>
                 <tr className="text-left text-xs text-[var(--color-ink-muted)]">
+                  <th className="px-3 py-2 font-medium">#</th>
                   <th className="px-3 py-2 font-medium">{bi("Cat No", "رقم الصنف")}</th>
                   <th className="px-3 py-2 font-medium">{bi("Description", "الوصف")}</th>
+                  <th className="px-3 py-2 font-medium">{bi("Arabic description", "الوصف بالعربية")}</th>
                   <th className="px-3 py-2 font-medium">{bi("Tax", "الضريبة")}</th>
                   <th className="px-3 py-2 text-right font-medium">{bi("Qty", "الكمية")}</th>
                   <th className="px-3 py-2 text-right font-medium">{bi("Rate", "السعر")}</th>
                   <th className="px-3 py-2 text-right font-medium">{bi("Gross", "الإجمالي")}</th>
                   <th className="px-3 py-2 text-right font-medium">{bi("Discount", "الخصم")}</th>
-                  {editable && <th className="px-3 py-2" />}
+                  <th className="px-3 py-2" />
                 </tr>
               </thead>
               <tbody>
-                {jobEstimateLines.map((line) => {
+                {jobEstimateLines.map((line, rowIndex) => {
                   const gross = line.qty * line.unitPrice;
+                  const commitOnEnter = (event: React.KeyboardEvent<HTMLInputElement>) => {
+                    if (event.key !== "Enter") return;
+                    event.preventDefault();
+                    event.currentTarget.blur();
+                  };
                   return (
                     <tr key={line.id} className="border-t transition-colors [border-color:var(--color-border)] hover:bg-black/[0.015] dark:hover:bg-white/[0.02]">
+                      <td className="px-3 py-2 align-top text-xs text-[var(--color-ink-muted)] tabular-nums">{rowIndex + 1}</td>
                       <td className="px-3 py-2 align-top">
                         {editable ? (
                           <input
                             defaultValue={line.catNo ?? ""}
                             placeholder="—"
+                            onKeyDown={commitOnEnter}
                             onBlur={(event) => { const value = event.target.value.trim(); if (value !== (line.catNo ?? "")) showResult(updateEstimateLine(line.id, { catNo: value })); }}
                             className="w-20 min-w-0 rounded px-1 py-0.5 text-sm outline-none focus:bg-black/[0.04] dark:focus:bg-white/[0.06]"
                           />
@@ -274,6 +341,7 @@ export default function EstimatePage() {
                           {editable ? (
                             <input
                               defaultValue={line.label}
+                              onKeyDown={commitOnEnter}
                               onBlur={(event) => { const value = event.target.value.trim(); if (value && value !== line.label) showResult(updateEstimateLine(line.id, { label: value })); }}
                               className="min-w-0 flex-1 rounded px-1 py-0.5 text-sm outline-none focus:bg-black/[0.04] dark:focus:bg-white/[0.06]"
                             />
@@ -281,21 +349,25 @@ export default function EstimatePage() {
                         </div>
                         {editable ? (
                           <input
-                            dir="rtl"
-                            defaultValue={line.descriptionAr ?? ""}
-                            placeholder={bi("Arabic description...", "الوصف بالعربية...")}
-                            onBlur={(event) => { const value = event.target.value.trim(); if (value !== (line.descriptionAr ?? "")) showResult(updateEstimateLine(line.id, { descriptionAr: value })); }}
-                            className="mt-0.5 w-full rounded px-1 py-0.5 text-xs text-[var(--color-ink-muted)] outline-none focus:bg-black/[0.04] dark:focus:bg-white/[0.06]"
-                          />
-                        ) : (line.descriptionAr && <p dir="rtl" className="mt-0.5 text-xs text-[var(--color-ink-muted)]">{line.descriptionAr}</p>)}
-                        {editable ? (
-                          <input
                             defaultValue={line.notes ?? ""}
                             placeholder={bi("Add a note...", "أضف ملاحظة...")}
+                            onKeyDown={commitOnEnter}
                             onBlur={(event) => { const value = event.target.value.trim(); if (value !== (line.notes ?? "")) showResult(updateEstimateLine(line.id, { notes: value })); }}
                             className="mt-0.5 w-full rounded px-1 py-0.5 text-xs text-[var(--color-ink-muted)] outline-none focus:bg-black/[0.04] dark:focus:bg-white/[0.06]"
                           />
                         ) : (line.notes && <p className="mt-0.5 text-xs text-[var(--color-ink-muted)]">{line.notes}</p>)}
+                      </td>
+                      <td className="px-3 py-2 align-top">
+                        {editable ? (
+                          <input
+                            dir="rtl"
+                            defaultValue={line.descriptionAr ?? ""}
+                            placeholder={bi("Arabic description...", "الوصف بالعربية...")}
+                            onKeyDown={commitOnEnter}
+                            onBlur={(event) => { const value = event.target.value.trim(); if (value !== (line.descriptionAr ?? "")) showResult(updateEstimateLine(line.id, { descriptionAr: value })); }}
+                            className="w-full rounded px-1 py-0.5 text-sm outline-none focus:bg-black/[0.04] dark:focus:bg-white/[0.06]"
+                          />
+                        ) : (line.descriptionAr ?? "—")}
                       </td>
                       <td className="px-3 py-2 align-top text-xs text-[var(--color-ink-muted)]">{line.kind === "discount" ? "—" : bi("VAT 15%", "ضريبة 15%")}</td>
                       <td className="px-3 py-2 align-top text-right">
@@ -303,6 +375,7 @@ export default function EstimatePage() {
                           <input
                             type="number"
                             defaultValue={line.qty}
+                            onKeyDown={commitOnEnter}
                             onBlur={(event) => { const qty = Number(event.target.value); if (Number.isFinite(qty) && qty > 0 && qty !== line.qty) showResult(updateEstimateLine(line.id, { qty })); }}
                             className="w-16 rounded px-1 py-0.5 text-right tabular-nums outline-none focus:bg-black/[0.04] dark:focus:bg-white/[0.06]"
                           />
@@ -313,6 +386,7 @@ export default function EstimatePage() {
                           <input
                             type="number"
                             defaultValue={line.unitPrice}
+                            onKeyDown={commitOnEnter}
                             onBlur={(event) => { const unitPrice = Number(event.target.value); if (Number.isFinite(unitPrice) && unitPrice !== line.unitPrice) showResult(updateEstimateLine(line.id, { unitPrice })); }}
                             className="w-24 rounded px-1 py-0.5 text-right tabular-nums outline-none focus:bg-black/[0.04] dark:focus:bg-white/[0.06]"
                           />
@@ -327,124 +401,114 @@ export default function EstimatePage() {
                             type="number"
                             min="0"
                             defaultValue={line.discountAmount ?? 0}
+                            onKeyDown={commitOnEnter}
                             onBlur={(event) => { const discountAmount = Number(event.target.value); if (Number.isFinite(discountAmount) && discountAmount !== (line.discountAmount ?? 0)) showResult(updateEstimateLine(line.id, { discountAmount })); }}
                             className="w-20 rounded px-1 py-0.5 text-right tabular-nums outline-none focus:bg-black/[0.04] dark:focus:bg-white/[0.06]"
                           />
                         ) : <span className="tabular-nums">{formatCurrency(line.discountAmount ?? 0)}</span>}
                       </td>
-                      {editable && (
-                        <td className="px-3 py-2 align-top text-right">
-                          <button onClick={() => showResult(removeEstimateLine(line.id))} className="text-[var(--color-ink-muted)] hover:text-[var(--color-status-critical)]" title="Remove line item" aria-label="Remove line item">
+                      <td className="px-3 py-2 align-top text-right">
+                        {editable && (
+                          <button type="button" onClick={() => showResult(removeEstimateLine(line.id))} className="text-[var(--color-ink-muted)] hover:text-[var(--color-status-critical)]" title="Remove line item" aria-label="Remove line item">
                             <Trash2 size={14} />
                           </button>
-                        </td>
-                      )}
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
+                {canAddLine && (() => {
+                  const draftGross = (Number(newLineQty) || 0) * (Number(newLineUnitPrice) || 0);
+                  return (
+                    <tr className="border-t bg-[var(--color-surface-1)] [border-color:var(--color-border)]">
+                      <td className="px-3 py-2 align-top text-xs text-[var(--color-ink-muted)] tabular-nums">{jobEstimateLines.length + 1}</td>
+                      <td className="px-3 py-2 align-top">
+                        <input
+                          value={newLineCatNo}
+                          onChange={(event) => setNewLineCatNo(event.target.value)}
+                          placeholder="—"
+                          className="w-20 min-w-0 rounded px-1 py-0.5 text-sm outline-none focus:bg-black/[0.04] dark:focus:bg-white/[0.06]"
+                        />
+                      </td>
+                      <td className="px-3 py-2 align-top">
+                        {newLineKind === "part" ? (
+                          <select
+                            ref={(el) => { primaryFieldRef.current = el; }}
+                            value={newLineItemId}
+                            onChange={(event) => { const item = inventoryItems.find((candidate) => candidate.id === event.target.value); setNewLineItemId(event.target.value); setNewLineUnitPrice(item ? String(item.unitPrice) : ""); setNewLineCatNo(item?.partNo ?? ""); setNewLineDescriptionAr(item?.nameAr ?? ""); }}
+                            className="w-full min-w-0 rounded px-1 py-0.5 text-sm outline-none focus:bg-black/[0.04] dark:focus:bg-white/[0.06]"
+                          >
+                            <option value="">{bi("Choose part...", "اختر قطعة...")}</option>
+                            {inventoryItems.map((item) => <option key={item.id} value={item.id}>{item.name}{item.nameAr ? ` · ${item.nameAr}` : ""}</option>)}
+                          </select>
+                        ) : (
+                          <input
+                            ref={(el) => { primaryFieldRef.current = el; }}
+                            value={newLineLabel}
+                            onChange={(event) => setNewLineLabel(event.target.value)}
+                            placeholder={newLineKind === "labor" ? bi("e.g. Diagnostic & labor charge", "مثال: رسوم الفحص والعمالة") : newLineKind === "discount" ? bi("e.g. Loyalty discount", "مثال: خصم الولاء") : bi("e.g. Transport / callout fee", "مثال: رسوم النقل / الزيارة")}
+                            className="min-w-0 w-full rounded px-1 py-0.5 text-sm outline-none focus:bg-black/[0.04] dark:focus:bg-white/[0.06]"
+                          />
+                        )}
+                        <input
+                          value={newLineNotes}
+                          onChange={(event) => setNewLineNotes(event.target.value)}
+                          placeholder={bi("Add a note...", "أضف ملاحظة...")}
+                          className="mt-0.5 w-full rounded px-1 py-0.5 text-xs text-[var(--color-ink-muted)] outline-none focus:bg-black/[0.04] dark:focus:bg-white/[0.06]"
+                        />
+                      </td>
+                      <td className="px-3 py-2 align-top">
+                        <input
+                          dir="rtl"
+                          value={newLineDescriptionAr}
+                          onChange={(event) => setNewLineDescriptionAr(event.target.value)}
+                          placeholder={bi("Arabic description...", "الوصف بالعربية...")}
+                          disabled={newLineKind === "part"}
+                          className="w-full rounded px-1 py-0.5 text-sm outline-none focus:bg-black/[0.04] dark:focus:bg-white/[0.06] disabled:opacity-50"
+                        />
+                      </td>
+                      <td className="px-3 py-2 align-top text-xs text-[var(--color-ink-muted)]">{newLineKind === "discount" ? "—" : bi("VAT 15%", "ضريبة 15%")}</td>
+                      <td className="px-3 py-2 align-top text-right">
+                        <input
+                          type="number" min="1" value={newLineQty} onChange={(event) => setNewLineQty(event.target.value)}
+                          className="w-16 rounded px-1 py-0.5 text-right tabular-nums outline-none focus:bg-black/[0.04] dark:focus:bg-white/[0.06]"
+                        />
+                      </td>
+                      <td className="px-3 py-2 align-top text-right">
+                        <input
+                          type="number" min="0" value={newLineUnitPrice} onChange={(event) => setNewLineUnitPrice(event.target.value)}
+                          className="w-24 rounded px-1 py-0.5 text-right tabular-nums outline-none focus:bg-black/[0.04] dark:focus:bg-white/[0.06]"
+                        />
+                      </td>
+                      <td className="px-3 py-2 align-top text-right font-medium tabular-nums">{formatCurrency(draftGross)}</td>
+                      <td className="px-3 py-2 align-top text-right">
+                        {newLineKind === "discount" ? "—" : (
+                          <input
+                            type="number" min="0" value={newLineDiscount} onChange={(event) => setNewLineDiscount(event.target.value)} placeholder="0"
+                            className="w-20 rounded px-1 py-0.5 text-right tabular-nums outline-none focus:bg-black/[0.04] dark:focus:bg-white/[0.06]"
+                          />
+                        )}
+                      </td>
+                      <td className="px-3 py-2 align-top text-right">
+                        <button type="submit" className="text-[var(--color-brand-1)] hover:opacity-70" title={bi("Add line", "إضافة بند")} aria-label={bi("Add line", "إضافة بند")}>
+                          <Plus size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })()}
+                {jobEstimateLines.length === 0 && !canAddLine && (
+                  <tr><td colSpan={10} className="px-3 py-6 text-center text-sm text-[var(--color-ink-muted)]">{bi("No line items yet.", "لا توجد بنود بعد.")}</td></tr>
+                )}
               </tbody>
-              <tfoot>
-                <tr className="border-t [border-color:var(--color-border)]"><td colSpan={6} className="px-3 py-2 text-right text-[var(--color-ink-muted)]">{bi("Subtotal (excl. VAT)", "الإجمالي (غير شامل الضريبة)")}</td><td className="px-3 py-2 text-right tabular-nums">{formatCurrency((job.estimateAmount ?? 0) / 1.15)}</td></tr>
-                <tr className="border-t [border-color:var(--color-border)]"><td colSpan={6} className="px-3 py-2 text-right text-[var(--color-ink-muted)]">{bi("VAT (15%)", "ضريبة القيمة المضافة (15%)")}</td><td className="px-3 py-2 text-right tabular-nums">{formatCurrency((job.estimateAmount ?? 0) - (job.estimateAmount ?? 0) / 1.15)}</td></tr>
-                <tr className="border-t font-semibold [border-color:var(--color-border)]"><td colSpan={6} className="px-3 py-2 text-right">{bi("Net (incl. VAT)", "الصافي (شامل الضريبة)")}</td><td className="px-3 py-2 text-right tabular-nums">{formatCurrency(job.estimateAmount)}</td></tr>
-              </tfoot>
+              {jobEstimateLines.length > 0 && (
+                <tfoot>
+                  <tr className="border-t [border-color:var(--color-border)]"><td colSpan={8} className="px-3 py-2 text-right text-[var(--color-ink-muted)]">{bi("Subtotal (excl. VAT)", "الإجمالي (غير شامل الضريبة)")}</td><td className="px-3 py-2 text-right tabular-nums">{formatCurrency((job.estimateAmount ?? 0) / 1.15)}</td><td /></tr>
+                  <tr className="border-t [border-color:var(--color-border)]"><td colSpan={8} className="px-3 py-2 text-right text-[var(--color-ink-muted)]">{bi("VAT (15%)", "ضريبة القيمة المضافة (15%)")}</td><td className="px-3 py-2 text-right tabular-nums">{formatCurrency((job.estimateAmount ?? 0) - (job.estimateAmount ?? 0) / 1.15)}</td><td /></tr>
+                  <tr className="border-t font-semibold [border-color:var(--color-border)]"><td colSpan={8} className="px-3 py-2 text-right">{bi("Net (incl. VAT)", "الصافي (شامل الضريبة)")}</td><td className="px-3 py-2 text-right tabular-nums">{formatCurrency(job.estimateAmount)}</td><td /></tr>
+                </tfoot>
+              )}
             </table>
-          </div>
-        )}
-        {jobEstimateLines.length === 0 && <p className="text-sm text-[var(--color-ink-muted)]">{bi("No line items yet.", "لا توجد بنود بعد.")}</p>}
-
-        {canAddLine && (
-          <form
-            className="space-y-3 rounded-lg border [border-color:var(--color-border)] bg-[var(--color-surface-1)] p-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              const item = newLineKind === "part" ? inventoryItems.find((candidate) => candidate.id === newLineItemId) : undefined;
-              const label = newLineKind === "part" ? (item?.name ?? "Part") : newLineLabel;
-              const enteredPrice = Number(newLineUnitPrice);
-              const unitPrice = newLineKind === "discount" ? -Math.abs(enteredPrice) : enteredPrice;
-              showResult(
-                addEstimateLine(job.id, {
-                  kind: newLineKind, label, catNo: newLineCatNo || undefined, descriptionAr: newLineKind === "part" ? (item?.nameAr) : (newLineDescriptionAr || undefined),
-                  itemId: newLineKind === "part" ? (newLineItemId || undefined) : undefined, qty: Number(newLineQty), unitPrice,
-                  discountAmount: newLineKind !== "discount" && newLineDiscount ? Number(newLineDiscount) : undefined,
-                  notes: newLineNotes || undefined,
-                }),
-                () => {
-                  setNewLineLabel(""); setNewLineDescriptionAr(""); setNewLineCatNo(""); setNewLineItemId(""); setNewLineQty("1"); setNewLineUnitPrice(""); setNewLineDiscount(""); setNewLineNotes("");
-                  // Keep focus in the entry row after every add — like Excel, hitting
-                  // Enter on one line should drop you straight into the next one
-                  // instead of forcing a reach for the mouse.
-                  primaryFieldRef.current?.focus();
-                }
-              );
-            }}
-          >
-            <p className="text-xs font-semibold text-[var(--color-ink-secondary)]">{bi("Add line item — press Enter to add and keep going", "إضافة بند — اضغط Enter للإضافة والمتابعة")}</p>
-
-            <Field label={bi("Type", "النوع")}>
-              <div role="radiogroup" aria-label={bi("Line item type", "نوع البند")} className="inline-flex flex-wrap gap-1 rounded-lg border p-1 [border-color:var(--color-border)] bg-[var(--color-surface-2)]">
-                {ESTIMATE_LINE_KINDS.map((kind, index) => (
-                  <button
-                    key={kind}
-                    ref={(el) => { kindTabRefs.current[index] = el; }}
-                    type="button"
-                    role="radio"
-                    aria-checked={newLineKind === kind}
-                    tabIndex={newLineKind === kind ? 0 : -1}
-                    onClick={() => { setNewLineKind(kind); setNewLineLabel(""); setNewLineItemId(""); setNewLineUnitPrice(""); setNewLineDiscount(""); }}
-                    onKeyDown={(event) => {
-                      if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
-                      event.preventDefault();
-                      const delta = event.key === "ArrowRight" ? 1 : -1;
-                      const nextIndex = (index + delta + ESTIMATE_LINE_KINDS.length) % ESTIMATE_LINE_KINDS.length;
-                      const nextKind = ESTIMATE_LINE_KINDS[nextIndex];
-                      setNewLineKind(nextKind);
-                      setNewLineLabel(""); setNewLineItemId(""); setNewLineUnitPrice(""); setNewLineDiscount("");
-                      kindTabRefs.current[nextIndex]?.focus();
-                    }}
-                    className={cx(
-                      "rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand-1)]/40",
-                      newLineKind === kind ? "bg-[var(--color-brand-1)] text-white" : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink-primary)]"
-                    )}
-                  >
-                    {ESTIMATE_KIND_LABEL[kind]}
-                  </button>
-                ))}
-              </div>
-            </Field>
-
-            <div className="grid gap-2 sm:grid-cols-[100px_1fr_70px_110px_110px_auto] sm:items-end">
-              <Field label={bi("Cat No", "رقم الصنف")}><Input value={newLineCatNo} onChange={(event) => setNewLineCatNo(event.target.value)} placeholder="—" /></Field>
-              {newLineKind === "part" ? (
-                <Field label={bi("Part", "القطعة")}>
-                  <Select ref={(el) => { primaryFieldRef.current = el; }} value={newLineItemId} onChange={(event) => { const item = inventoryItems.find((candidate) => candidate.id === event.target.value); setNewLineItemId(event.target.value); setNewLineUnitPrice(item ? String(item.unitPrice) : ""); setNewLineCatNo(item?.partNo ?? ""); setNewLineDescriptionAr(item?.nameAr ?? ""); }}>
-                    <option value="">{bi("Choose part...", "اختر قطعة...")}</option>
-                    {inventoryItems.map((item) => <option key={item.id} value={item.id}>{item.name}{item.nameAr ? ` · ${item.nameAr}` : ""}</option>)}
-                  </Select>
-                </Field>
-              ) : (
-                <Field label={bi("Description", "الوصف")}>
-                  <Input
-                    ref={(el) => { primaryFieldRef.current = el; }}
-                    value={newLineLabel}
-                    onChange={(event) => setNewLineLabel(event.target.value)}
-                    placeholder={newLineKind === "labor" ? "e.g. Diagnostic & labor charge" : newLineKind === "discount" ? "e.g. Loyalty discount" : "e.g. Transport / callout fee"}
-                  />
-                </Field>
-              )}
-              <Field label={bi("Qty", "الكمية")}><Input type="number" min="1" value={newLineQty} onChange={(event) => setNewLineQty(event.target.value)} /></Field>
-              <Field label={newLineKind === "discount" ? bi("Discount (SAR)", "الخصم (ريال)") : bi("Rate (SAR)", "السعر (ريال)")}><Input type="number" min="0" value={newLineUnitPrice} onChange={(event) => setNewLineUnitPrice(event.target.value)} /></Field>
-              {newLineKind !== "discount" && (
-                <Field label={bi("Line discount (SAR)", "خصم البند (ريال)")}><Input type="number" min="0" value={newLineDiscount} onChange={(event) => setNewLineDiscount(event.target.value)} placeholder="0" /></Field>
-              )}
-              <Button type="submit" variant="secondary">
-                <Plus size={14} /> {bi("Add", "إضافة")}
-              </Button>
-            </div>
-            {newLineKind !== "part" && (
-              <Field label={bi("Arabic description (optional)", "الوصف بالعربية (اختياري)")}><Input dir="rtl" value={newLineDescriptionAr} onChange={(event) => setNewLineDescriptionAr(event.target.value)} /></Field>
-            )}
-            <Field label={bi("Note (optional)", "ملاحظة (اختياري)")}><Input value={newLineNotes} onChange={(event) => setNewLineNotes(event.target.value)} placeholder={bi("Visible on the printed estimate", "تظهر في التقدير المطبوع")} /></Field>
           </form>
         )}
       </Card>

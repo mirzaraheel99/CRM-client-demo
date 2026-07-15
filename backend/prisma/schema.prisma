@@ -1,0 +1,270 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---- Enums (values with no spaces / punctuation only) ----
+
+enum Role {
+  front_desk
+  technician
+  supervisor
+  manager
+  admin
+}
+
+enum JobType {
+  warranty
+  non_warranty
+}
+
+enum CustomerType {
+  individual
+  corporate
+}
+
+enum Gender {
+  male
+  female
+}
+
+enum PreferredLanguage {
+  ar
+  en
+}
+
+enum ApplianceCategory {
+  AC
+  Refrigerator
+  Washer
+  Mobile
+  TV
+  Microwave
+}
+
+// Stage names, statuses, and other short display strings with spaces
+// ("Warranty Validation", "In Diagnosis", "Ready for Handover", ...) are kept
+// as plain String columns (validated by Zod in the API layer) rather than
+// Postgres enums, since Postgres enum members can't contain spaces and
+// mapping them would just add friction without real benefit at this scale.
+
+model Branch {
+  id            String         @id @default(cuid())
+  name          String
+  city          String
+  customers     Customer[]
+  technicians   Technician[]
+  serviceOrders ServiceOrder[]
+  jobCards      JobCard[]
+  users         User[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  username     String   @unique
+  passwordHash String
+  role         Role
+  branchId     String
+  branch       Branch   @relation(fields: [branchId], references: [id])
+  createdAt    DateTime @default(now())
+}
+
+model RolePermission {
+  id      String  @id @default(cuid())
+  action  String
+  role    Role
+  allowed Boolean @default(true)
+
+  @@unique([action, role])
+}
+
+model Customer {
+  id                 String    @id @default(cuid())
+  documentNo         String    @unique
+  firstName          String
+  fatherName         String
+  grandfatherName    String?
+  familyName         String
+  name               String
+  firstNameAr        String?
+  fatherNameAr       String?
+  grandfatherNameAr  String?
+  familyNameAr       String?
+  nameAr             String?
+  phone              String
+  homePhone          String?
+  whatsapp           String
+  email              String?
+  address            String?
+  nationalId         String?
+  nationality        String?
+  preferredLanguage  PreferredLanguage?
+  customerType       CustomerType @default(individual)
+  companyName        String?
+  crNumber           String?
+  dateOfBirth        DateTime?
+  gender             Gender?
+  notes              String?
+  branchId           String
+  branch             Branch    @relation(fields: [branchId], references: [id])
+  createdAt          DateTime  @default(now())
+  whatsappVerified   Boolean   @default(false)
+
+  serviceOrders ServiceOrder[]
+  jobCards      JobCard[]
+
+  @@index([phone])
+}
+
+model Brand {
+  id             String      @id @default(cuid())
+  name           String
+  nameAr         String?
+  warrantyMonths Int
+  rules          String
+  appliances     Appliance[]
+}
+
+model Appliance {
+  id                String   @id @default(cuid())
+  documentNo        String   @unique
+  brandId           String
+  brand             Brand    @relation(fields: [brandId], references: [id])
+  category          ApplianceCategory
+  model             String
+  modelAr           String?
+  serialNo          String
+  imeiNo            String?
+  purchaseDate      DateTime
+  warrantyStatus    String   @default("Unknown")
+  isSmartConnected  Boolean  @default(false)
+  purchaseInvoiceNo String?
+  retailerName      String?
+  purchasePrice     Float?
+  amcActive         Boolean?
+  amcExpiryDate     DateTime?
+  sasoCertNo        String?
+  energyRating      Int?
+  countryOfManufacture String?
+  color             String?
+  specification     String?
+  installationDate  DateTime?
+  installedLocation String?
+  photoUrl          String?
+
+  telemetry ApplianceTelemetry?
+  jobCards  JobCard[]
+
+  @@index([serialNo])
+}
+
+model ApplianceTelemetry {
+  applianceId         String    @id
+  appliance           Appliance @relation(fields: [applianceId], references: [id])
+  lastErrorCode       String?
+  lastErrorDescription String?
+  cycleCount          Int       @default(0)
+  lastSyncAt          DateTime  @default(now())
+}
+
+model Technician {
+  id          String   @id @default(cuid())
+  name        String
+  nameAr      String?
+  phone       String
+  skills      ApplianceCategory[]
+  zone        String
+  branchId    String
+  branch      Branch   @relation(fields: [branchId], references: [id])
+  status      String   @default("Available")
+  avatarColor String   @default("#2a78d6")
+
+  jobCards JobCard[]
+}
+
+model ServiceOrder {
+  id               String   @id @default(cuid())
+  documentNo       String   @unique
+  customerId       String
+  customer         Customer @relation(fields: [customerId], references: [id])
+  branchId         String
+  branch           Branch   @relation(fields: [branchId], references: [id])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  shortAddressCode String?
+  buildingNo       String?
+  unitNo           String?
+  district         String?
+  postalCode       String?
+  additionalNo     String?
+  requestSource    String?
+  preferredDate    DateTime?
+  preferredTimeSlot String?
+  buyerVatNumber   String?
+
+  jobCards JobCard[]
+}
+
+model JobCard {
+  id              String   @id @default(cuid())
+  serviceOrderId  String
+  serviceOrder    ServiceOrder @relation(fields: [serviceOrderId], references: [id])
+  sequenceNo      Int
+  documentNo      String   @unique
+  invoiceNo       String
+  customerId      String
+  customer        Customer @relation(fields: [customerId], references: [id])
+  applianceId     String
+  appliance       Appliance @relation(fields: [applianceId], references: [id])
+  technicianId    String?
+  technician      Technician? @relation(fields: [technicianId], references: [id])
+  branchId        String
+  branch          Branch   @relation(fields: [branchId], references: [id])
+  jobType         JobType
+  status          String
+  currentStage    String
+  problemDescription String
+  estimateAmount  Float?
+  finalAmount     Float?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  scheduledAt     DateTime?
+  customerApproved Boolean?
+  diagnosisNotes  String?
+  repairNotes     String?
+  qaApproved      Boolean  @default(false)
+  customerSignature String?
+  oemClaimNo      String?
+  estimateValidUntil DateTime?
+  estimatePreparedBy String?
+  estimateTermsOfPayment String?
+  estimatePoNumber String?
+  estimateNotes   String?
+  estimatePreviousQuoteNo String?
+  estimateCustomerRequest String?
+  estimateDeliveryLeadTime String?
+  estimateSubject String?
+  assetHandedOver Boolean  @default(false)
+  assetHandedOverAt DateTime?
+  assetHandedOverBy String?
+
+  stageHistory JobCardStageHistory[]
+
+  @@index([currentStage])
+}
+
+model JobCardStageHistory {
+  id         String   @id @default(cuid())
+  jobcardId  String
+  jobCard    JobCard  @relation(fields: [jobcardId], references: [id])
+  stageName  String
+  changedBy  String
+  timestamp  DateTime @default(now())
+  notes      String
+  stageRefNo String?
+}

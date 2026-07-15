@@ -1,0 +1,44 @@
+import Fastify from "fastify";
+import cors from "@fastify/cors";
+import jwt from "@fastify/jwt";
+import authenticatePlugin from "./plugins/authenticate.js";
+import authRoutes from "./routes/auth.js";
+import branchRoutes from "./routes/branches.js";
+import customerRoutes from "./routes/customers.js";
+import brandRoutes from "./routes/brands.js";
+import technicianRoutes from "./routes/technicians.js";
+import applianceRoutes from "./routes/appliances.js";
+import serviceOrderRoutes from "./routes/serviceOrders.js";
+import jobCardRoutes from "./routes/jobcards.js";
+
+const fastify = Fastify({ logger: true });
+
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error("JWT_SECRET must be set.");
+}
+
+await fastify.register(cors, {
+  origin: process.env.CORS_ORIGIN?.split(",") ?? true,
+});
+await fastify.register(jwt, { secret: JWT_SECRET });
+await fastify.register(authenticatePlugin);
+
+await fastify.register(authRoutes);
+await fastify.register(branchRoutes);
+await fastify.register(customerRoutes);
+await fastify.register(brandRoutes);
+await fastify.register(technicianRoutes);
+await fastify.register(applianceRoutes);
+await fastify.register(serviceOrderRoutes);
+await fastify.register(jobCardRoutes);
+
+fastify.get("/api/health", async () => ({ ok: true }));
+
+const port = Number(process.env.PORT ?? 4000);
+fastify
+  .listen({ port, host: "0.0.0.0" })
+  .catch((err) => {
+    fastify.log.error(err);
+    process.exit(1);
+  });

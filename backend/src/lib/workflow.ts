@@ -1,0 +1,85 @@
+import type { JobCard } from "@prisma/client";
+
+export interface StageRequirement {
+  label: string;
+  met: boolean;
+}
+
+// Phase 1 port of the frontend's src/lib/workflow.ts stageRequirements().
+// Payments and PurchaseBill aren't modeled server-side yet (Phase 2), so the
+// two checks that depend on them are stubbed as met — revisit once those
+// tables exist.
+export function stageRequirements(job: JobCard): StageRequirement[] {
+  switch (job.currentStage) {
+    case "Received":
+      return [{ label: "Qualified technician assigned", met: Boolean(job.technicianId) }];
+    case "Warranty Validation":
+      return [{ label: "Purchase bill recorded", met: true }]; // TODO Phase 2: PurchaseBill table
+    case "Diagnosis":
+      return [{ label: "Diagnosis notes saved", met: Boolean(job.diagnosisNotes?.trim()) }];
+    case "Estimate":
+      return [{ label: "Estimate amount saved", met: (job.estimateAmount ?? 0) > 0 }];
+    case "Customer Approval":
+      return [{
+        label: job.customerApproved === false ? "Customer declined the estimate" : "Customer approval recorded",
+        met: job.customerApproved === true,
+      }];
+    case "Repair":
+      return [{ label: "Repair notes saved", met: Boolean(job.repairNotes?.trim()) }];
+    case "QA":
+      return [{ label: "QA approved by a supervisor", met: job.qaApproved }];
+    case "Ready for Handover": {
+      const requirements: StageRequirement[] = [
+        { label: "Customer signature captured", met: Boolean(job.customerSignature?.trim()) },
+        { label: "Asset handover confirmed", met: job.assetHandedOver === true },
+      ];
+      if (job.jobType === "non_warranty") {
+        requirements.unshift(
+          { label: "Final amount confirmed", met: (job.finalAmount ?? 0) > 0 },
+          { label: "Payment collected", met: true } // TODO Phase 2: Payment table
+        );
+      }
+      return requirements;
+    }
+    default:
+      return [];
+  }
+}
+
+export function stageBlockers(job: JobCard): string[] {
+  return stageRequirements(job).filter((r) => !r.met).map((r) => r.label);
+}
+
+const STAGE_ORDER_WARRANTY = ["Received", "Warranty Validation", "Diagnosis", "Repair", "QA", "Ready for Handover", "Delivered"];
+const STAGE_ORDER_NON_WARRANTY = ["Received", "Diagnosis", "Estimate", "Customer Approval", "Repair", "QA", "Ready for Handover", "Delivered"];
+
+export function nextStage(job: JobCard): string | null {
+  const order = job.jobType === "warranty" ? STAGE_ORDER_WARRANTY : STAGE_ORDER_NON_WARRANTY;
+  const idx = order.indexOf(job.currentStage);
+  if (idx === -1 || idx === order.length - 1) return null;
+  return order[idx + 1];
+}
+
+export function canAdvanceCurrentStage(role: string, stage: string): boolean {
+  if (role === "manager" || role === "admin") return true;
+  if (role === "supervisor") return true;
+  if (role === "technician") return stage === "Diagnosis" || stage === "Repair";
+  return stage === "Received" || stage === "Estimate" || stage === "Customer Approval" || stage === "Ready for Handover";
+}
+
+const STAGE_TO_STATUS: Record<string, string> = {
+  Received: "Received",
+  "Warranty Validation": "In Diagnosis",
+  Diagnosis: "In Diagnosis",
+  Estimate: "Waiting Approval",
+  "Customer Approval": "Waiting Approval",
+  "OEM Approval": "Waiting Approval",
+  Repair: "In Repair",
+  QA: "QA",
+  "Ready for Handover": "Ready",
+  Delivered: "Delivered",
+};
+
+export function statusForStage(stage: string): string {
+  return STAGE_TO_STATUS[stage] ?? stage;
+}

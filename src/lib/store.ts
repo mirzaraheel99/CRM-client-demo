@@ -160,11 +160,11 @@ function clone<T>(value: T): T {
   return structuredClone(value);
 }
 
-// Branches, customers, brands, appliances, technicians, service orders, and
-// job cards are now real, server-persisted data (fetched via hydrate() after
-// login) rather than mock seed data, so they start empty here. Everything
-// else below has no backend yet (Phase 2), so it keeps running on the
-// original browser-only mock seed exactly as before.
+// Branches, customers, brands, appliances, technicians, service orders, job
+// cards, removed parts, and estimate line items are now real, server-persisted
+// data (fetched via hydrate() after login) rather than mock seed data, so
+// they start empty here. Everything else below has no backend yet (Phase 2),
+// so it keeps running on the original browser-only mock seed exactly as before.
 const initialSlice = () => ({
   branches: [] as Branch[],
   customers: [] as Customer[],
@@ -182,7 +182,7 @@ const initialSlice = () => ({
   removedParts: [] as RemovedPart[],
   attachments: clone(seed.ATTACHMENTS),
   partsUsed: clone(seed.PARTS_USED),
-  estimateLineItems: clone(seed.ESTIMATE_LINE_ITEMS),
+  estimateLineItems: [] as JobCardEstimateLine[],
   purchaseBills: clone(seed.PURCHASE_BILLS),
   communicationLogs: clone(seed.COMMUNICATION_LOGS),
   workflows: clone(seed.WORKFLOWS),
@@ -326,7 +326,7 @@ export const useStore = create<DemoState>()(
       hydrate: async () => {
         set({ hydrating: true });
         try {
-          const [branches, customers, brands, technicians, appliances, serviceOrders, jobCards, removedParts] = await Promise.all([
+          const [branches, customers, brands, technicians, appliances, serviceOrders, jobCards, removedParts, estimateLineItems] = await Promise.all([
             api.get<Branch[]>("/api/branches"),
             api.get<Customer[]>("/api/customers"),
             api.get<Brand[]>("/api/brands"),
@@ -335,11 +335,12 @@ export const useStore = create<DemoState>()(
             api.get<ServiceOrder[]>("/api/service-orders"),
             api.get<(JobCard & { stageHistory?: JobCardStageHistory[] })[]>("/api/job-cards"),
             api.get<RemovedPart[]>("/api/removed-parts"),
+            api.get<JobCardEstimateLine[]>("/api/estimate-lines"),
           ]);
           const stageHistory = jobCards.flatMap((job) => job.stageHistory ?? []);
           set({
             branches, customers, brands, technicians, appliances, serviceOrders,
-            jobCards, stageHistory, removedParts,
+            jobCards, stageHistory, removedParts, estimateLineItems,
             hydrated: true, hydrating: false,
           });
         } catch {
@@ -516,10 +517,16 @@ export const useStore = create<DemoState>()(
         const gross = input.qty * input.unitPrice;
         const discountAmount = input.kind === "discount" ? undefined : input.discountAmount;
         if (discountAmount !== undefined && (!Number.isFinite(discountAmount) || discountAmount < 0 || discountAmount > gross)) return result(false, "Line discount must be between 0 and the line's gross amount.");
-        const line: JobCardEstimateLine = {
-          id: nextId("estl"), jobcardId, kind: input.kind, label: input.label.trim(), descriptionAr: input.descriptionAr?.trim() || undefined, catNo: input.catNo?.trim() || undefined, notes: input.notes?.trim() || undefined, itemId: input.itemId,
-          qty: input.qty, unitPrice: input.unitPrice, discountAmount: discountAmount || undefined, totalPrice: gross - (discountAmount ?? 0),
-        };
+        let line: JobCardEstimateLine;
+        try {
+          line = await api.post<JobCardEstimateLine>(`/api/job-cards/${jobcardId}/estimate-lines`, {
+            kind: input.kind, label: input.label.trim(), descriptionAr: input.descriptionAr?.trim() || undefined,
+            catNo: input.catNo?.trim() || undefined, notes: input.notes?.trim() || undefined, itemId: input.itemId,
+            qty: input.qty, unitPrice: input.unitPrice, discountAmount: discountAmount || undefined,
+          });
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to save estimate line.");
+        }
         const lines = [...state.estimateLineItems, line];
         const total = lines.filter((candidate) => candidate.jobcardId === jobcardId).reduce((sum, candidate) => sum + candidate.totalPrice, 0);
         const now = new Date().toISOString();
@@ -533,7 +540,7 @@ export const useStore = create<DemoState>()(
         scheduleCommunicationReceipts(logs);
         try {
           await api.patch(`/api/job-cards/${jobcardId}/estimate`, { estimateAmount: total });
-        } catch { /* estimate total sync is best-effort; local line items remain the source of truth */ }
+        } catch { /* estimate total sync is best-effort; the line item itself is already saved */ }
         return result(true, `Added "${line.label}" to the estimate.`);
       },
       updateEstimateLine: async (lineId, patch) => {
@@ -553,14 +560,18 @@ export const useStore = create<DemoState>()(
         const gross = qty * unitPrice;
         const discountAmount = line.kind === "discount" ? undefined : (patch.discountAmount ?? line.discountAmount);
         if (discountAmount !== undefined && (!Number.isFinite(discountAmount) || discountAmount < 0 || discountAmount > gross)) return result(false, "Line discount must be between 0 and the line's gross amount.");
-        const updatedLine: JobCardEstimateLine = {
-          ...line,
-          label: patch.label !== undefined ? (patch.label.trim() || line.label) : line.label,
-          descriptionAr: patch.descriptionAr !== undefined ? (patch.descriptionAr.trim() || undefined) : line.descriptionAr,
-          catNo: patch.catNo !== undefined ? (patch.catNo.trim() || undefined) : line.catNo,
-          notes: patch.notes !== undefined ? (patch.notes.trim() || undefined) : line.notes,
-          qty, unitPrice, discountAmount: discountAmount || undefined, totalPrice: gross - (discountAmount ?? 0),
-        };
+        let updatedLine: JobCardEstimateLine;
+        try {
+          updatedLine = await api.patch<JobCardEstimateLine>(`/api/estimate-lines/${lineId}`, {
+            label: patch.label !== undefined ? (patch.label.trim() || line.label) : undefined,
+            descriptionAr: patch.descriptionAr !== undefined ? (patch.descriptionAr.trim() || undefined) : undefined,
+            catNo: patch.catNo !== undefined ? (patch.catNo.trim() || undefined) : undefined,
+            notes: patch.notes !== undefined ? (patch.notes.trim() || undefined) : undefined,
+            qty, unitPrice, discountAmount: discountAmount || undefined,
+          });
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to save estimate line.");
+        }
         const lines = state.estimateLineItems.map((candidate) => candidate.id === lineId ? updatedLine : candidate);
         const total = lines.filter((candidate) => candidate.jobcardId === job.id).reduce((sum, candidate) => sum + candidate.totalPrice, 0);
         const now = new Date().toISOString();
@@ -571,7 +582,7 @@ export const useStore = create<DemoState>()(
         });
         try {
           await api.patch(`/api/job-cards/${job.id}/estimate`, { estimateAmount: total });
-        } catch { /* estimate total sync is best-effort; local line items remain the source of truth */ }
+        } catch { /* estimate total sync is best-effort; the line item itself is already saved */ }
         return result(true, "Estimate line updated.");
       },
       removeEstimateLine: async (lineId) => {
@@ -582,10 +593,16 @@ export const useStore = create<DemoState>()(
         const job = state.jobCards.find((candidate) => candidate.id === line.jobcardId);
         if (!job) return result(false, "Job card not found.");
         if (!canEditEstimate(job)) return result(false, "Estimates can only be changed before repair begins.");
-        const lines = state.estimateLineItems.filter((candidate) => candidate.id !== lineId);
-        const total = lines.filter((candidate) => candidate.jobcardId === job.id).reduce((sum, candidate) => sum + candidate.totalPrice, 0);
+        const remaining = state.estimateLineItems.filter((candidate) => candidate.id !== lineId && candidate.jobcardId === job.id);
+        const total = remaining.reduce((sum, candidate) => sum + candidate.totalPrice, 0);
         const partsUsedTotal = state.partsUsed.filter((part) => part.jobcardId === job.id).reduce((sum, part) => sum + part.totalPrice, 0);
         if (total < partsUsedTotal) return result(false, `Estimate cannot drop below the ${partsUsedTotal.toLocaleString()} SAR already issued in parts.`);
+        try {
+          await api.delete(`/api/estimate-lines/${lineId}`);
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to remove estimate line.");
+        }
+        const lines = state.estimateLineItems.filter((candidate) => candidate.id !== lineId);
         const now = new Date().toISOString();
         const updatedJob = { ...job, estimateAmount: total || null, customerApproved: null, updatedAt: now };
         set({
@@ -594,7 +611,7 @@ export const useStore = create<DemoState>()(
         });
         try {
           await api.patch(`/api/job-cards/${job.id}/estimate`, { estimateAmount: total });
-        } catch { /* estimate total sync is best-effort; local line items remain the source of truth */ }
+        } catch { /* estimate total sync is best-effort; the line item itself is already saved */ }
         return result(true, "Removed line item from the estimate.");
       },
       setEstimateValidUntil: async (jobcardId, date) => {
@@ -901,10 +918,10 @@ export const useStore = create<DemoState>()(
 
       resetDemoData: () => {
         counter = COUNTER_START;
-        const { branches, customers, brands, technicians, appliances, serviceOrders, jobCards, stageHistory, removedParts } = get();
+        const { branches, customers, brands, technicians, appliances, serviceOrders, jobCards, stageHistory, removedParts, estimateLineItems } = get();
         set({
           ...initialSlice(),
-          branches, customers, brands, technicians, appliances, serviceOrders, jobCards, stageHistory, removedParts,
+          branches, customers, brands, technicians, appliances, serviceOrders, jobCards, stageHistory, removedParts, estimateLineItems,
           theme: "light",
           lang: "en",
           sidebarCollapsed: false,
@@ -971,7 +988,6 @@ export const useStore = create<DemoState>()(
         applianceTelemetry: state.applianceTelemetry,
         attachments: state.attachments,
         partsUsed: state.partsUsed,
-        estimateLineItems: state.estimateLineItems,
         purchaseBills: state.purchaseBills,
         communicationLogs: state.communicationLogs,
         workflows: state.workflows,

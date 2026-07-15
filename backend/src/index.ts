@@ -11,6 +11,7 @@ import applianceRoutes from "./routes/appliances.js";
 import serviceOrderRoutes from "./routes/serviceOrders.js";
 import jobCardRoutes from "./routes/jobcards.js";
 import removedPartRoutes from "./routes/removedParts.js";
+import estimateLineRoutes from "./routes/estimateLines.js";
 import licenseRoutes from "./routes/license.js";
 import { checkLicense } from "./lib/license.js";
 
@@ -46,6 +47,7 @@ await fastify.register(applianceRoutes);
 await fastify.register(serviceOrderRoutes);
 await fastify.register(jobCardRoutes);
 await fastify.register(removedPartRoutes);
+await fastify.register(estimateLineRoutes);
 
 fastify.get("/api/health", async () => ({ ok: true }));
 

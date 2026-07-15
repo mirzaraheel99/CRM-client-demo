@@ -255,8 +255,33 @@ model JobCard {
 
   stageHistory JobCardStageHistory[]
   removedParts RemovedPart[]
+  estimateLines EstimateLine[]
 
   @@index([currentStage])
+}
+
+// Estimate line items build up a job card's estimateAmount. These used to be
+// browser-local-only state, which meant every estimate a user built vanished
+// the moment job cards moved to real, server-generated IDs — so they're now
+// real, persisted rows tied to the job card they belong to.
+model EstimateLine {
+  id             String   @id @default(cuid())
+  jobcardId      String
+  jobCard        JobCard  @relation(fields: [jobcardId], references: [id])
+  kind           String
+  catNo          String?
+  label          String
+  descriptionAr  String?
+  notes          String?
+  itemId         String?
+  qty            Float
+  unitPrice      Float
+  discountAmount Float?
+  totalPrice     Float
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([jobcardId])
 }
 
 model JobCardStageHistory {

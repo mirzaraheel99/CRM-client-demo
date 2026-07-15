@@ -108,11 +108,11 @@ interface DemoState {
   advanceStage: (jobcardId: string, stage: StageName, notes: string, changedBy: string) => ActionResult;
   assignTechnician: (jobcardId: string, technicianId: string) => ActionResult;
   setDiagnosis: (jobcardId: string, notes: string) => ActionResult;
-  addEstimateLine: (jobcardId: string, input: { kind: EstimateLineKind; label: string; descriptionAr?: string; catNo?: string; notes?: string; itemId?: string; qty: number; unitPrice: number }) => ActionResult;
-  updateEstimateLine: (lineId: string, patch: { qty?: number; unitPrice?: number; label?: string; descriptionAr?: string; catNo?: string; notes?: string }) => ActionResult;
+  addEstimateLine: (jobcardId: string, input: { kind: EstimateLineKind; label: string; descriptionAr?: string; catNo?: string; notes?: string; itemId?: string; qty: number; unitPrice: number; discountAmount?: number }) => ActionResult;
+  updateEstimateLine: (lineId: string, patch: { qty?: number; unitPrice?: number; label?: string; descriptionAr?: string; catNo?: string; notes?: string; discountAmount?: number }) => ActionResult;
   removeEstimateLine: (lineId: string) => ActionResult;
   setEstimateValidUntil: (jobcardId: string, date: string) => ActionResult;
-  setEstimateHeader: (jobcardId: string, patch: { preparedBy?: string; termsOfPayment?: string; poNumber?: string; notes?: string }) => ActionResult;
+  setEstimateHeader: (jobcardId: string, patch: { preparedBy?: string; termsOfPayment?: string; poNumber?: string; notes?: string; previousQuoteNo?: string; customerRequest?: string; deliveryLeadTime?: string; subject?: string }) => ActionResult;
   approveCustomer: (jobcardId: string, approved: boolean, source?: "internal" | "customer") => ActionResult;
   setRepairNotes: (jobcardId: string, notes: string) => ActionResult;
   setQaApproved: (jobcardId: string, approved: boolean) => ActionResult;
@@ -599,9 +599,12 @@ export const useStore = create<DemoState>()(
         if (!Number.isFinite(input.unitPrice)) return result(false, "Unit price must be a number.");
         if (input.kind === "discount" && input.unitPrice > 0) return result(false, "Discount amount must be zero or negative.");
         if (input.kind !== "discount" && input.unitPrice < 0) return result(false, "Unit price must be zero or more.");
+        const gross = input.qty * input.unitPrice;
+        const discountAmount = input.kind === "discount" ? undefined : input.discountAmount;
+        if (discountAmount !== undefined && (!Number.isFinite(discountAmount) || discountAmount < 0 || discountAmount > gross)) return result(false, "Line discount must be between 0 and the line's gross amount.");
         const line: JobCardEstimateLine = {
           id: nextId("estl"), jobcardId, kind: input.kind, label: input.label.trim(), descriptionAr: input.descriptionAr?.trim() || undefined, catNo: input.catNo?.trim() || undefined, notes: input.notes?.trim() || undefined, itemId: input.itemId,
-          qty: input.qty, unitPrice: input.unitPrice, totalPrice: input.qty * input.unitPrice,
+          qty: input.qty, unitPrice: input.unitPrice, discountAmount: discountAmount || undefined, totalPrice: gross - (discountAmount ?? 0),
         };
         const lines = [...state.estimateLineItems, line];
         const total = lines.filter((candidate) => candidate.jobcardId === jobcardId).reduce((sum, candidate) => sum + candidate.totalPrice, 0);
@@ -630,13 +633,16 @@ export const useStore = create<DemoState>()(
         if (!Number.isFinite(unitPrice)) return result(false, "Unit price must be a number.");
         if (line.kind === "discount" && unitPrice > 0) return result(false, "Discount amount must be zero or negative.");
         if (line.kind !== "discount" && unitPrice < 0) return result(false, "Unit price must be zero or more.");
+        const gross = qty * unitPrice;
+        const discountAmount = line.kind === "discount" ? undefined : (patch.discountAmount ?? line.discountAmount);
+        if (discountAmount !== undefined && (!Number.isFinite(discountAmount) || discountAmount < 0 || discountAmount > gross)) return result(false, "Line discount must be between 0 and the line's gross amount.");
         const updatedLine: JobCardEstimateLine = {
           ...line,
           label: patch.label !== undefined ? (patch.label.trim() || line.label) : line.label,
           descriptionAr: patch.descriptionAr !== undefined ? (patch.descriptionAr.trim() || undefined) : line.descriptionAr,
           catNo: patch.catNo !== undefined ? (patch.catNo.trim() || undefined) : line.catNo,
           notes: patch.notes !== undefined ? (patch.notes.trim() || undefined) : line.notes,
-          qty, unitPrice, totalPrice: qty * unitPrice,
+          qty, unitPrice, discountAmount: discountAmount || undefined, totalPrice: gross - (discountAmount ?? 0),
         };
         const lines = state.estimateLineItems.map((candidate) => candidate.id === lineId ? updatedLine : candidate);
         const total = lines.filter((candidate) => candidate.jobcardId === job.id).reduce((sum, candidate) => sum + candidate.totalPrice, 0);
@@ -688,6 +694,10 @@ export const useStore = create<DemoState>()(
             estimateTermsOfPayment: patch.termsOfPayment !== undefined ? (patch.termsOfPayment.trim() || undefined) : candidate.estimateTermsOfPayment,
             estimatePoNumber: patch.poNumber !== undefined ? (patch.poNumber.trim() || undefined) : candidate.estimatePoNumber,
             estimateNotes: patch.notes !== undefined ? (patch.notes.trim() || undefined) : candidate.estimateNotes,
+            estimatePreviousQuoteNo: patch.previousQuoteNo !== undefined ? (patch.previousQuoteNo.trim() || undefined) : candidate.estimatePreviousQuoteNo,
+            estimateCustomerRequest: patch.customerRequest !== undefined ? (patch.customerRequest.trim() || undefined) : candidate.estimateCustomerRequest,
+            estimateDeliveryLeadTime: patch.deliveryLeadTime !== undefined ? (patch.deliveryLeadTime.trim() || undefined) : candidate.estimateDeliveryLeadTime,
+            estimateSubject: patch.subject !== undefined ? (patch.subject.trim() || undefined) : candidate.estimateSubject,
             updatedAt: new Date().toISOString(),
           } : candidate),
         });

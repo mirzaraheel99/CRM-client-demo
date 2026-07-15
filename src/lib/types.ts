@@ -221,6 +221,9 @@ export interface JobCardEstimateLine {
   itemId?: string;
   qty: number;
   unitPrice: number;
+  // Per-line discount amount (SAR), distinct from a standalone "discount"
+  // kind line — this shaves an amount off THIS line's gross (qty * unitPrice).
+  discountAmount?: number;
   totalPrice: number;
 }
 
@@ -311,6 +314,10 @@ export interface JobCard {
   estimateTermsOfPayment?: string;
   estimatePoNumber?: string;
   estimateNotes?: string;
+  estimatePreviousQuoteNo?: string;
+  estimateCustomerRequest?: string;
+  estimateDeliveryLeadTime?: string;
+  estimateSubject?: string;
   assetHandedOver: boolean;
   assetHandedOverAt?: string;
   assetHandedOverBy?: string;

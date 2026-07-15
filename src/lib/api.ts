@@ -1,4 +1,7 @@
-const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? "/api";
+// Call sites already pass full paths starting with "/api/..." (e.g.
+// api.post("/api/auth/login", ...)), so this is the origin prefix, not the
+// API path prefix — leave it empty for same-origin deployments.
+const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? "";
 const TOKEN_KEY = "fixflow-token";
 
 export function getToken(): string | null {

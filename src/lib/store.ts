@@ -12,6 +12,14 @@ import type {
   WorkflowDefinition, Role, StageName, Branch, Payment, PaymentMethod, Channel, ServiceOrder, RemovedPart, RequestSource, DemoUser,
 } from "./types";
 
+export interface LicenseStatus {
+  valid: boolean;
+  reason?: string;
+  customerName?: string;
+  expiresAt?: string;
+  daysRemaining?: number;
+}
+
 type JobResult = ActionResult & { job?: JobCard };
 type ServiceOrderResult = ActionResult & { serviceOrder?: ServiceOrder; jobs?: JobCard[] };
 type PaymentResult = ActionResult & { payment?: Payment };
@@ -50,6 +58,9 @@ interface DemoState {
   hydrated: boolean;
   hydrating: boolean;
   sessionChecked: boolean;
+  licenseStatus: LicenseStatus | null;
+  licenseChecked: boolean;
+  checkLicense: () => Promise<void>;
   role: Role;
   selectedBranchId: string | "all";
   theme: "light" | "dark";
@@ -257,6 +268,16 @@ export const useStore = create<DemoState>()(
       hydrated: false,
       hydrating: false,
       sessionChecked: false,
+      licenseStatus: null,
+      licenseChecked: false,
+      checkLicense: async () => {
+        try {
+          const status = await api.get<LicenseStatus>("/api/license/status");
+          set({ licenseStatus: status, licenseChecked: true });
+        } catch {
+          set({ licenseStatus: { valid: false, reason: "Could not reach the license server." }, licenseChecked: true });
+        }
+      },
       role: "admin",
       selectedBranchId: "all",
       theme: "light",

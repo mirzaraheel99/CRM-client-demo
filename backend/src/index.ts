@@ -10,6 +10,8 @@ import technicianRoutes from "./routes/technicians.js";
 import applianceRoutes from "./routes/appliances.js";
 import serviceOrderRoutes from "./routes/serviceOrders.js";
 import jobCardRoutes from "./routes/jobcards.js";
+import licenseRoutes from "./routes/license.js";
+import { checkLicense } from "./lib/license.js";
 
 const fastify = Fastify({ logger: true });
 
@@ -24,6 +26,16 @@ await fastify.register(cors, {
 await fastify.register(jwt, { secret: JWT_SECRET });
 await fastify.register(authenticatePlugin);
 
+const LICENSE_EXEMPT_PATHS = ["/api/license/status", "/api/health"];
+fastify.addHook("onRequest", async (request, reply) => {
+  if (LICENSE_EXEMPT_PATHS.some((path) => request.url.startsWith(path))) return;
+  const status = checkLicense();
+  if (!status.valid) {
+    reply.code(402).send({ ok: false, message: `License invalid: ${status.reason}`, license: status });
+  }
+});
+
+await fastify.register(licenseRoutes);
 await fastify.register(authRoutes);
 await fastify.register(branchRoutes);
 await fastify.register(customerRoutes);

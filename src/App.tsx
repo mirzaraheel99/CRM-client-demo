@@ -4,6 +4,7 @@ import { useStore } from "./lib/store";
 import { canAccessPath } from "./lib/permissions";
 import { Shell } from "./components/Shell";
 import { PageSkeleton } from "./components/ui";
+import { LicenseBlocker } from "./components/LicenseBlocker";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const PredictiveMaintenance = lazy(() => import("./pages/PredictiveMaintenance"));
@@ -82,8 +83,11 @@ function TrackingLoading() {
 
 export default function App() {
   const { theme, lang } = useStore();
+  const licenseStatus = useStore((state) => state.licenseStatus);
+  const licenseChecked = useStore((state) => state.licenseChecked);
 
   useEffect(() => {
+    void useStore.getState().checkLicense();
     void useStore.getState().bootstrap();
   }, []);
 
@@ -99,6 +103,14 @@ export default function App() {
     document.documentElement.setAttribute("dir", "ltr");
     document.documentElement.setAttribute("lang", lang);
   }, [lang]);
+
+  if (!licenseChecked) {
+    return <TrackingLoading />;
+  }
+
+  if (licenseStatus && !licenseStatus.valid) {
+    return <LicenseBlocker status={licenseStatus} />;
+  }
 
   return (
     <BrowserRouter basename={import.meta.env.BASE_URL}>

@@ -144,7 +144,7 @@ export function CommandPalette() {
             value={query}
             onChange={(e) => { setQuery(e.target.value); setActiveIdx(0); }}
             onKeyDown={onKeyDown}
-            placeholder="Search job cards, customers, appliances, or pages…"
+            placeholder={bi("Search job cards, customers, appliances, or pages…", "بحث في بطاقات العمل أو العملاء أو الأجهزة أو الصفحات…")}
             className="w-full bg-transparent text-sm outline-none placeholder:text-[var(--color-ink-muted)]"
           />
           <kbd className="hidden sm:inline-block shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-ink-muted)] [border-color:var(--color-border)]">esc</kbd>

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Check, Minus, Package, Plus, Search } from "lucide-react";
 import { Input, Button } from "./ui";
 import { formatCurrency } from "../lib/utils";
+import { bi } from "../lib/domainAr";
 import type { InventoryItem } from "../lib/types";
 
 export function PartsGrid({
@@ -50,7 +51,7 @@ export function PartsGrid({
     <div className="space-y-3">
       <div className="relative">
         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-ink-muted)]" />
-        <Input placeholder="Search parts by name, part no, brand…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8" />
+        <Input placeholder={bi("Search parts by name, part no, brand…", "بحث بالاسم أو رقم القطعة أو الماركة…")} value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8" />
       </div>
       <div className="max-h-[26rem] overflow-y-auto pr-1">
         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">

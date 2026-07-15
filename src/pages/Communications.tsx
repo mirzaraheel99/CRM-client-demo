@@ -74,7 +74,7 @@ export default function Communications() {
       <Card className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-[200px]">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-ink-muted)]" />
-          <Input placeholder="Search message or job ID…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} className="pl-8" />
+          <Input placeholder={bi("Search message or job ID…", "بحث في الرسالة أو رقم بطاقة العمل…")} value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} className="pl-8" />
         </div>
         <div className="w-40">
           <Select value={channel} onChange={(e) => { setChannel(e.target.value as Channel | "all"); setPage(1); }}>

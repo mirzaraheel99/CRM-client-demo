@@ -89,7 +89,7 @@ export default function ApplianceList() {
       <Card className="flex flex-wrap gap-3">
         <div className="relative min-w-[220px] flex-1">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-ink-muted)]" />
-          <Input placeholder="Search product no., model, serial, IMEI..." value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} className="pl-8" />
+          <Input placeholder={bi("Search product no., model, serial, IMEI...", "بحث برقم المنتج أو الموديل أو الرقم التسلسلي أو IMEI...")} value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} className="pl-8" />
         </div>
         <div className="w-44">
           <Select value={category} onChange={(event) => { setCategory(event.target.value as ApplianceCategory | "all"); setPage(1); }}>

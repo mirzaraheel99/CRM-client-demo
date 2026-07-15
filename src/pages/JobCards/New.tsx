@@ -349,7 +349,7 @@ export default function NewJobCard() {
 
                 <div className="mt-4">
                   <Field label={bi("Reported problem / requested service", "المشكلة المُبلّغ عنها / الخدمة المطلوبة")}>
-                    <Textarea rows={3} value={line.problem} onChange={(event) => patchLine(line.key, { problem: event.target.value })} placeholder="Describe the issue for this product sequence..." />
+                    <Textarea rows={3} value={line.problem} onChange={(event) => patchLine(line.key, { problem: event.target.value })} placeholder={bi("Describe the issue for this product sequence...", "صِف المشكلة لهذا التسلسل من المنتجات...")} />
                   </Field>
                 </div>
               </section>

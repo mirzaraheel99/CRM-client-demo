@@ -132,7 +132,7 @@ export default function CustomerList() {
         {canPerform(role, "create_customer") && <Button onClick={() => { setForm(emptyCustomerForm(defaultBranchId)); setFormTab("Name"); setOpen(true); }}>+ {bi("Add Customer", "إضافة عميل")}</Button>}
       </div>
 
-      <Card><div className="relative max-w-md"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-ink-muted)]" /><Input placeholder="Search customer no., name, phone, email..." value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} className="pl-8" /></div></Card>
+      <Card><div className="relative max-w-md"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-ink-muted)]" /><Input placeholder={bi("Search customer no., name, phone, email...", "بحث برقم العميل أو الاسم أو الهاتف أو البريد الإلكتروني...")} value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} className="pl-8" /></div></Card>
 
       <Card padded={false}>
         <div className="divide-y [border-color:var(--color-border)] sm:hidden">

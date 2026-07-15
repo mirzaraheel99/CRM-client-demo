@@ -37,7 +37,7 @@ export function WhatsappVerify({ customerId, verified }: { customerId: string; v
         <Input
           value={entered}
           onChange={(e) => { setEntered(e.target.value); setError(false); }}
-          placeholder="Enter 4-digit code"
+          placeholder={bi("Enter 4-digit code", "أدخل الرمز المكوّن من 4 أرقام")}
           className="max-w-[160px]"
         />
         <Button

@@ -360,7 +360,7 @@ export default function JobCardDetail() {
           </Field>
 
           <Field label={bi("Reported problem / requested service", "المشكلة المُبلّغ عنها / الخدمة المطلوبة")}>
-            <Textarea rows={3} value={addProductForm.problem} onChange={(event) => setAddProductForm({ ...addProductForm, problem: event.target.value })} placeholder="Describe the issue for this product sequence..." />
+            <Textarea rows={3} value={addProductForm.problem} onChange={(event) => setAddProductForm({ ...addProductForm, problem: event.target.value })} placeholder={bi("Describe the issue for this product sequence...", "صِف المشكلة لهذا التسلسل من المنتجات...")} />
           </Field>
 
           <Button className="w-full justify-center" onClick={submitAddProduct}>{bi("Add Product Sequence", "إضافة تسلسل المنتج")}</Button>
@@ -683,7 +683,7 @@ export default function JobCardDetail() {
                       <input
                         value={removedDesc}
                         onChange={(e) => setRemovedDesc(e.target.value)}
-                        placeholder="e.g. Old compressor (faulty)"
+                        placeholder={bi("e.g. Old compressor (faulty)", "مثال: ضاغط قديم (تالف)")}
                         className="w-full rounded-lg border bg-[var(--color-surface-2)] px-3 py-2 text-sm outline-none [border-color:var(--color-border)]"
                       />
                     </div>
@@ -692,7 +692,7 @@ export default function JobCardDetail() {
                       <input
                         value={removedSerial}
                         onChange={(e) => setRemovedSerial(e.target.value)}
-                        placeholder="SN…"
+                        placeholder={bi("SN…", "الرقم التسلسلي…")}
                         className="w-full rounded-lg border bg-[var(--color-surface-2)] px-3 py-2 text-sm outline-none [border-color:var(--color-border)]"
                       />
                     </div>
@@ -796,7 +796,7 @@ export default function JobCardDetail() {
 
               {activeStage === "Diagnosis" && canPerform(role, "set_diagnosis") && (
                 <div className="space-y-2 border-t pt-3 [border-color:var(--color-border)]">
-                  <Textarea rows={4} value={diagnosisInput} onChange={(event) => setDiagnosisInput(event.target.value)} placeholder="Record fault, checks, and likely cause..." />
+                  <Textarea rows={3} value={diagnosisInput} onChange={(event) => setDiagnosisInput(event.target.value)} placeholder={bi("Record fault, checks, and likely cause...", "سجّل العطل والفحوصات والسبب المحتمل...")} />
                   <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(setDiagnosis(job.id, diagnosisInput))}>{bi(isViewingPastStage ? "Save Amended Diagnosis" : "Save Diagnosis", isViewingPastStage ? "حفظ التشخيص المعدّل" : "حفظ التشخيص")}</Button>
                 </div>
               )}
@@ -818,7 +818,7 @@ export default function JobCardDetail() {
 
               {activeStage === "Repair" && canPerform(role, "set_repair_notes") && (
                 <div className="space-y-2 border-t pt-3 [border-color:var(--color-border)]">
-                  <Textarea rows={4} value={repairInput} onChange={(event) => setRepairInput(event.target.value)} placeholder="Record work completed and parts fitted..." />
+                  <Textarea rows={3} value={repairInput} onChange={(event) => setRepairInput(event.target.value)} placeholder={bi("Record work completed and parts fitted...", "سجّل الأعمال المنجزة والقطع المُركّبة...")} />
                   <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(setRepairNotes(job.id, repairInput))}>{bi(isViewingPastStage ? "Save Amended Repair Notes" : "Save Repair Notes", isViewingPastStage ? "حفظ ملاحظات الإصلاح المعدّلة" : "حفظ ملاحظات الإصلاح")}</Button>
                 </div>
               )}
@@ -943,7 +943,7 @@ export default function JobCardDetail() {
             <Select value={selectedTemplate?.id} onChange={(e) => applyTemplate(e.target.value)}>
               {availableTemplates.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
             </Select>
-            <Textarea rows={3} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Message to customer…" />
+            <Textarea rows={3} value={message} onChange={(e) => setMessage(e.target.value)} placeholder={bi("Message to customer…", "رسالة إلى العميل…")} />
             <Button className="w-full justify-center" onClick={handleSend} disabled={!message.trim()}>{bi("Send", "إرسال")}</Button>
           </Card>
           </div>

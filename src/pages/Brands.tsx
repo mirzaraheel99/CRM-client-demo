@@ -41,10 +41,8 @@ export default function Brands() {
       <Modal open={open} onClose={() => setOpen(false)} title={bi("Add Brand", "إضافة علامة تجارية")}>
         <div className="space-y-3">
           <Field label={bi("Brand name", "اسم العلامة التجارية")}>
-            <div className="flex gap-2">
-              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-              {aliasFieldsEnabled && <Input dir="rtl" className="w-2/5 shrink-0" placeholder={bi("Arabic", "عربي")} value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} />}
-            </div>
+            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder={bi("Arabic alias", "الاسم بالعربية")} value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} />}
           </Field>
           <Field label={bi("Warranty (months)", "الضمان (بالأشهر)")}>
             <Input type="number" value={form.warrantyMonths} onChange={(e) => setForm({ ...form, warrantyMonths: Number(e.target.value) })} />

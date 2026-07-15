@@ -170,28 +170,20 @@ export default function CustomerList() {
               <p className="text-xs text-[var(--color-ink-muted)]">{bi("Saudi naming convention: given name, father's name, grandfather's name (optional), family name.", "الترتيب السعودي للاسم: الاسم الأول، اسم الأب، اسم الجد (اختياري)، اسم العائلة.")}{aliasFieldsEnabled && bi(" Add the Arabic alias alongside each name if needed.", " أضف الاسم بالعربية بجانب كل اسم عند الحاجة.")}</p>
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label={bi("First name", "الاسم الأول")}>
-                  <div className="flex gap-2">
-                    <Input value={form.firstName} onChange={(event) => setForm({ ...form, firstName: event.target.value })} />
-                    {aliasFieldsEnabled && <Input dir="rtl" className="w-2/5 shrink-0" placeholder={bi("Arabic", "عربي")} value={form.firstNameAr} onChange={(event) => setForm({ ...form, firstNameAr: event.target.value })} />}
-                  </div>
+                  <Input value={form.firstName} onChange={(event) => setForm({ ...form, firstName: event.target.value })} />
+                  {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder={bi("Arabic alias", "الاسم بالعربية")} value={form.firstNameAr} onChange={(event) => setForm({ ...form, firstNameAr: event.target.value })} />}
                 </Field>
                 <Field label={bi("Father's name", "اسم الأب")}>
-                  <div className="flex gap-2">
-                    <Input value={form.fatherName} onChange={(event) => setForm({ ...form, fatherName: event.target.value })} />
-                    {aliasFieldsEnabled && <Input dir="rtl" className="w-2/5 shrink-0" placeholder={bi("Arabic", "عربي")} value={form.fatherNameAr} onChange={(event) => setForm({ ...form, fatherNameAr: event.target.value })} />}
-                  </div>
+                  <Input value={form.fatherName} onChange={(event) => setForm({ ...form, fatherName: event.target.value })} />
+                  {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder={bi("Arabic alias", "الاسم بالعربية")} value={form.fatherNameAr} onChange={(event) => setForm({ ...form, fatherNameAr: event.target.value })} />}
                 </Field>
                 <Field label={bi("Grandfather's name (optional)", "اسم الجد (اختياري)")}>
-                  <div className="flex gap-2">
-                    <Input value={form.grandfatherName} onChange={(event) => setForm({ ...form, grandfatherName: event.target.value })} />
-                    {aliasFieldsEnabled && <Input dir="rtl" className="w-2/5 shrink-0" placeholder={bi("Arabic", "عربي")} value={form.grandfatherNameAr} onChange={(event) => setForm({ ...form, grandfatherNameAr: event.target.value })} />}
-                  </div>
+                  <Input value={form.grandfatherName} onChange={(event) => setForm({ ...form, grandfatherName: event.target.value })} />
+                  {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder={bi("Arabic alias", "الاسم بالعربية")} value={form.grandfatherNameAr} onChange={(event) => setForm({ ...form, grandfatherNameAr: event.target.value })} />}
                 </Field>
                 <Field label={bi("Family name", "اسم العائلة")}>
-                  <div className="flex gap-2">
-                    <Input value={form.familyName} onChange={(event) => setForm({ ...form, familyName: event.target.value })} />
-                    {aliasFieldsEnabled && <Input dir="rtl" className="w-2/5 shrink-0" placeholder={bi("Arabic", "عربي")} value={form.familyNameAr} onChange={(event) => setForm({ ...form, familyNameAr: event.target.value })} />}
-                  </div>
+                  <Input value={form.familyName} onChange={(event) => setForm({ ...form, familyName: event.target.value })} />
+                  {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder={bi("Arabic alias", "الاسم بالعربية")} value={form.familyNameAr} onChange={(event) => setForm({ ...form, familyNameAr: event.target.value })} />}
                 </Field>
               </div>
               {form.customerType === "corporate" && (

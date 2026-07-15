@@ -127,10 +127,8 @@ export default function Technicians() {
       <Modal open={open} onClose={() => setOpen(false)} title={bi("Add Technician", "إضافة فني")}>
         <div className="space-y-3">
           <Field label={bi("Name", "الاسم")}>
-            <div className="flex gap-2">
-              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-              {aliasFieldsEnabled && <Input dir="rtl" className="w-2/5 shrink-0" placeholder={bi("Arabic", "عربي")} value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} />}
-            </div>
+            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder={bi("Arabic alias", "الاسم بالعربية")} value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} />}
           </Field>
           <Field label={bi("Phone", "الهاتف")}><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>
           <Field label={bi("Zone", "المنطقة")}>

@@ -37,7 +37,7 @@ fastify.get("/api/health", async () => ({ ok: true }));
 
 const port = Number(process.env.PORT ?? 4000);
 fastify
-  .listen({ port, host: "0.0.0.0" })
+  .listen({ port, host: process.env.HOST ?? "127.0.0.1" })
   .catch((err) => {
     fastify.log.error(err);
     process.exit(1);

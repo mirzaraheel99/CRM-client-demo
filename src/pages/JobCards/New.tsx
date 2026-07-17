@@ -185,19 +185,19 @@ export default function NewJobCard() {
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label={bi("First name", "الاسم الأول")}>
                 <Input value={newCustomer.firstName} onChange={(event) => setNewCustomer({ ...newCustomer, firstName: event.target.value })} />
-                {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder={bi("Arabic alias", "الاسم بالعربية")} value={newCustomer.firstNameAr} onChange={(event) => setNewCustomer({ ...newCustomer, firstNameAr: event.target.value })} />}
+                {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder="الاسم بالعربية" value={newCustomer.firstNameAr} onChange={(event) => setNewCustomer({ ...newCustomer, firstNameAr: event.target.value })} />}
               </Field>
               <Field label={bi("Father's name", "اسم الأب")}>
                 <Input value={newCustomer.fatherName} onChange={(event) => setNewCustomer({ ...newCustomer, fatherName: event.target.value })} />
-                {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder={bi("Arabic alias", "الاسم بالعربية")} value={newCustomer.fatherNameAr} onChange={(event) => setNewCustomer({ ...newCustomer, fatherNameAr: event.target.value })} />}
+                {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder="الاسم بالعربية" value={newCustomer.fatherNameAr} onChange={(event) => setNewCustomer({ ...newCustomer, fatherNameAr: event.target.value })} />}
               </Field>
               <Field label={bi("Grandfather's name (optional)", "اسم الجد (اختياري)")}>
                 <Input value={newCustomer.grandfatherName} onChange={(event) => setNewCustomer({ ...newCustomer, grandfatherName: event.target.value })} />
-                {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder={bi("Arabic alias", "الاسم بالعربية")} value={newCustomer.grandfatherNameAr} onChange={(event) => setNewCustomer({ ...newCustomer, grandfatherNameAr: event.target.value })} />}
+                {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder="الاسم بالعربية" value={newCustomer.grandfatherNameAr} onChange={(event) => setNewCustomer({ ...newCustomer, grandfatherNameAr: event.target.value })} />}
               </Field>
               <Field label={bi("Family name", "اسم العائلة")}>
                 <Input value={newCustomer.familyName} onChange={(event) => setNewCustomer({ ...newCustomer, familyName: event.target.value })} />
-                {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder={bi("Arabic alias", "الاسم بالعربية")} value={newCustomer.familyNameAr} onChange={(event) => setNewCustomer({ ...newCustomer, familyNameAr: event.target.value })} />}
+                {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder="الاسم بالعربية" value={newCustomer.familyNameAr} onChange={(event) => setNewCustomer({ ...newCustomer, familyNameAr: event.target.value })} />}
               </Field>
             </div>
             <div className="grid gap-4 border-t pt-3 [border-color:var(--color-border)] sm:grid-cols-2">

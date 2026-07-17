@@ -365,7 +365,7 @@ export default function EstimatePage() {
                           <input
                             dir="rtl"
                             defaultValue={line.descriptionAr ?? ""}
-                            placeholder={bi("Arabic description...", "الوصف بالعربية...")}
+                            placeholder="الوصف بالعربية..."
                             onKeyDown={commitOnEnter}
                             onBlur={(event) => { const value = event.target.value.trim(); if (value !== (line.descriptionAr ?? "")) showResult(updateEstimateLine(line.id, { descriptionAr: value })); }}
                             className="w-full rounded px-1 py-0.5 text-sm outline-none focus:bg-black/[0.04] dark:focus:bg-white/[0.06]"
@@ -465,7 +465,7 @@ export default function EstimatePage() {
                           dir="rtl"
                           value={newLineDescriptionAr}
                           onChange={(event) => setNewLineDescriptionAr(event.target.value)}
-                          placeholder={bi("Arabic description...", "الوصف بالعربية...")}
+                          placeholder="الوصف بالعربية..."
                           disabled={newLineKind === "part"}
                           className="w-full rounded px-1 py-0.5 text-sm outline-none focus:bg-black/[0.04] dark:focus:bg-white/[0.06] disabled:opacity-50"
                         />

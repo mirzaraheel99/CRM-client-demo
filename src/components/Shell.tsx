@@ -67,8 +67,8 @@ export function Shell({ children }: { children: ReactNode }) {
       <aside
         id="primary-navigation"
         className={cx(
-          "fixed inset-y-0 left-0 z-40 flex w-[260px] shrink-0 flex-col border-r bg-[var(--color-surface-1)] transition-transform [border-color:var(--color-border)] md:relative md:z-auto md:translate-x-0 md:transition-all",
-          mobileNavOpen ? "translate-x-0" : "-translate-x-full",
+          "fixed inset-y-0 left-0 rtl:left-auto rtl:right-0 z-40 flex w-[260px] shrink-0 flex-col border-r rtl:border-r-0 rtl:border-l bg-[var(--color-surface-1)] transition-transform [border-color:var(--color-border)] md:relative md:z-auto md:translate-x-0 md:transition-all",
+          mobileNavOpen ? "translate-x-0" : "-translate-x-full rtl:translate-x-full",
           sidebarCollapsed ? "md:w-[64px]" : "md:w-[240px]"
         )}
       >
@@ -83,7 +83,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <button
             type="button"
             aria-label="Close navigation"
-            className="ml-auto flex h-9 w-9 items-center justify-center rounded-lg text-[var(--color-ink-secondary)] hover:bg-black/5 md:hidden dark:hover:bg-white/10"
+            className="ml-auto rtl:ml-0 rtl:mr-auto flex h-9 w-9 items-center justify-center rounded-lg text-[var(--color-ink-secondary)] hover:bg-black/5 md:hidden dark:hover:bg-white/10"
             onClick={() => setMobileNavOpen(false)}
           >
             <X size={18} />
@@ -147,7 +147,7 @@ export function Shell({ children }: { children: ReactNode }) {
           >
             <Menu size={19} />
           </button>
-          <div className="mr-auto min-w-0 md:hidden">
+          <div className="mr-auto rtl:mr-0 rtl:ml-auto min-w-0 md:hidden">
             <p className="truncate text-sm font-semibold">FixFlow</p>
             <p className="truncate text-[10px] text-[var(--color-ink-muted)]">Appliance Service Suite</p>
           </div>
@@ -158,7 +158,7 @@ export function Shell({ children }: { children: ReactNode }) {
             className="hidden md:flex items-center gap-2 rounded-lg border bg-[var(--color-surface-2)] px-3 py-1.5 text-sm text-[var(--color-ink-muted)] hover:border-[var(--color-brand-1)]/40 transition-colors [border-color:var(--color-border)] md:w-64"
           >
             <Search size={14} />
-            <span className="flex-1 text-left">Search…</span>
+            <span className="flex-1 text-left rtl:text-right">{bi("Search…", "بحث…")}</span>
             <kbd className="rounded border px-1.5 py-0.5 text-[10px] font-medium [border-color:var(--color-border)]">⌘K</kbd>
           </button>
           <button
@@ -177,18 +177,18 @@ export function Shell({ children }: { children: ReactNode }) {
                 value={selectedBranchId}
                 onChange={(e) => setBranch(e.target.value)}
                 aria-label={t(lang, "branch")}
-                className="max-w-[154px] appearance-none truncate rounded-lg border bg-[var(--color-surface-2)] py-1.5 pl-3 pr-7 text-sm font-medium outline-none [border-color:var(--color-border)] sm:max-w-none"
+                className="max-w-[154px] appearance-none truncate rounded-lg border bg-[var(--color-surface-2)] py-1.5 pl-3 pr-7 rtl:pl-7 rtl:pr-3 text-sm font-medium outline-none [border-color:var(--color-border)] sm:max-w-none"
               >
                 <option value="all">{t(lang, "allBranches")}</option>
                 {branches.map((b) => (
                   <option key={b.id} value={b.id}>{b.name}</option>
                 ))}
               </select>
-              <ChevronDown size={14} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-ink-muted)]" />
+              <ChevronDown size={14} className="pointer-events-none absolute right-2 rtl:right-auto rtl:left-2 top-1/2 -translate-y-1/2 text-[var(--color-ink-muted)]" />
             </div>
           </div>
 
-          <div className="order-3 ml-auto flex shrink-0 items-center gap-1.5 md:order-none md:gap-2">
+          <div className="order-3 ml-auto rtl:ml-0 rtl:mr-auto flex shrink-0 items-center gap-1.5 md:order-none md:gap-2">
             {currentUser?.role === "admin" ? (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-[var(--color-ink-muted)] hidden sm:inline">{bi("View as", "عرض كـ")}</span>
@@ -197,13 +197,13 @@ export function Shell({ children }: { children: ReactNode }) {
                     value={role}
                     onChange={(e) => changeRole(e.target.value as Role)}
                     aria-label={t(lang, "role")}
-                    className="max-w-[128px] appearance-none truncate rounded-lg border bg-[var(--color-surface-2)] py-1.5 pl-3 pr-7 text-sm font-medium outline-none [border-color:var(--color-border)] sm:max-w-none"
+                    className="max-w-[128px] appearance-none truncate rounded-lg border bg-[var(--color-surface-2)] py-1.5 pl-3 pr-7 rtl:pl-7 rtl:pr-3 text-sm font-medium outline-none [border-color:var(--color-border)] sm:max-w-none"
                   >
                     {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
                       <option key={r} value={r}>{ROLE_LABELS[r]}</option>
                     ))}
                   </select>
-                  <ChevronDown size={14} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-ink-muted)]" />
+                  <ChevronDown size={14} className="pointer-events-none absolute right-2 rtl:right-auto rtl:left-2 top-1/2 -translate-y-1/2 text-[var(--color-ink-muted)]" />
                 </div>
               </div>
             ) : (
@@ -224,7 +224,7 @@ export function Shell({ children }: { children: ReactNode }) {
             >
               {theme === "light" ? <Moon size={17} /> : <Sun size={17} />}
             </button>
-            <div className="hidden items-center gap-2 border-l pl-2 ml-1 [border-color:var(--color-border)] sm:flex">
+            <div className="hidden items-center gap-2 border-l rtl:border-l-0 rtl:border-r pl-2 rtl:pl-0 rtl:pr-2 ml-1 rtl:ml-0 rtl:mr-1 [border-color:var(--color-border)] sm:flex">
               <Avatar name={currentUser?.name ?? ROLE_LABELS[role]} />
               <button
                 onClick={() => { logout(); navigate("/login", { replace: true }); }}

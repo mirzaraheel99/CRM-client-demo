@@ -25,7 +25,7 @@ export function ApplianceBasicFields({ value, onChange, brands, aliasFieldsEnabl
       </Field>
       <Field label={bi("Model", "الطراز")}>
         <Input value={value.model} onChange={(event) => onChange({ model: event.target.value })} />
-        {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder={bi("Arabic alias", "الاسم بالعربية")} value={value.modelAr} onChange={(event) => onChange({ modelAr: event.target.value })} />}
+        {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder="الاسم بالعربية" value={value.modelAr} onChange={(event) => onChange({ modelAr: event.target.value })} />}
       </Field>
       <Field label={bi("Serial number / unit number", "الرقم التسلسلي / رقم الوحدة")}><Input value={value.serialNo} onChange={(event) => onChange({ serialNo: event.target.value })} /></Field>
       {value.category === "Mobile" && <Field label={bi("IMEI", "الآيمي")}><Input value={value.imeiNo} onChange={(event) => onChange({ imeiNo: event.target.value })} /></Field>}

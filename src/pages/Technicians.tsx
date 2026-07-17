@@ -128,7 +128,7 @@ export default function Technicians() {
         <div className="space-y-3">
           <Field label={bi("Name", "الاسم")}>
             <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder={bi("Arabic alias", "الاسم بالعربية")} value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} />}
+            {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder="الاسم بالعربية" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} />}
           </Field>
           <Field label={bi("Phone", "الهاتف")}><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>
           <Field label={bi("Zone", "المنطقة")}>

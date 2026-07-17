@@ -171,19 +171,19 @@ export default function CustomerList() {
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label={bi("First name", "الاسم الأول")}>
                   <Input value={form.firstName} onChange={(event) => setForm({ ...form, firstName: event.target.value })} />
-                  {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder={bi("Arabic alias", "الاسم بالعربية")} value={form.firstNameAr} onChange={(event) => setForm({ ...form, firstNameAr: event.target.value })} />}
+                  {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder="الاسم بالعربية" value={form.firstNameAr} onChange={(event) => setForm({ ...form, firstNameAr: event.target.value })} />}
                 </Field>
                 <Field label={bi("Father's name", "اسم الأب")}>
                   <Input value={form.fatherName} onChange={(event) => setForm({ ...form, fatherName: event.target.value })} />
-                  {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder={bi("Arabic alias", "الاسم بالعربية")} value={form.fatherNameAr} onChange={(event) => setForm({ ...form, fatherNameAr: event.target.value })} />}
+                  {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder="الاسم بالعربية" value={form.fatherNameAr} onChange={(event) => setForm({ ...form, fatherNameAr: event.target.value })} />}
                 </Field>
                 <Field label={bi("Grandfather's name (optional)", "اسم الجد (اختياري)")}>
                   <Input value={form.grandfatherName} onChange={(event) => setForm({ ...form, grandfatherName: event.target.value })} />
-                  {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder={bi("Arabic alias", "الاسم بالعربية")} value={form.grandfatherNameAr} onChange={(event) => setForm({ ...form, grandfatherNameAr: event.target.value })} />}
+                  {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder="الاسم بالعربية" value={form.grandfatherNameAr} onChange={(event) => setForm({ ...form, grandfatherNameAr: event.target.value })} />}
                 </Field>
                 <Field label={bi("Family name", "اسم العائلة")}>
                   <Input value={form.familyName} onChange={(event) => setForm({ ...form, familyName: event.target.value })} />
-                  {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder={bi("Arabic alias", "الاسم بالعربية")} value={form.familyNameAr} onChange={(event) => setForm({ ...form, familyNameAr: event.target.value })} />}
+                  {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder="الاسم بالعربية" value={form.familyNameAr} onChange={(event) => setForm({ ...form, familyNameAr: event.target.value })} />}
                 </Field>
               </div>
               {form.customerType === "corporate" && (

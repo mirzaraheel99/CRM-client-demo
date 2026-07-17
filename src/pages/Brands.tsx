@@ -42,7 +42,7 @@ export default function Brands() {
         <div className="space-y-3">
           <Field label={bi("Brand name", "اسم العلامة التجارية")}>
             <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder={bi("Arabic alias", "الاسم بالعربية")} value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} />}
+            {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder="الاسم بالعربية" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} />}
           </Field>
           <Field label={bi("Warranty (months)", "الضمان (بالأشهر)")}>
             <Input type="number" value={form.warrantyMonths} onChange={(e) => setForm({ ...form, warrantyMonths: Number(e.target.value) })} />

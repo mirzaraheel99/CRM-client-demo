@@ -68,7 +68,7 @@ export function Shell({ children }: { children: ReactNode }) {
         id="primary-navigation"
         className={cx(
           "fixed inset-y-0 left-0 rtl:left-auto rtl:right-0 z-40 flex w-[260px] shrink-0 flex-col border-r rtl:border-r-0 rtl:border-l bg-[var(--color-surface-1)] transition-transform [border-color:var(--color-border)] md:relative md:z-auto md:translate-x-0 md:transition-all",
-          mobileNavOpen ? "translate-x-0" : "-translate-x-full rtl:translate-x-full",
+          mobileNavOpen ? "translate-x-0" : "max-md:-translate-x-full max-md:rtl:translate-x-full",
           sidebarCollapsed ? "md:w-[64px]" : "md:w-[240px]"
         )}
       >

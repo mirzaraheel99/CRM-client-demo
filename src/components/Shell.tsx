@@ -2,11 +2,12 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, ClipboardList, Users, PackageSearch, Tag, Boxes, PackageCheck,
   UserCog, GitBranch, MessageSquare, BarChart3, Smartphone, Sun, Moon,
-  Languages, ChevronDown, Wrench, Menu, RotateCcw, Radar, X, Search, Settings as SettingsIcon, LogOut,
+  Languages, ChevronDown, Menu, RotateCcw, Radar, X, Search, Settings as SettingsIcon, LogOut,
 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { t } from "../lib/i18n";
 import { Avatar } from "./ui";
+import { Logo } from "./Logo";
 import { Toaster } from "./Toaster";
 import { CommandPalette } from "./CommandPalette";
 import { useCommandPaletteStore } from "../lib/commandPaletteStore";
@@ -74,10 +75,10 @@ export function Shell({ children }: { children: ReactNode }) {
       >
         <div className="flex items-center gap-2 px-4 h-16 border-b [border-color:var(--color-border)] shrink-0">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-brand-1)] text-white shrink-0">
-            <Wrench size={16} />
+            <Logo size={16} />
           </div>
           <div className={cx("min-w-0", sidebarCollapsed && "md:hidden")}>
-            <p className="text-sm font-semibold truncate">FixFlow</p>
+            <p className="text-sm font-semibold truncate">VFix</p>
             <p className="text-[11px] text-[var(--color-ink-muted)] truncate">Appliance Service Suite</p>
           </div>
           <button
@@ -148,7 +149,7 @@ export function Shell({ children }: { children: ReactNode }) {
             <Menu size={19} />
           </button>
           <div className="mr-auto rtl:mr-0 rtl:ml-auto min-w-0 md:hidden">
-            <p className="truncate text-sm font-semibold">FixFlow</p>
+            <p className="truncate text-sm font-semibold">VFix</p>
             <p className="truncate text-[10px] text-[var(--color-ink-muted)]">Appliance Service Suite</p>
           </div>
 

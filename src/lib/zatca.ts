@@ -8,7 +8,7 @@ import type { Customer, Appliance, Brand, JobCard, JobCardPartUsed, InventoryIte
 // Tag-Length-Value structure (seller name, VAT number, timestamp, total, VAT
 // total) the QR must encode, so the printed layout and code are shaped exactly
 // like what ZATCA expects once wired to a real compliance CSID.
-const SELLER_NAME = "FixFlow Home Services LLC";
+const SELLER_NAME = "VFix Home Services LLC";
 const SELLER_VAT_NUMBER = "310123456700003";
 
 function tlvField(tag: number, value: string): Uint8Array {
@@ -95,7 +95,7 @@ export async function printTaxInvoice({
 </head><body>
   <div class="header">
     <div>
-      <div class="brand">FixFlow</div>
+      <div class="brand">VFix</div>
       <div class="brand-sub">${SELLER_NAME} · VAT ${SELLER_VAT_NUMBER}</div>
     </div>
     <div style="text-align:right"><h1>${invoiceNo}</h1><p class="muted">${formatDate(timestamp)}</p></div>

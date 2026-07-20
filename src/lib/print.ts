@@ -82,7 +82,7 @@ export function printEstimate({
 </style>
 </head><body>
   <div class="header">
-    <div><div class="brand">FixFlow</div><div class="brand-sub">Appliance Service Estimate</div></div>
+    <div><div class="brand">VFix</div><div class="brand-sub">Appliance Service Estimate</div></div>
     <div style="text-align:right"><h1>${estimateNo}</h1><p class="muted">${job.documentNo} | ${formatDate(job.createdAt)}</p></div>
   </div>
   <span class="badge">Estimate — Not a Tax Invoice</span>

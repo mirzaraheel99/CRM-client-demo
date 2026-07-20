@@ -642,10 +642,10 @@ for (let i = 0; i < 130; i++) {
   };
 
   addMessage("Received", "whatsapp", `Hi ${customer.name.split(" ")[0]}, we received your ${appliance.model} (${job.documentNo}).`);
-  addMessage("Received", "sms", `FixFlow received ${job.documentNo}. We will share a diagnosis shortly.`);
+  addMessage("Received", "sms", `VFix received ${job.documentNo}. We will share a diagnosis shortly.`);
   if (jobType === "non_warranty" && approvalIndex >= 0 && progressIdx >= approvalIndex) {
     addMessage("Customer Approval", "whatsapp", `Estimate ready for ${job.documentNo}: SAR ${estimateAmount?.toLocaleString()} for parts and labor.`);
-    addMessage("Customer Approval", "email", `Your FixFlow estimate for ${job.documentNo} is ready for approval.`);
+    addMessage("Customer Approval", "email", `Your VFix estimate for ${job.documentNo} is ready for approval.`);
   }
   if (readyIndex >= 0 && progressIdx >= readyIndex) {
     addMessage("Ready for Handover", "whatsapp", `Your ${appliance.model} is repaired and ready for pickup.`);

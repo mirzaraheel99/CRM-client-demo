@@ -19,7 +19,7 @@ export function LicenseBlocker({ status }: { status: LicenseStatus }) {
           </p>
         )}
         <p className="mt-4 text-xs text-[var(--color-ink-muted)]">
-          Contact your FixFlow account representative to renew this license.
+          Contact your VFix account representative to renew this license.
         </p>
       </div>
     </div>

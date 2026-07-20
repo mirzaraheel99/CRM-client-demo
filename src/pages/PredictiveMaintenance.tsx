@@ -64,7 +64,7 @@ export default function PredictiveMaintenance() {
         </table>
       </Card>
 
-      <Card className="max-w-2xl"><CardHeader title={bi("How this works", "كيف تعمل هذه الميزة")} /><p className="text-sm text-[var(--color-ink-secondary)]">For every brand and product category with enough completed repairs, FixFlow estimates the typical age at first service. Products approaching that window are flagged, while customer outreach is always routed through the most recent service relationship rather than permanent product ownership.</p></Card>
+      <Card className="max-w-2xl"><CardHeader title={bi("How this works", "كيف تعمل هذه الميزة")} /><p className="text-sm text-[var(--color-ink-secondary)]">For every brand and product category with enough completed repairs, VFix estimates the typical age at first service. Products approaching that window are flagged, while customer outreach is always routed through the most recent service relationship rather than permanent product ownership.</p></Card>
     </div>
   );
 }

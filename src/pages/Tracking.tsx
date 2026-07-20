@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { CheckCircle2, ImagePlus, Mail, MessageCircle, Smartphone, Wrench, XCircle } from "lucide-react";
+import { CheckCircle2, ImagePlus, Mail, MessageCircle, Smartphone, XCircle } from "lucide-react";
 import { useStore } from "../lib/store";
 import { Badge, Button, Card, WorkflowStepper } from "../components/ui";
+import { Logo } from "../components/Logo";
 import { JobStatusBadge } from "../components/StatusBadge";
 import { PaymentPanel } from "../components/PaymentPanel";
 import { Toaster } from "../components/Toaster";
@@ -45,7 +46,7 @@ export default function TrackingPage() {
 
   return (
     <div className="min-h-screen bg-[var(--color-surface-page)] text-[var(--color-ink-primary)]">
-      <header className="flex h-16 items-center gap-2 border-b bg-[var(--color-surface-1)] px-6 [border-color:var(--color-border)]"><div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-brand-1)] text-white"><Wrench size={16} /></div><div><p className="text-sm font-semibold">FixFlow</p><p className="text-[11px] text-[var(--color-ink-muted)]">{bi("Customer tracking | no login required", "تتبع العميل | بدون تسجيل دخول")}</p></div></header>
+      <header className="flex h-16 items-center gap-2 border-b bg-[var(--color-surface-1)] px-6 [border-color:var(--color-border)]"><div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-brand-1)] text-white"><Logo size={16} /></div><div><p className="text-sm font-semibold">VFix</p><p className="text-[11px] text-[var(--color-ink-muted)]">{bi("Customer tracking | no login required", "تتبع العميل | بدون تسجيل دخول")}</p></div></header>
 
       <main className="mx-auto max-w-3xl space-y-5 p-5 sm:p-8">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -89,7 +90,7 @@ export default function TrackingPage() {
         </Card>
 
         {comms.length > 0 && <Card><p className="mb-3 text-sm font-semibold">{bi("Messages sent to you", "الرسائل المرسلة إليك")}</p><div className="space-y-2.5">{comms.slice(0, 5).map((communication) => <div key={communication.id} className="flex items-start gap-2 text-sm"><span className="mt-0.5 text-[var(--color-brand-1)]">{CHANNEL_ICON[communication.channel]}</span><div className="flex-1"><p>{communication.message}</p><p className="text-[11px] text-[var(--color-ink-muted)]">{formatDate(communication.timestamp)} | {bi(communication.status, COMM_STATUS_AR[communication.status as keyof typeof COMM_STATUS_AR])}</p></div></div>)}</div></Card>}
-        <p className="pb-6 text-center text-[11px] text-[var(--color-ink-muted)]">Powered by FixFlow</p>
+        <p className="pb-6 text-center text-[11px] text-[var(--color-ink-muted)]">Powered by VFix</p>
       </main>
       <Toaster />
     </div>

@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
-import { Wrench, LogIn } from "lucide-react";
+import { LogIn } from "lucide-react";
 import { useStore } from "../lib/store";
 import { Card, Button, Input, Field } from "../components/ui";
+import { Logo } from "../components/Logo";
 import { bi } from "../lib/domainAr";
 
 const DEMO_ACCOUNTS = [
@@ -42,10 +43,10 @@ export default function Login() {
       <Card className="w-full max-w-sm space-y-5">
         <div className="flex items-center gap-2.5">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--color-brand-1)] text-white shrink-0">
-            <Wrench size={17} />
+            <Logo size={17} />
           </div>
           <div>
-            <p className="text-sm font-semibold">FixFlow</p>
+            <p className="text-sm font-semibold">VFix</p>
             <p className="text-[11px] text-[var(--color-ink-muted)]">{bi("Appliance Service Suite", "منصة خدمة الأجهزة")}</p>
           </div>
         </div>

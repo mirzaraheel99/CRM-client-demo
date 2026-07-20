@@ -7,7 +7,7 @@ export interface MessageTemplate {
   body: string;
 }
 
-// Fixed templates seeded from the FixFlow sales deck's example customer messages,
+// Fixed templates seeded from the VFix sales deck's example customer messages,
 // plus the spec's other trigger points. {{tokens}} are substituted at send time;
 // the result stays editable before sending.
 export const MESSAGE_TEMPLATES: MessageTemplate[] = [
@@ -33,7 +33,7 @@ export const MESSAGE_TEMPLATES: MessageTemplate[] = [
     id: "invoice_document",
     label: "Tax Invoice Document (WhatsApp)",
     channels: ["whatsapp"],
-    body: "Hi {{customer}}, here is your Tax Invoice {{invoiceNo}} for {{appliance}} ({{jobId}}): {{amount}} (incl. VAT). Thank you for choosing FixFlow.",
+    body: "Hi {{customer}}, here is your Tax Invoice {{invoiceNo}} for {{appliance}} ({{jobId}}): {{amount}} (incl. VAT). Thank you for choosing VFix.",
   },
   {
     id: "repair_complete",
@@ -63,7 +63,7 @@ export const MESSAGE_TEMPLATES: MessageTemplate[] = [
     id: "delivered",
     label: "Item Delivered",
     channels: ["whatsapp", "sms"],
-    body: "Your {{appliance}} ({{jobId}}) has been delivered. Thank you for choosing FixFlow.",
+    body: "Your {{appliance}} ({{jobId}}) has been delivered. Thank you for choosing VFix.",
   },
   {
     id: "maintenance_reminder",

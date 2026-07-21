@@ -797,16 +797,16 @@ export default function JobCardDetail() {
 
               {activeStage === "Warranty Validation" && canPerform(role, "create_job") && (
                 <div className="space-y-2 border-t pt-3 [border-color:var(--color-border)]">
-                  <Field label={bi("Purchase bill number", "رقم فاتورة الشراء")} required><Input value={billForm.billNo} onChange={(event) => setBillForm({ ...billForm, billNo: event.target.value })} /></Field>
-                  <Field label={bi("Vendor", "المورد")} required><Input value={billForm.vendorName} onChange={(event) => setBillForm({ ...billForm, vendorName: event.target.value })} /></Field>
-                  <Field label={bi("Bill date", "تاريخ الفاتورة")} required><Input type="date" value={billForm.billDate} onChange={(event) => setBillForm({ ...billForm, billDate: event.target.value })} /></Field>
+                  <Field label={bi("Purchase bill number", "رقم فاتورة الشراء")} required={isFieldRequired("jobCardStage", "purchaseBill")}><Input value={billForm.billNo} onChange={(event) => setBillForm({ ...billForm, billNo: event.target.value })} /></Field>
+                  <Field label={bi("Vendor", "المورد")} required={isFieldRequired("jobCardStage", "purchaseBill")}><Input value={billForm.vendorName} onChange={(event) => setBillForm({ ...billForm, vendorName: event.target.value })} /></Field>
+                  <Field label={bi("Bill date", "تاريخ الفاتورة")} required={isFieldRequired("jobCardStage", "purchaseBill")}><Input type="date" value={billForm.billDate} onChange={(event) => setBillForm({ ...billForm, billDate: event.target.value })} /></Field>
                   <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(savePurchaseBill(job.id, billForm))}>{bi("Save Purchase Bill", "حفظ فاتورة الشراء")}</Button>
                 </div>
               )}
 
               {activeStage === "Diagnosis" && canPerform(role, "set_diagnosis") && (
                 <div className="space-y-2 border-t pt-3 [border-color:var(--color-border)]">
-                  <Field label={bi("Diagnosis notes", "ملاحظات التشخيص")} required>
+                  <Field label={bi("Diagnosis notes", "ملاحظات التشخيص")} required={isFieldRequired("jobCardStage", "diagnosisNotes")}>
                     <Textarea rows={3} value={diagnosisInput} onChange={(event) => setDiagnosisInput(event.target.value)} placeholder={bi("Record fault, checks, and likely cause...", "سجّل العطل والفحوصات والسبب المحتمل...")} />
                   </Field>
                   <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(setDiagnosis(job.id, diagnosisInput))}>{bi(isViewingPastStage ? "Save Amended Diagnosis" : "Save Diagnosis", isViewingPastStage ? "حفظ التشخيص المعدّل" : "حفظ التشخيص")}</Button>
@@ -830,7 +830,7 @@ export default function JobCardDetail() {
 
               {activeStage === "Repair" && canPerform(role, "set_repair_notes") && (
                 <div className="space-y-2 border-t pt-3 [border-color:var(--color-border)]">
-                  <Field label={bi("Repair notes", "ملاحظات الإصلاح")} required>
+                  <Field label={bi("Repair notes", "ملاحظات الإصلاح")} required={isFieldRequired("jobCardStage", "repairNotes")}>
                     <Textarea rows={3} value={repairInput} onChange={(event) => setRepairInput(event.target.value)} placeholder={bi("Record work completed and parts fitted...", "سجّل الأعمال المنجزة والقطع المُركّبة...")} />
                   </Field>
                   <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(setRepairNotes(job.id, repairInput))}>{bi(isViewingPastStage ? "Save Amended Repair Notes" : "Save Repair Notes", isViewingPastStage ? "حفظ ملاحظات الإصلاح المعدّلة" : "حفظ ملاحظات الإصلاح")}</Button>
@@ -847,13 +847,13 @@ export default function JobCardDetail() {
                 <div className="space-y-3 border-t pt-3 [border-color:var(--color-border)]">
                   {job.jobType === "non_warranty" && canPerform(role, "finalize_job") && (
                     <div className="space-y-2">
-                      <Field label={bi("Final amount (SAR)", "المبلغ النهائي (ريال)")} required><Input type="number" min={partsTotal} value={finalAmountInput} onChange={(event) => setFinalAmountInput(event.target.value)} /></Field>
+                      <Field label={bi("Final amount (SAR)", "المبلغ النهائي (ريال)")} required={isFieldRequired("jobCardStage", "finalAmount")}><Input type="number" min={partsTotal} value={finalAmountInput} onChange={(event) => setFinalAmountInput(event.target.value)} /></Field>
                       <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(setFinalAmount(job.id, Number(finalAmountInput)))}>{bi("Confirm Final Amount", "تأكيد المبلغ النهائي")}</Button>
                     </div>
                   )}
                   {canPerform(role, "capture_signature") && (
                     <div className="space-y-2">
-                      <Field label={bi("Customer signature / name", "توقيع / اسم العميل")} required><Input value={signatureInput} onChange={(event) => setSignatureInput(event.target.value)} /></Field>
+                      <Field label={bi("Customer signature / name", "توقيع / اسم العميل")} required={isFieldRequired("jobCardStage", "customerSignature")}><Input value={signatureInput} onChange={(event) => setSignatureInput(event.target.value)} /></Field>
                       <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(captureCustomerSignature(job.id, signatureInput))}>{bi("Capture Signature", "تسجيل التوقيع")}</Button>
                     </div>
                   )}

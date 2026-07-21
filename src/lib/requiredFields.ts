@@ -5,7 +5,7 @@
 // "locked": the backend/business logic hard-requires them (e.g. a customer
 // needs a phone number), so they can't be turned off by an admin.
 
-export type RequiredFieldEntity = "customer" | "appliance" | "jobCardLine" | "serviceOrder";
+export type RequiredFieldEntity = "customer" | "appliance" | "jobCardLine" | "serviceOrder" | "jobCardStage";
 
 export interface RequiredFieldDef {
   key: string;
@@ -20,6 +20,7 @@ export const REQUIRED_FIELD_ENTITY_LABEL: Record<RequiredFieldEntity, { en: stri
   appliance: { en: "Product / Appliance", ar: "المنتج / الجهاز" },
   jobCardLine: { en: "Job details", ar: "تفاصيل المهمة" },
   serviceOrder: { en: "Service address & intake", ar: "عنوان الخدمة والاستلام" },
+  jobCardStage: { en: "Job Card workflow (Diagnosis, Repair, Handover)", ar: "سير عمل بطاقة العمل (التشخيص، الإصلاح، التسليم)" },
 };
 
 export const REQUIRED_FIELD_DEFS: Record<RequiredFieldEntity, RequiredFieldDef[]> = {
@@ -60,6 +61,17 @@ export const REQUIRED_FIELD_DEFS: Record<RequiredFieldEntity, RequiredFieldDef[]
     { key: "requestSource", label: "Request source", labelAr: "مصدر الطلب", defaultRequired: false },
     { key: "preferredDate", label: "Preferred date", labelAr: "التاريخ المفضل", defaultRequired: false },
     { key: "preferredTimeSlot", label: "Preferred time slot", labelAr: "الفترة الزمنية المفضلة", defaultRequired: false },
+  ],
+  // These gate whether the job can advance past that stage on the Job Card
+  // Detail page, in addition to just showing an asterisk — turning one off
+  // both hides the asterisk and removes it from the "must complete before
+  // advancing" checklist (see stageRequirements in workflow.ts).
+  jobCardStage: [
+    { key: "diagnosisNotes", label: "Diagnosis notes", labelAr: "ملاحظات التشخيص", defaultRequired: true },
+    { key: "repairNotes", label: "Repair notes", labelAr: "ملاحظات الإصلاح", defaultRequired: true },
+    { key: "purchaseBill", label: "Purchase bill (Warranty Validation)", labelAr: "فاتورة الشراء (التحقق من الضمان)", defaultRequired: true },
+    { key: "finalAmount", label: "Final amount (non-warranty jobs)", labelAr: "المبلغ النهائي (المهام بدون ضمان)", defaultRequired: true },
+    { key: "customerSignature", label: "Customer signature", labelAr: "توقيع العميل", defaultRequired: true },
   ],
 };
 

@@ -1,5 +1,6 @@
 import type { JobCard, Payment, PurchaseBill, Role } from "./types";
 import { canAdvanceCurrentStage } from "./permissions";
+import { isFieldRequired } from "./requiredFields";
 
 export interface StageRequirement {
   label: string;
@@ -20,9 +21,11 @@ export function stageRequirements(job: JobCard, context: JobFlowContext): StageR
     return [{ label: "Qualified technician assigned", met: Boolean(job.technicianId) }];
   }
   if (job.currentStage === "Warranty Validation") {
+    if (!isFieldRequired("jobCardStage", "purchaseBill")) return [];
     return [{ label: "Purchase bill recorded", met: Boolean(context.purchaseBill) }];
   }
   if (job.currentStage === "Diagnosis") {
+    if (!isFieldRequired("jobCardStage", "diagnosisNotes")) return [];
     return [{ label: "Diagnosis notes saved", met: Boolean(job.diagnosisNotes?.trim()) }];
   }
   if (job.currentStage === "Estimate") {
@@ -32,22 +35,22 @@ export function stageRequirements(job: JobCard, context: JobFlowContext): StageR
     return [{ label: job.customerApproved === false ? "Customer declined the estimate" : "Customer approval recorded", met: job.customerApproved === true }];
   }
   if (job.currentStage === "Repair") {
+    if (!isFieldRequired("jobCardStage", "repairNotes")) return [];
     return [{ label: "Repair notes saved", met: Boolean(job.repairNotes?.trim()) }];
   }
   if (job.currentStage === "QA") {
     return [{ label: "QA approved by a supervisor", met: job.qaApproved }];
   }
   if (job.currentStage === "Ready for Handover") {
-    const requirements: StageRequirement[] = [
-      { label: "Customer signature captured", met: Boolean(job.customerSignature?.trim()) },
-      { label: "Asset handover confirmed", met: job.assetHandedOver === true },
-    ];
-    if (job.jobType === "non_warranty") {
-      requirements.unshift(
+    const requirements: StageRequirement[] = [];
+    if (job.jobType === "non_warranty" && isFieldRequired("jobCardStage", "finalAmount")) {
+      requirements.push(
         { label: "Final amount confirmed", met: (job.finalAmount ?? 0) > 0 },
         { label: "Payment collected", met: (job.finalAmount ?? 0) > 0 && paidTotal(context.payments) >= (job.finalAmount ?? 0) }
       );
     }
+    if (isFieldRequired("jobCardStage", "customerSignature")) requirements.push({ label: "Customer signature captured", met: Boolean(job.customerSignature?.trim()) });
+    requirements.push({ label: "Asset handover confirmed", met: job.assetHandedOver === true });
     return requirements;
   }
   return [];

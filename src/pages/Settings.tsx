@@ -2,6 +2,7 @@ import { useStore } from "../lib/store";
 import { Card, CardHeader, Badge, Button } from "../components/ui";
 import { toast } from "../lib/toast";
 import { canPerform, getActionRoles, type DemoAction } from "../lib/permissions";
+import { REQUIRED_FIELD_ENTITY_LABEL, REQUIRED_FIELD_DEFS, isFieldRequired, isFieldLocked, type RequiredFieldEntity } from "../lib/requiredFields";
 import { bi } from "../lib/domainAr";
 import type { Role } from "../lib/types";
 
@@ -51,11 +52,14 @@ function ToggleSwitch({ checked, onChange, disabled }: { checked: boolean; onCha
 }
 
 export default function Settings() {
-  const { role, aliasFieldsEnabled, setAliasFieldsEnabled, permissionsVersion, updateRolePermission, resetRolePermissions } = useStore();
+  const { role, aliasFieldsEnabled, setAliasFieldsEnabled, permissionsVersion, updateRolePermission, resetRolePermissions, requiredFieldsVersion, setFieldRequired, resetRequiredFields } = useStore();
   const canManage = canPerform(role, "manage_settings");
   // permissionsVersion (destructured above) forces a re-render whenever the module-level table in permissions.ts changes.
   void permissionsVersion;
+  // requiredFieldsVersion (destructured above) forces a re-render whenever the module-level table in requiredFields.ts changes.
+  void requiredFieldsVersion;
   const actionRoles = getActionRoles();
+  const requiredFieldEntities = Object.keys(REQUIRED_FIELD_DEFS) as RequiredFieldEntity[];
 
   return (
     <div className="space-y-5">
@@ -87,6 +91,47 @@ export default function Settings() {
           />
         </div>
         {!canManage && <p className="text-[11px] text-[var(--color-ink-muted)]">{bi("Only admins can change this setting.", "يمكن للمسؤولين فقط تغيير هذا الإعداد.")}</p>}
+      </Card>
+
+      <Card className="space-y-4">
+        <CardHeader
+          title={bi("Required fields", "الحقول الإلزامية")}
+          subtitle={bi("Choose which fields staff must fill in on the New Job Card, Add Customer, and Add Product forms", "اختر الحقول التي يجب على الموظفين تعبئتها في نماذج بطاقة العمل الجديدة وإضافة عميل وإضافة منتج")}
+          action={canManage ? <Button size="sm" variant="secondary" onClick={() => { const outcome = resetRequiredFields(); toast(outcome.message, outcome.ok ? "success" : "error"); }}>{bi("Reset to defaults", "إعادة للوضع الافتراضي")}</Button> : undefined}
+        />
+        {requiredFieldEntities.map((entity) => (
+          <div key={entity} className="space-y-2">
+            <p className="text-xs font-semibold text-[var(--color-ink-secondary)]">{bi(REQUIRED_FIELD_ENTITY_LABEL[entity].en, REQUIRED_FIELD_ENTITY_LABEL[entity].ar)}</p>
+            <div className="overflow-x-auto rounded-lg border [border-color:var(--color-border)]">
+              <table className="w-full min-w-[480px] text-sm">
+                <tbody>
+                  {REQUIRED_FIELD_DEFS[entity].map((def) => {
+                    const locked = isFieldLocked(entity, def.key);
+                    return (
+                      <tr key={def.key} className="border-t first:border-t-0 [border-color:var(--color-border)]">
+                        <td className="px-3 py-2 text-[var(--color-ink-secondary)]">
+                          {bi(def.label, def.labelAr)}
+                          {locked && <span className="ml-1.5 text-[11px] text-[var(--color-ink-muted)]">({bi("always required", "دائماً إلزامي")})</span>}
+                        </td>
+                        <td className="w-16 px-3 py-2 text-right">
+                          <ToggleSwitch
+                            checked={locked || isFieldRequired(entity, def.key)}
+                            disabled={!canManage || locked}
+                            onChange={(next) => {
+                              const outcome = setFieldRequired(entity, def.key, next);
+                              if (!outcome.ok) toast(outcome.message, "error");
+                            }}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ))}
+        {!canManage && <p className="text-[11px] text-[var(--color-ink-muted)]">{bi("Only admins can change required fields.", "يمكن للمسؤولين فقط تغيير الحقول الإلزامية.")}</p>}
       </Card>
 
       <Card className="space-y-3">

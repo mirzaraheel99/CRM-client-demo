@@ -10,6 +10,7 @@ import { toast } from "../../lib/toast";
 import { useSort } from "../../lib/useSort";
 import { appliancesByBranch } from "../../lib/selectors";
 import { canPerform } from "../../lib/permissions";
+import { getMissingRequiredFields } from "../../lib/requiredFields";
 import { APPLIANCE_CATEGORY_AR, WARRANTY_STATUS_AR, bi } from "../../lib/domainAr";
 import type { Appliance, ApplianceCategory } from "../../lib/types";
 
@@ -25,7 +26,9 @@ const FORM_TAB_LABELS: Record<string, string> = {
 };
 
 export default function ApplianceList() {
-  const { appliances, brands, jobCards, selectedBranchId, role, addAppliance, aliasFieldsEnabled } = useStore();
+  const { appliances, brands, jobCards, selectedBranchId, role, addAppliance, aliasFieldsEnabled, requiredFieldsVersion } = useStore();
+  // requiredFieldsVersion (destructured above) forces a re-render whenever the module-level table in requiredFields.ts changes.
+  void requiredFieldsVersion;
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<ApplianceCategory | "all">("all");
   const [open, setOpen] = useState(false);
@@ -63,7 +66,7 @@ export default function ApplianceList() {
   const pagedRows = rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   async function submit() {
-    if (!form.brandId || !form.model.trim() || !form.serialNo.trim() || !form.purchaseDate) return;
+    if (getMissingRequiredFields("appliance", form).length > 0) return;
     const brand = brands.find((candidate) => candidate.id === form.brandId)!;
     const months = (Date.now() - new Date(form.purchaseDate).getTime()) / (1000 * 60 * 60 * 24 * 30);
     const appliance = await addAppliance({
@@ -156,7 +159,7 @@ export default function ApplianceList() {
           {formTab === "Purchase" && <AppliancePurchaseFields value={form} onChange={(patch) => setForm({ ...form, ...patch })} />}
           {formTab === "Compliance" && <ApplianceComplianceFields value={form} onChange={(patch) => setForm({ ...form, ...patch })} />}
           {formTab === "Site" && <ApplianceSiteFields value={form} onChange={(patch) => setForm({ ...form, ...patch })} />}
-          <Button className="w-full justify-center" onClick={submit}>{bi("Save Product", "حفظ المنتج")}</Button>
+          <Button className="w-full justify-center" onClick={submit} disabled={getMissingRequiredFields("appliance", form).length > 0}>{bi("Save Product", "حفظ المنتج")}</Button>
         </div>
       </Modal>
     </div>

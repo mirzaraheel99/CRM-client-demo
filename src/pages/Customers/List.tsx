@@ -8,6 +8,7 @@ import { formatDate } from "../../lib/utils";
 import { toast } from "../../lib/toast";
 import { useSort } from "../../lib/useSort";
 import { canPerform } from "../../lib/permissions";
+import { isFieldRequired, getMissingRequiredFields } from "../../lib/requiredFields";
 import { bi } from "../../lib/domainAr";
 import type { Customer, CustomerType, Gender, PreferredLanguage } from "../../lib/types";
 
@@ -50,7 +51,9 @@ function emptyCustomerForm(branchId: string) {
 }
 
 export default function CustomerList() {
-  const { customers, jobCards, serviceOrders, branches, selectedBranchId, role, addCustomer, aliasFieldsEnabled } = useStore();
+  const { customers, jobCards, serviceOrders, branches, selectedBranchId, role, addCustomer, aliasFieldsEnabled, requiredFieldsVersion } = useStore();
+  // requiredFieldsVersion (destructured above) forces a re-render whenever the module-level table in requiredFields.ts changes.
+  void requiredFieldsVersion;
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const defaultBranchId = selectedBranchId === "all" ? branches[0]?.id ?? "" : selectedBranchId;
@@ -99,7 +102,7 @@ export default function CustomerList() {
   const pagedRows = rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   async function submit() {
-    if (!form.firstName.trim() || !form.familyName.trim() || !form.phone.trim()) return;
+    if (getMissingRequiredFields("customer", form).length > 0) return;
     const existing = customers.find((customer) => customer.phone.replace(/\D/g, "") === form.phone.replace(/\D/g, ""));
     const saved = await addCustomer({
       ...form,
@@ -169,11 +172,11 @@ export default function CustomerList() {
               </Field>
               <p className="text-xs text-[var(--color-ink-muted)]">{bi("Saudi naming convention: given name, father's name, grandfather's name (optional), family name.", "الترتيب السعودي للاسم: الاسم الأول، اسم الأب، اسم الجد (اختياري)، اسم العائلة.")}{aliasFieldsEnabled && bi(" Add the Arabic alias alongside each name if needed.", " أضف الاسم بالعربية بجانب كل اسم عند الحاجة.")}</p>
               <div className="grid gap-3 sm:grid-cols-2">
-                <Field label={bi("First name", "الاسم الأول")}>
+                <Field label={bi("First name", "الاسم الأول")} required={isFieldRequired("customer", "firstName")}>
                   <Input value={form.firstName} onChange={(event) => setForm({ ...form, firstName: event.target.value })} />
                   {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder="الاسم بالعربية" value={form.firstNameAr} onChange={(event) => setForm({ ...form, firstNameAr: event.target.value })} />}
                 </Field>
-                <Field label={bi("Father's name", "اسم الأب")}>
+                <Field label={bi("Father's name", "اسم الأب")} required={isFieldRequired("customer", "fatherName")}>
                   <Input value={form.fatherName} onChange={(event) => setForm({ ...form, fatherName: event.target.value })} />
                   {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder="الاسم بالعربية" value={form.fatherNameAr} onChange={(event) => setForm({ ...form, fatherNameAr: event.target.value })} />}
                 </Field>
@@ -181,7 +184,7 @@ export default function CustomerList() {
                   <Input value={form.grandfatherName} onChange={(event) => setForm({ ...form, grandfatherName: event.target.value })} />
                   {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder="الاسم بالعربية" value={form.grandfatherNameAr} onChange={(event) => setForm({ ...form, grandfatherNameAr: event.target.value })} />}
                 </Field>
-                <Field label={bi("Family name", "اسم العائلة")}>
+                <Field label={bi("Family name", "اسم العائلة")} required={isFieldRequired("customer", "familyName")}>
                   <Input value={form.familyName} onChange={(event) => setForm({ ...form, familyName: event.target.value })} />
                   {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder="الاسم بالعربية" value={form.familyNameAr} onChange={(event) => setForm({ ...form, familyNameAr: event.target.value })} />}
                 </Field>
@@ -198,12 +201,12 @@ export default function CustomerList() {
           {formTab === "Contact" && (
             <div className="space-y-3">
               <div className="grid gap-3 sm:grid-cols-2">
-                <Field label={bi("Mobile phone", "الجوال")}><Input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} placeholder="+966..." /></Field>
-                <Field label={bi("Home phone (optional)", "الهاتف المنزلي (اختياري)")}><Input value={form.homePhone} onChange={(event) => setForm({ ...form, homePhone: event.target.value })} placeholder="+9661..." /></Field>
-                <Field label={bi("WhatsApp", "واتساب")}><Input value={form.whatsapp} onChange={(event) => setForm({ ...form, whatsapp: event.target.value })} placeholder="Defaults to mobile" /></Field>
-                <Field label={bi("Email", "البريد الإلكتروني")}><Input value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></Field>
+                <Field label={bi("Mobile phone", "الجوال")} required={isFieldRequired("customer", "phone")}><Input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} placeholder="+966..." /></Field>
+                <Field label={bi("Home phone (optional)", "الهاتف المنزلي (اختياري)")} required={isFieldRequired("customer", "homePhone")}><Input value={form.homePhone} onChange={(event) => setForm({ ...form, homePhone: event.target.value })} placeholder="+9661..." /></Field>
+                <Field label={bi("WhatsApp", "واتساب")} required={isFieldRequired("customer", "whatsapp")}><Input value={form.whatsapp} onChange={(event) => setForm({ ...form, whatsapp: event.target.value })} placeholder="Defaults to mobile" /></Field>
+                <Field label={bi("Email", "البريد الإلكتروني")} required={isFieldRequired("customer", "email")}><Input value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></Field>
               </div>
-              <Field label={bi("Address", "العنوان")}><Input value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} /></Field>
+              <Field label={bi("Address", "العنوان")} required={isFieldRequired("customer", "address")}><Input value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} /></Field>
               <Field label={bi("Branch", "الفرع")}>
                 <Select value={form.branchId} onChange={(event) => setForm({ ...form, branchId: event.target.value })}>
                   {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
@@ -237,7 +240,7 @@ export default function CustomerList() {
             </div>
           )}
 
-          <Button className="w-full justify-center" onClick={submit}>{bi("Save Customer", "حفظ العميل")}</Button>
+          <Button className="w-full justify-center" onClick={submit} disabled={getMissingRequiredFields("customer", form).length > 0}>{bi("Save Customer", "حفظ العميل")}</Button>
         </div>
       </Modal>
     </div>

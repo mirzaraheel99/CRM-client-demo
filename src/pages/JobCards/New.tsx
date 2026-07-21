@@ -10,6 +10,7 @@ import { toast } from "../../lib/toast";
 import { filterByBranch } from "../../lib/selectors";
 import { formatDate, formatSequence } from "../../lib/utils";
 import { JOB_TYPE_AR, REQUEST_SOURCE_AR, bi } from "../../lib/domainAr";
+import { isFieldRequired, getMissingRequiredFields } from "../../lib/requiredFields";
 import type { JobType, RequestSource } from "../../lib/types";
 
 const NEW_CUSTOMER = "__new_customer__";
@@ -42,7 +43,9 @@ function emptyLine(applianceId = ""): IntakeLine {
 export default function NewJobCard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { customers, appliances, brands, branches, technicians, selectedBranchId, createServiceOrder, addCustomer, addAppliance, aliasFieldsEnabled } = useStore();
+  const { customers, appliances, brands, branches, technicians, selectedBranchId, createServiceOrder, addCustomer, addAppliance, aliasFieldsEnabled, requiredFieldsVersion } = useStore();
+  // requiredFieldsVersion (destructured above) forces a re-render whenever the module-level table in requiredFields.ts changes.
+  void requiredFieldsVersion;
   const initialCustomerId = searchParams.get("customerId") ?? "";
   const initialCustomer = customers.find((customer) => customer.id === initialCustomerId);
   const initialApplianceId = searchParams.get("applianceId") ?? "";
@@ -60,14 +63,18 @@ export default function NewJobCard() {
   const applianceMap = useMemo(() => new Map(appliances.map((appliance) => [appliance.id, appliance])), [appliances]);
   const selectedIds = useMemo(() => new Set(lines.map((line) => line.applianceId).filter((id) => id && id !== NEW_PRODUCT)), [lines]);
   const branchTechnicians = useMemo(() => technicians.filter((technician) => technician.branchId === branchId && technician.status !== "Off Duty"), [technicians, branchId]);
-  const customerReady = customerId === NEW_CUSTOMER ? Boolean(newCustomer.firstName.trim() && newCustomer.familyName.trim() && newCustomer.phone.trim() && branchId) : Boolean(customerId);
+  const customerReady = customerId === NEW_CUSTOMER
+    ? Boolean(branchId) && getMissingRequiredFields("customer", newCustomer).length === 0
+    : Boolean(customerId);
+  const serviceOrderReady = getMissingRequiredFields("serviceOrder", orderDetails).length === 0;
   const lineReady = (line: IntakeLine) => {
     if (!line.problem.trim() || line.problem.trim().length <= 3) return false;
-    if (line.applianceId === NEW_PRODUCT) return Boolean(line.newProduct.brandId && line.newProduct.model.trim() && line.newProduct.serialNo.trim() && line.newProduct.purchaseDate);
+    if (getMissingRequiredFields("jobCardLine", line).length > 0) return false;
+    if (line.applianceId === NEW_PRODUCT) return getMissingRequiredFields("appliance", line.newProduct).length === 0;
     return Boolean(line.applianceId);
   };
   const canSubmit = Boolean(
-    customerReady && branchId && lines.length > 0 &&
+    customerReady && serviceOrderReady && branchId && lines.length > 0 &&
     lines.every(lineReady) &&
     selectedIds.size === lines.filter((line) => line.applianceId !== NEW_PRODUCT).length
   );
@@ -183,11 +190,11 @@ export default function NewJobCard() {
           <div className="space-y-3 rounded-md bg-black/[0.03] p-3 dark:bg-white/[0.05]">
             <p className="text-xs text-[var(--color-ink-muted)]">{bi("Saudi naming convention: given name, father's name, grandfather's name (optional), family name.", "الترتيب السعودي للاسم: الاسم الأول، اسم الأب، اسم الجد (اختياري)، اسم العائلة.")}</p>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label={bi("First name", "الاسم الأول")}>
+              <Field label={bi("First name", "الاسم الأول")} required={isFieldRequired("customer", "firstName")}>
                 <Input value={newCustomer.firstName} onChange={(event) => setNewCustomer({ ...newCustomer, firstName: event.target.value })} />
                 {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder="الاسم بالعربية" value={newCustomer.firstNameAr} onChange={(event) => setNewCustomer({ ...newCustomer, firstNameAr: event.target.value })} />}
               </Field>
-              <Field label={bi("Father's name", "اسم الأب")}>
+              <Field label={bi("Father's name", "اسم الأب")} required={isFieldRequired("customer", "fatherName")}>
                 <Input value={newCustomer.fatherName} onChange={(event) => setNewCustomer({ ...newCustomer, fatherName: event.target.value })} />
                 {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder="الاسم بالعربية" value={newCustomer.fatherNameAr} onChange={(event) => setNewCustomer({ ...newCustomer, fatherNameAr: event.target.value })} />}
               </Field>
@@ -195,17 +202,17 @@ export default function NewJobCard() {
                 <Input value={newCustomer.grandfatherName} onChange={(event) => setNewCustomer({ ...newCustomer, grandfatherName: event.target.value })} />
                 {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder="الاسم بالعربية" value={newCustomer.grandfatherNameAr} onChange={(event) => setNewCustomer({ ...newCustomer, grandfatherNameAr: event.target.value })} />}
               </Field>
-              <Field label={bi("Family name", "اسم العائلة")}>
+              <Field label={bi("Family name", "اسم العائلة")} required={isFieldRequired("customer", "familyName")}>
                 <Input value={newCustomer.familyName} onChange={(event) => setNewCustomer({ ...newCustomer, familyName: event.target.value })} />
                 {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder="الاسم بالعربية" value={newCustomer.familyNameAr} onChange={(event) => setNewCustomer({ ...newCustomer, familyNameAr: event.target.value })} />}
               </Field>
             </div>
             <div className="grid gap-4 border-t pt-3 [border-color:var(--color-border)] sm:grid-cols-2">
-              <Field label={bi("Mobile phone", "الجوال")}><Input value={newCustomer.phone} onChange={(event) => setNewCustomer({ ...newCustomer, phone: event.target.value })} placeholder="+966..." /></Field>
-              <Field label={bi("Home phone (optional)", "الهاتف المنزلي (اختياري)")}><Input value={newCustomer.homePhone} onChange={(event) => setNewCustomer({ ...newCustomer, homePhone: event.target.value })} placeholder="+9661..." /></Field>
-              <Field label={bi("WhatsApp", "واتساب")}><Input value={newCustomer.whatsapp} onChange={(event) => setNewCustomer({ ...newCustomer, whatsapp: event.target.value })} placeholder="Defaults to mobile" /></Field>
-              <Field label={bi("Email", "البريد الإلكتروني")}><Input value={newCustomer.email} onChange={(event) => setNewCustomer({ ...newCustomer, email: event.target.value })} /></Field>
-              <div className="sm:col-span-2"><Field label={bi("Address", "العنوان")}><Input value={newCustomer.address} onChange={(event) => setNewCustomer({ ...newCustomer, address: event.target.value })} /></Field></div>
+              <Field label={bi("Mobile phone", "الجوال")} required={isFieldRequired("customer", "phone")}><Input value={newCustomer.phone} onChange={(event) => setNewCustomer({ ...newCustomer, phone: event.target.value })} placeholder="+966..." /></Field>
+              <Field label={bi("Home phone (optional)", "الهاتف المنزلي (اختياري)")} required={isFieldRequired("customer", "homePhone")}><Input value={newCustomer.homePhone} onChange={(event) => setNewCustomer({ ...newCustomer, homePhone: event.target.value })} placeholder="+9661..." /></Field>
+              <Field label={bi("WhatsApp", "واتساب")} required={isFieldRequired("customer", "whatsapp")}><Input value={newCustomer.whatsapp} onChange={(event) => setNewCustomer({ ...newCustomer, whatsapp: event.target.value })} placeholder="Defaults to mobile" /></Field>
+              <Field label={bi("Email", "البريد الإلكتروني")} required={isFieldRequired("customer", "email")}><Input value={newCustomer.email} onChange={(event) => setNewCustomer({ ...newCustomer, email: event.target.value })} /></Field>
+              <div className="sm:col-span-2"><Field label={bi("Address", "العنوان")} required={isFieldRequired("customer", "address")}><Input value={newCustomer.address} onChange={(event) => setNewCustomer({ ...newCustomer, address: event.target.value })} /></Field></div>
             </div>
           </div>
         )}
@@ -214,22 +221,22 @@ export default function NewJobCard() {
       <Card className="space-y-4">
         <CardHeader title={bi("Service address & intake", "عنوان الخدمة وبيانات الاستلام")} subtitle="Saudi National Address for the service location, plus how the request came in." />
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field label={bi("Short address code", "الرمز المختصر للعنوان")}><Input value={orderDetails.shortAddressCode} onChange={(event) => setOrderDetails({ ...orderDetails, shortAddressCode: event.target.value })} placeholder="RAFH3552" /></Field>
-          <Field label={bi("Building no.", "رقم المبنى")}><Input value={orderDetails.buildingNo} onChange={(event) => setOrderDetails({ ...orderDetails, buildingNo: event.target.value })} /></Field>
+          <Field label={bi("Short address code", "الرمز المختصر للعنوان")} required={isFieldRequired("serviceOrder", "shortAddressCode")}><Input value={orderDetails.shortAddressCode} onChange={(event) => setOrderDetails({ ...orderDetails, shortAddressCode: event.target.value })} placeholder="RAFH3552" /></Field>
+          <Field label={bi("Building no.", "رقم المبنى")} required={isFieldRequired("serviceOrder", "buildingNo")}><Input value={orderDetails.buildingNo} onChange={(event) => setOrderDetails({ ...orderDetails, buildingNo: event.target.value })} /></Field>
           <Field label={bi("Unit no. (optional)", "رقم الوحدة (اختياري)")}><Input value={orderDetails.unitNo} onChange={(event) => setOrderDetails({ ...orderDetails, unitNo: event.target.value })} /></Field>
-          <Field label={bi("District", "الحي")}><Input value={orderDetails.district} onChange={(event) => setOrderDetails({ ...orderDetails, district: event.target.value })} /></Field>
-          <Field label={bi("Postal code", "الرمز البريدي")}><Input value={orderDetails.postalCode} onChange={(event) => setOrderDetails({ ...orderDetails, postalCode: event.target.value })} /></Field>
-          <Field label={bi("Additional no.", "الرقم الإضافي")}><Input value={orderDetails.additionalNo} onChange={(event) => setOrderDetails({ ...orderDetails, additionalNo: event.target.value })} /></Field>
+          <Field label={bi("District", "الحي")} required={isFieldRequired("serviceOrder", "district")}><Input value={orderDetails.district} onChange={(event) => setOrderDetails({ ...orderDetails, district: event.target.value })} /></Field>
+          <Field label={bi("Postal code", "الرمز البريدي")} required={isFieldRequired("serviceOrder", "postalCode")}><Input value={orderDetails.postalCode} onChange={(event) => setOrderDetails({ ...orderDetails, postalCode: event.target.value })} /></Field>
+          <Field label={bi("Additional no.", "الرقم الإضافي")} required={isFieldRequired("serviceOrder", "additionalNo")}><Input value={orderDetails.additionalNo} onChange={(event) => setOrderDetails({ ...orderDetails, additionalNo: event.target.value })} /></Field>
         </div>
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field label={bi("Request source", "مصدر الطلب")}>
+          <Field label={bi("Request source", "مصدر الطلب")} required={isFieldRequired("serviceOrder", "requestSource")}>
             <Select value={orderDetails.requestSource} onChange={(event) => setOrderDetails({ ...orderDetails, requestSource: event.target.value as RequestSource | "" })}>
               <option value="">{bi("Not set", "غير محدد")}</option>
               {REQUEST_SOURCES.map((source) => <option key={source} value={source}>{bi(source.replace("_", " "), REQUEST_SOURCE_AR[source])}</option>)}
             </Select>
           </Field>
-          <Field label={bi("Preferred date", "التاريخ المفضل")}><Input type="date" value={orderDetails.preferredDate} onChange={(event) => setOrderDetails({ ...orderDetails, preferredDate: event.target.value })} /></Field>
-          <Field label={bi("Preferred time slot", "الفترة الزمنية المفضلة")}>
+          <Field label={bi("Preferred date", "التاريخ المفضل")} required={isFieldRequired("serviceOrder", "preferredDate")}><Input type="date" value={orderDetails.preferredDate} onChange={(event) => setOrderDetails({ ...orderDetails, preferredDate: event.target.value })} /></Field>
+          <Field label={bi("Preferred time slot", "الفترة الزمنية المفضلة")} required={isFieldRequired("serviceOrder", "preferredTimeSlot")}>
             <Select value={orderDetails.preferredTimeSlot} onChange={(event) => setOrderDetails({ ...orderDetails, preferredTimeSlot: event.target.value })}>
               <option value="">{bi("Not set", "غير محدد")}</option>
               {TIME_SLOTS.map((slot) => <option key={slot} value={slot}>{slot}</option>)}
@@ -329,7 +336,7 @@ export default function NewJobCard() {
                 )}
 
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                  <Field label={bi("Assign technician", "إسناد فني")}>
+                  <Field label={bi("Assign technician", "إسناد فني")} required={isFieldRequired("jobCardLine", "technicianId")}>
                     <Select value={line.technicianId} onChange={(event) => patchLine(line.key, { technicianId: event.target.value })}>
                       <option value="">{bi("Assign later", "الإسناد لاحقاً")}</option>
                       {branchTechnicians
@@ -348,7 +355,7 @@ export default function NewJobCard() {
                 </div>
 
                 <div className="mt-4">
-                  <Field label={bi("Reported problem / requested service", "المشكلة المُبلّغ عنها / الخدمة المطلوبة")}>
+                  <Field label={bi("Reported problem / requested service", "المشكلة المُبلّغ عنها / الخدمة المطلوبة")} required={isFieldRequired("jobCardLine", "problem")}>
                     <Textarea rows={3} value={line.problem} onChange={(event) => patchLine(line.key, { problem: event.target.value })} placeholder={bi("Describe the issue for this product sequence...", "صِف المشكلة لهذا التسلسل من المنتجات...")} />
                   </Field>
                 </div>

@@ -316,10 +316,13 @@ export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement
   );
 }
 
-export function Field({ label, children }: { label: string; children: ReactNode }) {
+export function Field({ label, children, required }: { label: string; children: ReactNode; required?: boolean }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium text-[var(--color-ink-secondary)]">{label}</span>
+      <span className="mb-1 block text-xs font-medium text-[var(--color-ink-secondary)]">
+        {label}
+        {required && <span className="ml-0.5 text-[var(--color-status-serious)]" aria-hidden="true"> *</span>}
+      </span>
       {children}
     </label>
   );

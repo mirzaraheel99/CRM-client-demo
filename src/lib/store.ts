@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import * as seed from "./seed";
 import { canAdvanceCurrentStage, canPerform, setActionRole, resetActionRoles, type DemoAction } from "./permissions";
+import { setFieldRequired as setFieldRequiredRaw, resetRequiredFields as resetRequiredFieldsRaw, type RequiredFieldEntity } from "./requiredFields";
 import { MESSAGE_TEMPLATES, renderTemplate } from "./templates";
 import { formatDate } from "./utils";
 import { api, ApiError, getToken, setToken } from "./api";
@@ -69,6 +70,7 @@ interface DemoState {
   maintenanceRemindersSent: Record<string, string>;
   aliasFieldsEnabled: boolean;
   permissionsVersion: number;
+  requiredFieldsVersion: number;
 
   setRole: (role: Role) => void;
   setBranch: (branchId: string | "all") => void;
@@ -82,6 +84,8 @@ interface DemoState {
   hydrate: () => Promise<void>;
   updateRolePermission: (action: DemoAction, targetRole: Role, allowed: boolean) => ActionResult;
   resetRolePermissions: () => ActionResult;
+  setFieldRequired: (entity: RequiredFieldEntity, key: string, required: boolean) => ActionResult;
+  resetRequiredFields: () => ActionResult;
 
   addCustomer: (customer: Omit<Customer, "id" | "documentNo" | "createdAt" | "whatsappVerified" | "name">) => Promise<Customer>;
   verifyWhatsapp: (customerId: string) => void;
@@ -289,6 +293,7 @@ export const useStore = create<DemoState>()(
       maintenanceRemindersSent: {},
       aliasFieldsEnabled: true,
       permissionsVersion: 0,
+      requiredFieldsVersion: 0,
 
       setRole: (role) => set({ role }),
       setBranch: (selectedBranchId) => set({ selectedBranchId }),
@@ -383,6 +388,20 @@ export const useStore = create<DemoState>()(
         resetActionRoles();
         set({ permissionsVersion: state.permissionsVersion + 1 });
         return result(true, "Role permissions reset to defaults.");
+      },
+      setFieldRequired: (entity, key, required) => {
+        const state = get();
+        if (!canPerform(state.role, "manage_settings")) return result(false, "Your role cannot change required fields.");
+        setFieldRequiredRaw(entity, key, required);
+        set({ requiredFieldsVersion: state.requiredFieldsVersion + 1 });
+        return result(true, "Required fields updated.");
+      },
+      resetRequiredFields: () => {
+        const state = get();
+        if (!canPerform(state.role, "manage_settings")) return result(false, "Your role cannot change required fields.");
+        resetRequiredFieldsRaw();
+        set({ requiredFieldsVersion: state.requiredFieldsVersion + 1 });
+        return result(true, "Required fields reset to defaults.");
       },
 
       addCustomer: async (input) => {

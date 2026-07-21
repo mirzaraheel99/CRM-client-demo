@@ -8,7 +8,7 @@ import { formatDate } from "../../lib/utils";
 import { toast } from "../../lib/toast";
 import { useSort } from "../../lib/useSort";
 import { canPerform } from "../../lib/permissions";
-import { isFieldRequired, getMissingRequiredFields } from "../../lib/requiredFields";
+import { isFieldRequired, getMissingCustomerFields } from "../../lib/requiredFields";
 import { bi } from "../../lib/domainAr";
 import type { Customer, CustomerType, Gender, PreferredLanguage } from "../../lib/types";
 
@@ -35,6 +35,8 @@ function emptyCustomerForm(branchId: string) {
     customerType: "individual" as CustomerType,
     companyName: "",
     crNumber: "",
+    vatNumber: "",
+    contactPersonName: "",
     phone: "",
     homePhone: "",
     whatsapp: "",
@@ -102,25 +104,31 @@ export default function CustomerList() {
   const pagedRows = rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   async function submit() {
-    if (getMissingRequiredFields("customer", form).length > 0) return;
+    if (getMissingCustomerFields(form.customerType, form).length > 0) return;
+    const isCorporate = form.customerType === "corporate";
     const existing = customers.find((customer) => customer.phone.replace(/\D/g, "") === form.phone.replace(/\D/g, ""));
     const saved = await addCustomer({
       ...form,
-      grandfatherName: form.grandfatherName || undefined,
-      firstNameAr: form.firstNameAr.trim() || undefined,
-      fatherNameAr: form.fatherNameAr.trim() || undefined,
-      grandfatherNameAr: form.grandfatherNameAr.trim() || undefined,
-      familyNameAr: form.familyNameAr.trim() || undefined,
+      firstName: isCorporate ? undefined : form.firstName,
+      fatherName: isCorporate ? undefined : form.fatherName,
+      grandfatherName: isCorporate ? undefined : (form.grandfatherName || undefined),
+      familyName: isCorporate ? undefined : form.familyName,
+      firstNameAr: isCorporate ? undefined : (form.firstNameAr.trim() || undefined),
+      fatherNameAr: isCorporate ? undefined : (form.fatherNameAr.trim() || undefined),
+      grandfatherNameAr: isCorporate ? undefined : (form.grandfatherNameAr.trim() || undefined),
+      familyNameAr: isCorporate ? undefined : (form.familyNameAr.trim() || undefined),
       homePhone: form.homePhone || undefined,
       whatsapp: form.whatsapp.trim() || form.phone,
-      nationalId: form.nationalId || undefined,
-      nationality: form.nationality || undefined,
+      nationalId: isCorporate ? undefined : (form.nationalId || undefined),
+      nationality: isCorporate ? undefined : (form.nationality || undefined),
       preferredLanguage: form.preferredLanguage || undefined,
-      dateOfBirth: form.dateOfBirth || undefined,
-      gender: form.gender || undefined,
+      dateOfBirth: isCorporate ? undefined : (form.dateOfBirth || undefined),
+      gender: isCorporate ? undefined : (form.gender || undefined),
       notes: form.notes || undefined,
-      companyName: form.customerType === "corporate" ? form.companyName : undefined,
-      crNumber: form.customerType === "corporate" ? form.crNumber : undefined,
+      companyName: isCorporate ? form.companyName : undefined,
+      crNumber: isCorporate ? form.crNumber : undefined,
+      vatNumber: isCorporate ? form.vatNumber : undefined,
+      contactPersonName: isCorporate ? (form.contactPersonName || undefined) : undefined,
     });
     setForm(emptyCustomerForm(defaultBranchId));
     setFormTab("Name");
@@ -170,30 +178,46 @@ export default function CustomerList() {
                   <option value="corporate">{bi("Corporate", "شركة")}</option>
                 </Select>
               </Field>
-              <p className="text-xs text-[var(--color-ink-muted)]">{bi("Saudi naming convention: given name, father's name, grandfather's name (optional), family name.", "الترتيب السعودي للاسم: الاسم الأول، اسم الأب، اسم الجد (اختياري)، اسم العائلة.")}{aliasFieldsEnabled && bi(" Add the Arabic alias alongside each name if needed.", " أضف الاسم بالعربية بجانب كل اسم عند الحاجة.")}</p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field label={bi("First name", "الاسم الأول")} required={isFieldRequired("customer", "firstName")}>
-                  <Input value={form.firstName} onChange={(event) => setForm({ ...form, firstName: event.target.value })} />
-                  {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder="الاسم بالعربية" value={form.firstNameAr} onChange={(event) => setForm({ ...form, firstNameAr: event.target.value })} />}
-                </Field>
-                <Field label={bi("Father's name", "اسم الأب")} required={isFieldRequired("customer", "fatherName")}>
-                  <Input value={form.fatherName} onChange={(event) => setForm({ ...form, fatherName: event.target.value })} />
-                  {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder="الاسم بالعربية" value={form.fatherNameAr} onChange={(event) => setForm({ ...form, fatherNameAr: event.target.value })} />}
-                </Field>
-                <Field label={bi("Grandfather's name (optional)", "اسم الجد (اختياري)")}>
-                  <Input value={form.grandfatherName} onChange={(event) => setForm({ ...form, grandfatherName: event.target.value })} />
-                  {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder="الاسم بالعربية" value={form.grandfatherNameAr} onChange={(event) => setForm({ ...form, grandfatherNameAr: event.target.value })} />}
-                </Field>
-                <Field label={bi("Family name", "اسم العائلة")} required={isFieldRequired("customer", "familyName")}>
-                  <Input value={form.familyName} onChange={(event) => setForm({ ...form, familyName: event.target.value })} />
-                  {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder="الاسم بالعربية" value={form.familyNameAr} onChange={(event) => setForm({ ...form, familyNameAr: event.target.value })} />}
-                </Field>
-              </div>
-              {form.customerType === "corporate" && (
-                <div className="grid gap-3 rounded-md bg-black/[0.03] p-3 dark:bg-white/[0.05] sm:grid-cols-2">
-                  <Field label={bi("Company name", "اسم الشركة")}><Input value={form.companyName} onChange={(event) => setForm({ ...form, companyName: event.target.value })} /></Field>
-                  <Field label={bi("CR number", "رقم السجل التجاري")}><Input value={form.crNumber} onChange={(event) => setForm({ ...form, crNumber: event.target.value })} /></Field>
-                </div>
+              {form.customerType === "individual" ? (
+                <>
+                  <p className="text-xs text-[var(--color-ink-muted)]">{bi("Saudi naming convention: given name, father's name, grandfather's name (optional), family name.", "الترتيب السعودي للاسم: الاسم الأول، اسم الأب، اسم الجد (اختياري)، اسم العائلة.")}{aliasFieldsEnabled && bi(" Add the Arabic alias alongside each name if needed.", " أضف الاسم بالعربية بجانب كل اسم عند الحاجة.")}</p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Field label={bi("First name", "الاسم الأول")} required={isFieldRequired("customer", "firstName")}>
+                      <Input value={form.firstName} onChange={(event) => setForm({ ...form, firstName: event.target.value })} />
+                      {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder="الاسم بالعربية" value={form.firstNameAr} onChange={(event) => setForm({ ...form, firstNameAr: event.target.value })} />}
+                    </Field>
+                    <Field label={bi("Father's name", "اسم الأب")} required={isFieldRequired("customer", "fatherName")}>
+                      <Input value={form.fatherName} onChange={(event) => setForm({ ...form, fatherName: event.target.value })} />
+                      {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder="الاسم بالعربية" value={form.fatherNameAr} onChange={(event) => setForm({ ...form, fatherNameAr: event.target.value })} />}
+                    </Field>
+                    <Field label={bi("Grandfather's name (optional)", "اسم الجد (اختياري)")}>
+                      <Input value={form.grandfatherName} onChange={(event) => setForm({ ...form, grandfatherName: event.target.value })} />
+                      {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder="الاسم بالعربية" value={form.grandfatherNameAr} onChange={(event) => setForm({ ...form, grandfatherNameAr: event.target.value })} />}
+                    </Field>
+                    <Field label={bi("Family name", "اسم العائلة")} required={isFieldRequired("customer", "familyName")}>
+                      <Input value={form.familyName} onChange={(event) => setForm({ ...form, familyName: event.target.value })} />
+                      {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder="الاسم بالعربية" value={form.familyNameAr} onChange={(event) => setForm({ ...form, familyNameAr: event.target.value })} />}
+                    </Field>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-xs text-[var(--color-ink-muted)]">{bi("Saudi e-invoicing (ZATCA) compliance requires the company's legal name, Commercial Registration number, and VAT registration number for a corporate buyer.", "يتطلب التوافق مع الفوترة الإلكترونية السعودية (زاتكا) الاسم القانوني للشركة ورقم السجل التجاري والرقم الضريبي للمشتري من نوع الشركات.")}</p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Field label={bi("Company name", "اسم الشركة")} required={isFieldRequired("customer", "companyName")}>
+                      <Input value={form.companyName} onChange={(event) => setForm({ ...form, companyName: event.target.value })} />
+                    </Field>
+                    <Field label={bi("CR number (Commercial Registration)", "رقم السجل التجاري")} required={isFieldRequired("customer", "crNumber")}>
+                      <Input value={form.crNumber} onChange={(event) => setForm({ ...form, crNumber: event.target.value })} />
+                    </Field>
+                    <Field label={bi("VAT registration number", "الرقم الضريبي")} required={isFieldRequired("customer", "vatNumber")}>
+                      <Input value={form.vatNumber} onChange={(event) => setForm({ ...form, vatNumber: event.target.value })} placeholder="3XXXXXXXXXXXXX3" />
+                    </Field>
+                    <Field label={bi("Contact person name (optional)", "اسم الشخص المسؤول (اختياري)")} required={isFieldRequired("customer", "contactPersonName")}>
+                      <Input value={form.contactPersonName} onChange={(event) => setForm({ ...form, contactPersonName: event.target.value })} />
+                    </Field>
+                  </div>
+                </>
               )}
             </div>
           )}
@@ -240,7 +264,7 @@ export default function CustomerList() {
             </div>
           )}
 
-          <Button className="w-full justify-center" onClick={submit} disabled={getMissingRequiredFields("customer", form).length > 0}>{bi("Save Customer", "حفظ العميل")}</Button>
+          <Button className="w-full justify-center" onClick={submit} disabled={getMissingCustomerFields(form.customerType, form).length > 0}>{bi("Save Customer", "حفظ العميل")}</Button>
         </div>
       </Modal>
     </div>

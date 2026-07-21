@@ -86,10 +86,10 @@ model RolePermission {
 model Customer {
   id                 String    @id @default(cuid())
   documentNo         String    @unique
-  firstName          String
-  fatherName         String
+  firstName          String?
+  fatherName         String?
   grandfatherName    String?
-  familyName         String
+  familyName         String?
   name               String
   firstNameAr        String?
   fatherNameAr       String?
@@ -107,6 +107,8 @@ model Customer {
   customerType       CustomerType @default(individual)
   companyName        String?
   crNumber           String?
+  vatNumber          String?
+  contactPersonName  String?
   dateOfBirth        DateTime?
   gender             Gender?
   notes              String?

@@ -39,13 +39,15 @@ export interface Customer {
   id: string;
   documentNo: string;
   // Saudi naming convention: given name, father's name, grandfather's name
-  // (commonly omitted), family/tribe name. `name` is the composed full name
-  // kept for display so the many read sites across the app don't need to
+  // (commonly omitted), family/tribe name. Only applies to individual
+  // customers — corporate customers use companyName/crNumber/vatNumber
+  // instead. `name` is the composed full name (or the company name) kept
+  // for display so the many read sites across the app don't need to
   // rebuild it from parts.
-  firstName: string;
-  fatherName: string;
+  firstName?: string;
+  fatherName?: string;
   grandfatherName?: string;
-  familyName: string;
+  familyName?: string;
   name: string;
   // Arabic-script counterparts of the fields above, for staff who read/write
   // Arabic only. `nameAr` is the composed Arabic full name, mirroring `name`.
@@ -65,6 +67,10 @@ export interface Customer {
   customerType: CustomerType;
   companyName?: string;
   crNumber?: string;
+  // Saudi VAT registration number (15 digits, starts/ends with 3) — required
+  // for corporate customers to appear as the buyer on a standard tax invoice.
+  vatNumber?: string;
+  contactPersonName?: string;
   dateOfBirth?: string;
   gender?: Gender;
   notes?: string;

@@ -24,9 +24,13 @@ export const REQUIRED_FIELD_ENTITY_LABEL: Record<RequiredFieldEntity, { en: stri
 
 export const REQUIRED_FIELD_DEFS: Record<RequiredFieldEntity, RequiredFieldDef[]> = {
   customer: [
-    { key: "firstName", label: "First name", labelAr: "الاسم الأول", defaultRequired: true, locked: true },
-    { key: "fatherName", label: "Father's name", labelAr: "اسم الأب", defaultRequired: false },
-    { key: "familyName", label: "Family name", labelAr: "اسم العائلة", defaultRequired: true, locked: true },
+    { key: "firstName", label: "First name (individual)", labelAr: "الاسم الأول (فرد)", defaultRequired: true, locked: true },
+    { key: "fatherName", label: "Father's name (individual)", labelAr: "اسم الأب (فرد)", defaultRequired: false },
+    { key: "familyName", label: "Family name (individual)", labelAr: "اسم العائلة (فرد)", defaultRequired: true, locked: true },
+    { key: "companyName", label: "Company name (corporate)", labelAr: "اسم الشركة (شركة)", defaultRequired: true, locked: true },
+    { key: "crNumber", label: "CR number (corporate)", labelAr: "رقم السجل التجاري (شركة)", defaultRequired: true, locked: true },
+    { key: "vatNumber", label: "VAT registration number (corporate)", labelAr: "الرقم الضريبي (شركة)", defaultRequired: true, locked: true },
+    { key: "contactPersonName", label: "Contact person name (corporate)", labelAr: "اسم الشخص المسؤول (شركة)", defaultRequired: false },
     { key: "phone", label: "Mobile phone", labelAr: "الجوال", defaultRequired: true, locked: true },
     { key: "homePhone", label: "Home phone", labelAr: "الهاتف المنزلي", defaultRequired: false },
     { key: "whatsapp", label: "WhatsApp", labelAr: "واتساب", defaultRequired: false },
@@ -123,4 +127,16 @@ export function getMissingRequiredFields(entity: RequiredFieldEntity, values: Re
     if (typeof value === "string") return !value.trim();
     return value === undefined || value === null || value === "";
   });
+}
+
+// The customer entity's identity fields branch by customerType: an individual
+// customer never has companyName/crNumber/vatNumber, and a corporate customer
+// never has firstName/fatherName/familyName. Excluding whichever branch
+// doesn't apply keeps getMissingRequiredFields from demanding both at once.
+const CUSTOMER_INDIVIDUAL_ONLY_KEYS = ["firstName", "fatherName", "familyName"];
+const CUSTOMER_CORPORATE_ONLY_KEYS = ["companyName", "crNumber", "vatNumber", "contactPersonName"];
+
+export function getMissingCustomerFields(customerType: "individual" | "corporate", values: Record<string, unknown>): RequiredFieldDef[] {
+  const excludedKeys = customerType === "corporate" ? CUSTOMER_INDIVIDUAL_ONLY_KEYS : CUSTOMER_CORPORATE_ONLY_KEYS;
+  return getMissingRequiredFields("customer", values).filter((def) => !excludedKeys.includes(def.key));
 }

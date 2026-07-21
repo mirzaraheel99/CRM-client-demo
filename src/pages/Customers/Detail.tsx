@@ -42,14 +42,24 @@ export default function CustomerDetail() {
           </div>
         </Card>
         <Card>
-          <CardHeader title={bi("Personal details", "البيانات الشخصية")} subtitle="Saudi naming convention and identification" />
+          <CardHeader title={customer.customerType === "corporate" ? bi("Company details", "بيانات الشركة") : bi("Personal details", "البيانات الشخصية")} subtitle={customer.customerType === "corporate" ? "Commercial Registration and VAT identification" : "Saudi naming convention and identification"} />
           <div className="space-y-1.5 text-sm">
-            <p><span className="text-[var(--color-ink-muted)]">{bi("First name", "الاسم الأول")}:</span> {customer.firstName}</p>
-            <p><span className="text-[var(--color-ink-muted)]">{bi("Father's name", "اسم الأب")}:</span> {customer.fatherName}</p>
-            {customer.grandfatherName && <p><span className="text-[var(--color-ink-muted)]">{bi("Grandfather's name", "اسم الجد")}:</span> {customer.grandfatherName}</p>}
-            <p><span className="text-[var(--color-ink-muted)]">{bi("Family name", "اسم العائلة")}:</span> {customer.familyName}</p>
             <p><span className="text-[var(--color-ink-muted)]">{bi("Customer type", "نوع العميل")}:</span> {bi(customer.customerType === "corporate" ? "Corporate" : "Individual", CUSTOMER_TYPE_AR[customer.customerType])}</p>
-            {customer.companyName && <p><span className="text-[var(--color-ink-muted)]">{bi("Company", "الشركة")}:</span> {customer.companyName} {customer.crNumber && `(${customer.crNumber})`}</p>}
+            {customer.customerType === "corporate" ? (
+              <>
+                <p><span className="text-[var(--color-ink-muted)]">{bi("Company name", "اسم الشركة")}:</span> {customer.companyName}</p>
+                <p><span className="text-[var(--color-ink-muted)]">{bi("CR number", "رقم السجل التجاري")}:</span> {customer.crNumber}</p>
+                <p><span className="text-[var(--color-ink-muted)]">{bi("VAT registration number", "الرقم الضريبي")}:</span> {customer.vatNumber}</p>
+                {customer.contactPersonName && <p><span className="text-[var(--color-ink-muted)]">{bi("Contact person", "الشخص المسؤول")}:</span> {customer.contactPersonName}</p>}
+              </>
+            ) : (
+              <>
+                <p><span className="text-[var(--color-ink-muted)]">{bi("First name", "الاسم الأول")}:</span> {customer.firstName}</p>
+                <p><span className="text-[var(--color-ink-muted)]">{bi("Father's name", "اسم الأب")}:</span> {customer.fatherName}</p>
+                {customer.grandfatherName && <p><span className="text-[var(--color-ink-muted)]">{bi("Grandfather's name", "اسم الجد")}:</span> {customer.grandfatherName}</p>}
+                <p><span className="text-[var(--color-ink-muted)]">{bi("Family name", "اسم العائلة")}:</span> {customer.familyName}</p>
+              </>
+            )}
             {customer.nationalId && <p><span className="text-[var(--color-ink-muted)]">{bi("National ID / Iqama", "الهوية / الإقامة")}:</span> {customer.nationalId}</p>}
             {customer.nationality && <p><span className="text-[var(--color-ink-muted)]">{bi("Nationality", "الجنسية")}:</span> {customer.nationality}</p>}
             {customer.gender && <p><span className="text-[var(--color-ink-muted)]">{bi("Gender", "الجنس")}:</span> {bi(customer.gender === "male" ? "Male" : "Female", GENDER_AR[customer.gender])}</p>}

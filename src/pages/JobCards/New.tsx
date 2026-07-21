@@ -66,7 +66,8 @@ export default function NewJobCard() {
   const customerReady = customerId === NEW_CUSTOMER
     ? Boolean(branchId) && getMissingRequiredFields("customer", newCustomer).length === 0
     : Boolean(customerId);
-  const serviceOrderReady = getMissingRequiredFields("serviceOrder", orderDetails).length === 0;
+  const isCorporateBuyer = customerId !== NEW_CUSTOMER && customers.find((candidate) => candidate.id === customerId)?.customerType === "corporate";
+  const serviceOrderReady = getMissingRequiredFields("serviceOrder", orderDetails).filter((def) => def.key !== "buyerVatNumber" || isCorporateBuyer).length === 0;
   const lineReady = (line: IntakeLine) => {
     if (!line.problem.trim() || line.problem.trim().length <= 3) return false;
     if (getMissingRequiredFields("jobCardLine", line).length > 0) return false;
@@ -223,7 +224,7 @@ export default function NewJobCard() {
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label={bi("Short address code", "الرمز المختصر للعنوان")} required={isFieldRequired("serviceOrder", "shortAddressCode")}><Input value={orderDetails.shortAddressCode} onChange={(event) => setOrderDetails({ ...orderDetails, shortAddressCode: event.target.value })} placeholder="RAFH3552" /></Field>
           <Field label={bi("Building no.", "رقم المبنى")} required={isFieldRequired("serviceOrder", "buildingNo")}><Input value={orderDetails.buildingNo} onChange={(event) => setOrderDetails({ ...orderDetails, buildingNo: event.target.value })} /></Field>
-          <Field label={bi("Unit no. (optional)", "رقم الوحدة (اختياري)")}><Input value={orderDetails.unitNo} onChange={(event) => setOrderDetails({ ...orderDetails, unitNo: event.target.value })} /></Field>
+          <Field label={bi("Unit no. (optional)", "رقم الوحدة (اختياري)")} required={isFieldRequired("serviceOrder", "unitNo")}><Input value={orderDetails.unitNo} onChange={(event) => setOrderDetails({ ...orderDetails, unitNo: event.target.value })} /></Field>
           <Field label={bi("District", "الحي")} required={isFieldRequired("serviceOrder", "district")}><Input value={orderDetails.district} onChange={(event) => setOrderDetails({ ...orderDetails, district: event.target.value })} /></Field>
           <Field label={bi("Postal code", "الرمز البريدي")} required={isFieldRequired("serviceOrder", "postalCode")}><Input value={orderDetails.postalCode} onChange={(event) => setOrderDetails({ ...orderDetails, postalCode: event.target.value })} /></Field>
           <Field label={bi("Additional no.", "الرقم الإضافي")} required={isFieldRequired("serviceOrder", "additionalNo")}><Input value={orderDetails.additionalNo} onChange={(event) => setOrderDetails({ ...orderDetails, additionalNo: event.target.value })} /></Field>
@@ -244,7 +245,7 @@ export default function NewJobCard() {
           </Field>
         </div>
         {selectedExistingCustomer?.customerType === "corporate" && (
-          <Field label={bi("Buyer VAT number", "الرقم الضريبي للمشتري")}><Input value={orderDetails.buyerVatNumber} onChange={(event) => setOrderDetails({ ...orderDetails, buyerVatNumber: event.target.value })} placeholder="3xxxxxxxxx00003" /></Field>
+          <Field label={bi("Buyer VAT number", "الرقم الضريبي للمشتري")} required={isFieldRequired("serviceOrder", "buyerVatNumber")}><Input value={orderDetails.buyerVatNumber} onChange={(event) => setOrderDetails({ ...orderDetails, buyerVatNumber: event.target.value })} placeholder="3xxxxxxxxx00003" /></Field>
         )}
       </Card>
 

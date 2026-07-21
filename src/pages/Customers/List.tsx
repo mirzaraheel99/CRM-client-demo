@@ -190,7 +190,7 @@ export default function CustomerList() {
                       <Input value={form.fatherName} onChange={(event) => setForm({ ...form, fatherName: event.target.value })} />
                       {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder="الاسم بالعربية" value={form.fatherNameAr} onChange={(event) => setForm({ ...form, fatherNameAr: event.target.value })} />}
                     </Field>
-                    <Field label={bi("Grandfather's name (optional)", "اسم الجد (اختياري)")}>
+                    <Field label={bi("Grandfather's name (optional)", "اسم الجد (اختياري)")} required={isFieldRequired("customer", "grandfatherName")}>
                       <Input value={form.grandfatherName} onChange={(event) => setForm({ ...form, grandfatherName: event.target.value })} />
                       {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder="الاسم بالعربية" value={form.grandfatherNameAr} onChange={(event) => setForm({ ...form, grandfatherNameAr: event.target.value })} />}
                     </Field>
@@ -242,17 +242,17 @@ export default function CustomerList() {
           {formTab === "Additional" && (
             <div className="space-y-3">
               <div className="grid gap-3 sm:grid-cols-2">
-                <Field label={bi("National ID / Iqama No.", "رقم الهوية / الإقامة")}><Input value={form.nationalId} onChange={(event) => setForm({ ...form, nationalId: event.target.value })} /></Field>
-                <Field label={bi("Nationality", "الجنسية")}><Input value={form.nationality} onChange={(event) => setForm({ ...form, nationality: event.target.value })} placeholder="Saudi" /></Field>
-                <Field label={bi("Preferred language", "اللغة المفضلة")}>
+                <Field label={bi("National ID / Iqama No.", "رقم الهوية / الإقامة")} required={form.customerType === "individual" && isFieldRequired("customer", "nationalId")}><Input value={form.nationalId} onChange={(event) => setForm({ ...form, nationalId: event.target.value })} /></Field>
+                <Field label={bi("Nationality", "الجنسية")} required={form.customerType === "individual" && isFieldRequired("customer", "nationality")}><Input value={form.nationality} onChange={(event) => setForm({ ...form, nationality: event.target.value })} placeholder="Saudi" /></Field>
+                <Field label={bi("Preferred language", "اللغة المفضلة")} required={isFieldRequired("customer", "preferredLanguage")}>
                   <Select value={form.preferredLanguage} onChange={(event) => setForm({ ...form, preferredLanguage: event.target.value as PreferredLanguage | "" })}>
                     <option value="">{bi("Not set", "غير محدد")}</option>
                     <option value="ar">{bi("Arabic", "العربية")}</option>
                     <option value="en">{bi("English", "الإنجليزية")}</option>
                   </Select>
                 </Field>
-                <Field label={bi("Date of birth", "تاريخ الميلاد")}><Input type="date" value={form.dateOfBirth} onChange={(event) => setForm({ ...form, dateOfBirth: event.target.value })} /></Field>
-                <Field label={bi("Gender", "الجنس")}>
+                <Field label={bi("Date of birth", "تاريخ الميلاد")} required={form.customerType === "individual" && isFieldRequired("customer", "dateOfBirth")}><Input type="date" value={form.dateOfBirth} onChange={(event) => setForm({ ...form, dateOfBirth: event.target.value })} /></Field>
+                <Field label={bi("Gender", "الجنس")} required={form.customerType === "individual" && isFieldRequired("customer", "gender")}>
                   <Select value={form.gender} onChange={(event) => setForm({ ...form, gender: event.target.value as Gender | "" })}>
                     <option value="">{bi("Not specified", "غير محدد")}</option>
                     <option value="male">{bi("Male", "ذكر")}</option>
@@ -260,7 +260,7 @@ export default function CustomerList() {
                   </Select>
                 </Field>
               </div>
-              <Field label={bi("Notes", "ملاحظات")}><Textarea rows={3} value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></Field>
+              <Field label={bi("Notes", "ملاحظات")} required={isFieldRequired("customer", "notes")}><Textarea rows={3} value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></Field>
             </div>
           )}
 

@@ -27,6 +27,7 @@ export const REQUIRED_FIELD_DEFS: Record<RequiredFieldEntity, RequiredFieldDef[]
   customer: [
     { key: "firstName", label: "First name (individual)", labelAr: "الاسم الأول (فرد)", defaultRequired: true, locked: true },
     { key: "fatherName", label: "Father's name (individual)", labelAr: "اسم الأب (فرد)", defaultRequired: false },
+    { key: "grandfatherName", label: "Grandfather's name (individual)", labelAr: "اسم الجد (فرد)", defaultRequired: false },
     { key: "familyName", label: "Family name (individual)", labelAr: "اسم العائلة (فرد)", defaultRequired: true, locked: true },
     { key: "companyName", label: "Company name (corporate)", labelAr: "اسم الشركة (شركة)", defaultRequired: true, locked: true },
     { key: "crNumber", label: "CR number (corporate)", labelAr: "رقم السجل التجاري (شركة)", defaultRequired: true, locked: true },
@@ -37,16 +38,32 @@ export const REQUIRED_FIELD_DEFS: Record<RequiredFieldEntity, RequiredFieldDef[]
     { key: "whatsapp", label: "WhatsApp", labelAr: "واتساب", defaultRequired: false },
     { key: "email", label: "Email", labelAr: "البريد الإلكتروني", defaultRequired: false },
     { key: "address", label: "Address", labelAr: "العنوان", defaultRequired: false },
+    { key: "nationalId", label: "National ID / Iqama no.", labelAr: "رقم الهوية / الإقامة", defaultRequired: false },
+    { key: "nationality", label: "Nationality", labelAr: "الجنسية", defaultRequired: false },
+    { key: "preferredLanguage", label: "Preferred language", labelAr: "اللغة المفضلة", defaultRequired: false },
+    { key: "dateOfBirth", label: "Date of birth", labelAr: "تاريخ الميلاد", defaultRequired: false },
+    { key: "gender", label: "Gender", labelAr: "الجنس", defaultRequired: false },
+    { key: "notes", label: "Notes", labelAr: "ملاحظات", defaultRequired: false },
   ],
   appliance: [
     { key: "brandId", label: "Brand", labelAr: "العلامة التجارية", defaultRequired: true, locked: true },
+    { key: "category", label: "Category", labelAr: "الفئة", defaultRequired: false },
     { key: "model", label: "Model", labelAr: "الطراز", defaultRequired: true, locked: true },
     { key: "serialNo", label: "Serial / unit number", labelAr: "الرقم التسلسلي", defaultRequired: true, locked: true },
     { key: "purchaseDate", label: "Purchase date", labelAr: "تاريخ الشراء", defaultRequired: true, locked: true },
     { key: "imeiNo", label: "IMEI", labelAr: "الآيمي", defaultRequired: false },
     { key: "purchaseInvoiceNo", label: "Purchase invoice no.", labelAr: "رقم فاتورة الشراء", defaultRequired: false },
     { key: "retailerName", label: "Retailer / dealer name", labelAr: "اسم المتجر / الموزع", defaultRequired: false },
+    { key: "purchasePrice", label: "Purchase price", labelAr: "سعر الشراء", defaultRequired: false },
+    { key: "amcExpiryDate", label: "AMC / extended warranty expiry", labelAr: "تاريخ انتهاء عقد الصيانة", defaultRequired: false },
+    { key: "sasoCertNo", label: "SASO certification no.", labelAr: "رقم شهادة سابر", defaultRequired: false },
+    { key: "energyRating", label: "Energy efficiency rating", labelAr: "تصنيف كفاءة الطاقة", defaultRequired: false },
+    { key: "countryOfManufacture", label: "Country of manufacture", labelAr: "بلد الصنع", defaultRequired: false },
+    { key: "color", label: "Color", labelAr: "اللون", defaultRequired: false },
+    { key: "specification", label: "Specification / capacity", labelAr: "المواصفات / السعة", defaultRequired: false },
+    { key: "installationDate", label: "Installation date", labelAr: "تاريخ التركيب", defaultRequired: false },
     { key: "installedLocation", label: "Installed location at site", labelAr: "موقع التركيب في الموقع", defaultRequired: false },
+    { key: "photoUrl", label: "Product / serial-plate photo", labelAr: "صورة المنتج / لوحة الرقم التسلسلي", defaultRequired: false },
   ],
   jobCardLine: [
     { key: "problem", label: "Reported problem", labelAr: "المشكلة المُبلّغ عنها", defaultRequired: true, locked: true },
@@ -55,12 +72,14 @@ export const REQUIRED_FIELD_DEFS: Record<RequiredFieldEntity, RequiredFieldDef[]
   serviceOrder: [
     { key: "shortAddressCode", label: "Short address code", labelAr: "الرمز المختصر للعنوان", defaultRequired: false },
     { key: "buildingNo", label: "Building no.", labelAr: "رقم المبنى", defaultRequired: false },
+    { key: "unitNo", label: "Unit no.", labelAr: "رقم الوحدة", defaultRequired: false },
     { key: "district", label: "District", labelAr: "الحي", defaultRequired: false },
     { key: "postalCode", label: "Postal code", labelAr: "الرمز البريدي", defaultRequired: false },
     { key: "additionalNo", label: "Additional no.", labelAr: "الرقم الإضافي", defaultRequired: false },
     { key: "requestSource", label: "Request source", labelAr: "مصدر الطلب", defaultRequired: false },
     { key: "preferredDate", label: "Preferred date", labelAr: "التاريخ المفضل", defaultRequired: false },
     { key: "preferredTimeSlot", label: "Preferred time slot", labelAr: "الفترة الزمنية المفضلة", defaultRequired: false },
+    { key: "buyerVatNumber", label: "Buyer VAT number (corporate)", labelAr: "الرقم الضريبي للمشتري (شركة)", defaultRequired: false },
   ],
   // These gate whether the job can advance past that stage on the Job Card
   // Detail page, in addition to just showing an asterisk — turning one off
@@ -145,7 +164,7 @@ export function getMissingRequiredFields(entity: RequiredFieldEntity, values: Re
 // customer never has companyName/crNumber/vatNumber, and a corporate customer
 // never has firstName/fatherName/familyName. Excluding whichever branch
 // doesn't apply keeps getMissingRequiredFields from demanding both at once.
-const CUSTOMER_INDIVIDUAL_ONLY_KEYS = ["firstName", "fatherName", "familyName"];
+const CUSTOMER_INDIVIDUAL_ONLY_KEYS = ["firstName", "fatherName", "grandfatherName", "familyName", "nationalId", "nationality", "dateOfBirth", "gender"];
 const CUSTOMER_CORPORATE_ONLY_KEYS = ["companyName", "crNumber", "vatNumber", "contactPersonName"];
 
 export function getMissingCustomerFields(customerType: "individual" | "corporate", values: Record<string, unknown>): RequiredFieldDef[] {

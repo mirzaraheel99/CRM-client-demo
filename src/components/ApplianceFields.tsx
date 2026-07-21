@@ -19,7 +19,7 @@ export function ApplianceBasicFields({ value, onChange, brands, aliasFieldsEnabl
           {brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
         </Select>
       </Field>
-      <Field label={bi("Category", "الفئة")}>
+      <Field label={bi("Category", "الفئة")} required={isFieldRequired("appliance", "category")}>
         <Select value={value.category} onChange={(event) => onChange({ category: event.target.value as ApplianceCategory })}>
           {APPLIANCE_CATEGORIES.map((item) => <option key={item} value={item}>{bi(item, APPLIANCE_CATEGORY_AR[item])}</option>)}
         </Select>
@@ -41,8 +41,8 @@ export function AppliancePurchaseFields({ value, onChange }: FieldGroupProps) {
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label={bi("Purchase invoice / receipt no.", "رقم فاتورة / إيصال الشراء")} required={isFieldRequired("appliance", "purchaseInvoiceNo")}><Input value={value.purchaseInvoiceNo} onChange={(event) => onChange({ purchaseInvoiceNo: event.target.value })} /></Field>
         <Field label={bi("Retailer / dealer name", "اسم المتجر / الموزع")} required={isFieldRequired("appliance", "retailerName")}><Input value={value.retailerName} onChange={(event) => onChange({ retailerName: event.target.value })} /></Field>
-        <Field label={bi("Purchase price (SAR)", "سعر الشراء (ريال)")}><Input type="number" min="0" value={value.purchasePrice} onChange={(event) => onChange({ purchasePrice: event.target.value })} /></Field>
-        {value.amcActive && <Field label={bi("AMC / extended warranty expiry", "تاريخ انتهاء عقد الصيانة / الضمان الممدد")}><Input type="date" value={value.amcExpiryDate} onChange={(event) => onChange({ amcExpiryDate: event.target.value })} /></Field>}
+        <Field label={bi("Purchase price (SAR)", "سعر الشراء (ريال)")} required={isFieldRequired("appliance", "purchasePrice")}><Input type="number" min="0" value={value.purchasePrice} onChange={(event) => onChange({ purchasePrice: event.target.value })} /></Field>
+        {value.amcActive && <Field label={bi("AMC / extended warranty expiry", "تاريخ انتهاء عقد الصيانة / الضمان الممدد")} required={isFieldRequired("appliance", "amcExpiryDate")}><Input type="date" value={value.amcExpiryDate} onChange={(event) => onChange({ amcExpiryDate: event.target.value })} /></Field>}
       </div>
       <label className="flex items-center gap-2 text-sm text-[var(--color-ink-secondary)]">
         <input type="checkbox" checked={value.amcActive} onChange={(event) => onChange({ amcActive: event.target.checked })} className="h-4 w-4 rounded [border-color:var(--color-border)]" />
@@ -55,17 +55,17 @@ export function AppliancePurchaseFields({ value, onChange }: FieldGroupProps) {
 export function ApplianceComplianceFields({ value, onChange }: FieldGroupProps) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
-      <Field label={bi("SASO certification no.", "رقم شهادة سابر")}><Input value={value.sasoCertNo} onChange={(event) => onChange({ sasoCertNo: event.target.value })} /></Field>
-      <Field label={bi("Energy efficiency rating", "تصنيف كفاءة الطاقة")}>
+      <Field label={bi("SASO certification no.", "رقم شهادة سابر")} required={isFieldRequired("appliance", "sasoCertNo")}><Input value={value.sasoCertNo} onChange={(event) => onChange({ sasoCertNo: event.target.value })} /></Field>
+      <Field label={bi("Energy efficiency rating", "تصنيف كفاءة الطاقة")} required={isFieldRequired("appliance", "energyRating")}>
         <Select value={value.energyRating} onChange={(event) => onChange({ energyRating: event.target.value as ApplianceFormState["energyRating"] })}>
           <option value="">{bi("Not set", "غير محدد")}</option>
           {(["1", "2", "3", "4", "5"] as const).map((n) => <option key={n} value={n}>{"★".repeat(Number(n))} ({n})</option>)}
         </Select>
       </Field>
-      <Field label={bi("Country of manufacture", "بلد الصنع")}><Input value={value.countryOfManufacture} onChange={(event) => onChange({ countryOfManufacture: event.target.value })} /></Field>
-      <Field label={bi("Color", "اللون")}><Input value={value.color} onChange={(event) => onChange({ color: event.target.value })} /></Field>
-      <Field label={bi("Specification / capacity", "المواصفات / السعة")}><Input value={value.specification} onChange={(event) => onChange({ specification: event.target.value })} placeholder="e.g. 1.5 Ton, 18 Cu.Ft, 8 Kg" /></Field>
-      <Field label={bi("Installation date", "تاريخ التركيب")}><Input type="date" value={value.installationDate} onChange={(event) => onChange({ installationDate: event.target.value })} /></Field>
+      <Field label={bi("Country of manufacture", "بلد الصنع")} required={isFieldRequired("appliance", "countryOfManufacture")}><Input value={value.countryOfManufacture} onChange={(event) => onChange({ countryOfManufacture: event.target.value })} /></Field>
+      <Field label={bi("Color", "اللون")} required={isFieldRequired("appliance", "color")}><Input value={value.color} onChange={(event) => onChange({ color: event.target.value })} /></Field>
+      <Field label={bi("Specification / capacity", "المواصفات / السعة")} required={isFieldRequired("appliance", "specification")}><Input value={value.specification} onChange={(event) => onChange({ specification: event.target.value })} placeholder="e.g. 1.5 Ton, 18 Cu.Ft, 8 Kg" /></Field>
+      <Field label={bi("Installation date", "تاريخ التركيب")} required={isFieldRequired("appliance", "installationDate")}><Input type="date" value={value.installationDate} onChange={(event) => onChange({ installationDate: event.target.value })} /></Field>
     </div>
   );
 }
@@ -74,7 +74,7 @@ export function ApplianceSiteFields({ value, onChange }: FieldGroupProps) {
   return (
     <div className="space-y-3">
       <Field label={bi("Installed location at site", "موقع التركيب في الموقع")} required={isFieldRequired("appliance", "installedLocation")}><Input value={value.installedLocation} onChange={(event) => onChange({ installedLocation: event.target.value })} placeholder="e.g. Majlis, 2nd floor" /></Field>
-      <Field label={bi("Product / serial-plate photo", "صورة المنتج / لوحة الرقم التسلسلي")}>
+      <Field label={bi("Product / serial-plate photo", "صورة المنتج / لوحة الرقم التسلسلي")} required={isFieldRequired("appliance", "photoUrl")}>
         <input
           type="file"
           accept="image/*"

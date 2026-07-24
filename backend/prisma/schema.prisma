@@ -37,15 +37,6 @@ enum PreferredLanguage {
   en
 }
 
-enum ApplianceCategory {
-  AC
-  Refrigerator
-  Washer
-  Mobile
-  TV
-  Microwave
-}
-
 // Stage names, statuses, and other short display strings with spaces
 // ("Warranty Validation", "In Diagnosis", "Ready for Handover", ...) are kept
 // as plain String columns (validated by Zod in the API layer) rather than
@@ -132,12 +123,25 @@ model Brand {
   appliances     Appliance[]
 }
 
+// Appliance category is a soft reference by name (Appliance.category is a
+// plain String, not a FK) rather than a hard relation, so admins can add a
+// brand-new category from the Categories page without a schema migration.
+model Category {
+  id                    String   @id @default(cuid())
+  name                  String   @unique
+  nameAr                String?
+  code                  String?
+  description           String?
+  defaultWarrantyMonths Int?
+  createdAt             DateTime @default(now())
+}
+
 model Appliance {
   id                String   @id @default(cuid())
   documentNo        String   @unique
   brandId           String
   brand             Brand    @relation(fields: [brandId], references: [id])
-  category          ApplianceCategory
+  category          String
   model             String
   modelAr           String?
   serialNo          String
@@ -179,7 +183,7 @@ model Technician {
   name        String
   nameAr      String?
   phone       String
-  skills      ApplianceCategory[]
+  skills      String[]
   zone        String
   branchId    String
   branch      Branch   @relation(fields: [branchId], references: [id])

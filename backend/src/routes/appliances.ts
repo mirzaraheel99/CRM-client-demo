@@ -3,11 +3,9 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { nextApplianceDocumentNo } from "../lib/documentNo.js";
 
-const APPLIANCE_CATEGORIES = ["AC", "Refrigerator", "Washer", "Mobile", "TV", "Microwave"] as const;
-
 const applianceSchema = z.object({
   brandId: z.string().min(1),
-  category: z.enum(APPLIANCE_CATEGORIES),
+  category: z.string().min(1),
   model: z.string().min(1),
   modelAr: z.string().optional(),
   serialNo: z.string().min(1),

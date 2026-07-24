@@ -70,7 +70,7 @@ export default function JobCardDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const {
-    jobCards, serviceOrders, customers, appliances, applianceTelemetry, brands, technicians, workflows, aliasFieldsEnabled,
+    jobCards, serviceOrders, customers, appliances, applianceTelemetry, brands, categories, technicians, workflows, aliasFieldsEnabled,
     stageHistory, attachments, partsUsed, estimateLineItems, communicationLogs, inventoryItems, inventoryLocations, inventoryStock, purchaseBills, payments, removedParts,
     role, selectedBranchId, advanceStage, assignTechnician, setDiagnosis, approveCustomer, setRepairNotes, setQaApproved,
     setFinalAmount, captureCustomerSignature, confirmAssetHandover, savePurchaseBill, addPartUsed, removePartUsed, addAttachment, sendCommunication,
@@ -356,7 +356,7 @@ export default function JobCardDetail() {
           {addProductForm.applianceId === NEW_PRODUCT_OPTION && (
             <div className="space-y-4 rounded-md bg-black/[0.03] p-3 dark:bg-white/[0.05]">
               <Tabs tabs={ADD_PRODUCT_TABS} active={addProductTab} onChange={setAddProductTab} labels={ADD_PRODUCT_TAB_LABELS} />
-              {addProductTab === "Basic" && <ApplianceBasicFields value={newProductForm} onChange={(patch) => setNewProductForm({ ...newProductForm, ...patch })} brands={brands} aliasFieldsEnabled={aliasFieldsEnabled} />}
+              {addProductTab === "Basic" && <ApplianceBasicFields value={newProductForm} onChange={(patch) => setNewProductForm({ ...newProductForm, ...patch })} brands={brands} categories={categories} aliasFieldsEnabled={aliasFieldsEnabled} />}
               {addProductTab === "Purchase" && <AppliancePurchaseFields value={newProductForm} onChange={(patch) => setNewProductForm({ ...newProductForm, ...patch })} />}
               {addProductTab === "Compliance" && <ApplianceComplianceFields value={newProductForm} onChange={(patch) => setNewProductForm({ ...newProductForm, ...patch })} />}
               {addProductTab === "Site" && <ApplianceSiteFields value={newProductForm} onChange={(patch) => setNewProductForm({ ...newProductForm, ...patch })} />}

@@ -27,8 +27,6 @@ export type ApplianceFormState = {
   photoUrl: string;
 };
 
-export const APPLIANCE_CATEGORIES: ApplianceCategory[] = ["AC", "Refrigerator", "Washer", "Mobile", "TV", "Microwave"];
-
 export function emptyApplianceForm(category: ApplianceCategory = "AC"): ApplianceFormState {
   return {
     brandId: "",

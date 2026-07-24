@@ -17,6 +17,7 @@ const CustomerDetail = lazy(() => import("./pages/Customers/Detail"));
 const ApplianceList = lazy(() => import("./pages/Appliances/List"));
 const ApplianceDetail = lazy(() => import("./pages/Appliances/Detail"));
 const Brands = lazy(() => import("./pages/Brands"));
+const Categories = lazy(() => import("./pages/Categories"));
 const Inventory = lazy(() => import("./pages/Inventory"));
 const AssetCustody = lazy(() => import("./pages/AssetCustody"));
 const Technicians = lazy(() => import("./pages/Technicians"));
@@ -61,6 +62,7 @@ function ShellRoutes() {
           <Route path="/appliances" element={<ApplianceList />} />
           <Route path="/appliances/:id" element={<ApplianceDetail />} />
           <Route path="/brands" element={<Brands />} />
+          <Route path="/categories" element={<Categories />} />
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/asset-custody" element={<AssetCustody />} />
           <Route path="/technicians" element={<Technicians />} />

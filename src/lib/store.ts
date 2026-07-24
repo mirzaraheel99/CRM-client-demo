@@ -7,7 +7,7 @@ import { MESSAGE_TEMPLATES, renderTemplate } from "./templates";
 import { formatDate } from "./utils";
 import { api, ApiError, getToken, setToken } from "./api";
 import type {
-  ActionResult, Customer, Appliance, ApplianceTelemetry, Brand, Technician, InventoryItem, InventoryLocation,
+  ActionResult, Customer, Appliance, ApplianceTelemetry, Brand, Category, Technician, InventoryItem, InventoryLocation,
   InventoryStock, InventoryTransaction, JobCard, JobCardStageHistory,
   JobCardAttachment, JobCardPartUsed, JobCardEstimateLine, EstimateLineKind, PurchaseBill, CommunicationLog,
   WorkflowDefinition, Role, StageName, Branch, Payment, PaymentMethod, Channel, ServiceOrder, RemovedPart, RequestSource, DemoUser,
@@ -35,6 +35,7 @@ interface DemoState {
   branches: Branch[];
   customers: Customer[];
   brands: Brand[];
+  categories: Category[];
   appliances: Appliance[];
   applianceTelemetry: ApplianceTelemetry[];
   technicians: Technician[];
@@ -92,6 +93,9 @@ interface DemoState {
   addAppliance: (appliance: Omit<Appliance, "id" | "documentNo">) => Promise<Appliance>;
   updateAppliance: (id: string, patch: Partial<Omit<Appliance, "id" | "documentNo">>) => Promise<ActionResult>;
   addBrand: (brand: Omit<Brand, "id">) => Promise<Brand>;
+  addCategory: (category: Omit<Category, "id" | "createdAt">) => Promise<ActionResult>;
+  updateCategory: (id: string, patch: Partial<Omit<Category, "id" | "createdAt">>) => Promise<ActionResult>;
+  deleteCategory: (id: string) => Promise<ActionResult>;
   addTechnician: (technician: Omit<Technician, "id">) => Promise<Technician>;
   addInventoryItem: (item: Omit<InventoryItem, "id">) => InventoryItem;
   addInventoryTransaction: (transaction: Omit<InventoryTransaction, "id" | "timestamp">) => ActionResult;
@@ -172,6 +176,7 @@ const initialSlice = () => ({
   branches: [] as Branch[],
   customers: [] as Customer[],
   brands: [] as Brand[],
+  categories: [] as Category[],
   appliances: [] as Appliance[],
   applianceTelemetry: clone(seed.APPLIANCE_TELEMETRY),
   technicians: [] as Technician[],
@@ -346,10 +351,11 @@ export const useStore = create<DemoState>()(
             return fallback;
           }
         };
-        const [branches, customers, brands, technicians, appliances, serviceOrders, jobCardsRaw, removedParts, estimateLineItems] = await Promise.all([
+        const [branches, customers, brands, categories, technicians, appliances, serviceOrders, jobCardsRaw, removedParts, estimateLineItems] = await Promise.all([
           fetchOr<Branch[]>("/api/branches", state.branches),
           fetchOr<Customer[]>("/api/customers", state.customers),
           fetchOr<Brand[]>("/api/brands", state.brands),
+          fetchOr<Category[]>("/api/categories", state.categories),
           fetchOr<Technician[]>("/api/technicians", state.technicians),
           fetchOr<Appliance[]>("/api/appliances", state.appliances),
           fetchOr<ServiceOrder[]>("/api/service-orders", state.serviceOrders),
@@ -361,7 +367,7 @@ export const useStore = create<DemoState>()(
           ? jobCardsRaw.flatMap((job) => job.stageHistory ?? [])
           : state.stageHistory;
         set({
-          branches, customers, brands, technicians, appliances, serviceOrders,
+          branches, customers, brands, categories, technicians, appliances, serviceOrders,
           jobCards: jobCardsRaw, stageHistory, removedParts, estimateLineItems,
           hydrated: true, hydrating: false,
         });
@@ -429,6 +435,33 @@ export const useStore = create<DemoState>()(
         const brand = await api.post<Brand>("/api/brands", input);
         await get().hydrate();
         return brand;
+      },
+      addCategory: async (input) => {
+        try {
+          await api.post<Category>("/api/categories", input);
+          await get().hydrate();
+          return result(true, "Category added.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to add category.");
+        }
+      },
+      updateCategory: async (id, patch) => {
+        try {
+          await api.patch(`/api/categories/${id}`, patch);
+          await get().hydrate();
+          return result(true, "Category updated.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to update category.");
+        }
+      },
+      deleteCategory: async (id) => {
+        try {
+          await api.delete(`/api/categories/${id}`);
+          await get().hydrate();
+          return result(true, "Category deleted.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to delete category.");
+        }
       },
       addTechnician: async (input) => {
         const technician = await api.post<Technician>("/api/technicians", input);

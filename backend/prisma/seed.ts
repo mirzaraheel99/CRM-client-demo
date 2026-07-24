@@ -1,4 +1,4 @@
-import { PrismaClient, type ApplianceCategory } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { DEFAULT_ACTION_ROLES, ALL_ACTIONS } from "../src/lib/permissions.js";
 import { nextCustomerDocumentNo, nextApplianceDocumentNo, nextServiceOrderDocumentNo } from "../src/lib/documentNo.js";
@@ -34,6 +34,17 @@ async function main() {
     }
   }
 
+  await Promise.all(
+    [
+      { name: "AC", nameAr: "مكيف", defaultWarrantyMonths: 12 },
+      { name: "Refrigerator", nameAr: "ثلاجة", defaultWarrantyMonths: 12 },
+      { name: "Washer", nameAr: "غسالة", defaultWarrantyMonths: 12 },
+      { name: "Mobile", nameAr: "جوال", defaultWarrantyMonths: 12 },
+      { name: "TV", nameAr: "تلفاز", defaultWarrantyMonths: 12 },
+      { name: "Microwave", nameAr: "ميكروويف", defaultWarrantyMonths: 12 },
+    ].map((c) => prisma.category.create({ data: c }))
+  );
+
   const brands = await Promise.all(
     [
       { name: "Samsung", warrantyMonths: 12, rules: "Standard 12-month manufacturer warranty from purchase date; OEM claim required for parts over SAR 200." },
@@ -46,7 +57,7 @@ async function main() {
   );
   const [samsung] = brands;
 
-  const technicianSeeds: { name: string; phone: string; skills: ApplianceCategory[]; zone: string; branchId: string }[] = [
+  const technicianSeeds: { name: string; phone: string; skills: string[]; zone: string; branchId: string }[] = [
     { name: "Tariq Al-Dosari", phone: "0501234567", skills: ["AC", "Refrigerator"], zone: "North Riyadh", branchId: riyadh.id },
     { name: "Bilal Al-Mutairi", phone: "0502345678", skills: ["Washer", "Microwave"], zone: "Jeddah Central", branchId: jeddah.id },
     { name: "Salem Al-Amri", phone: "0503456789", skills: ["Mobile", "TV"], zone: "Dammam Corniche", branchId: dammam.id },

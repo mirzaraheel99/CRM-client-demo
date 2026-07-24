@@ -1,4 +1,4 @@
-import { PrismaClient, type ApplianceCategory } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { nextCustomerDocumentNo, nextApplianceDocumentNo, nextServiceOrderDocumentNo } from "../src/lib/documentNo.js";
 import { nextStageRefNo } from "../src/lib/stageRefNo.js";
 
@@ -24,7 +24,7 @@ async function main() {
   if (technicians.length === 0 || brands.length === 0) throw new Error("No technicians/brands found — run `npm run seed` first.");
 
   const cases: {
-    customerName: string; phone: string; category: ApplianceCategory; brandName: string; model: string;
+    customerName: string; phone: string; category: string; brandName: string; model: string;
     jobType: "warranty" | "non_warranty"; problem: string; stage: string; status: string;
     diagnosisNotes?: string; estimateLines?: { kind: string; label: string; qty: number; unitPrice: number }[];
     customerApproved?: boolean; qaApproved?: boolean; assetHandedOver?: boolean;

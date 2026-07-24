@@ -9,7 +9,7 @@ import { JobStatusBadge, JobTypeBadge } from "../../components/StatusBadge";
 import { formatCurrency, formatDate, relativeTime } from "../../lib/utils";
 import { toast } from "../../lib/toast";
 import { canPerform } from "../../lib/permissions";
-import { APPLIANCE_CATEGORY_AR, WARRANTY_STATUS_AR, bi } from "../../lib/domainAr";
+import { categoryNameAr, WARRANTY_STATUS_AR, bi } from "../../lib/domainAr";
 
 const EDIT_TABS = ["Basic", "Purchase", "Compliance", "Site"];
 const EDIT_TAB_LABELS: Record<string, string> = {
@@ -22,7 +22,7 @@ const EDIT_TAB_LABELS: Record<string, string> = {
 export default function ApplianceDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { appliances, applianceTelemetry, customers, brands, jobCards, selectedBranchId, role, aliasFieldsEnabled, updateAppliance } = useStore();
+  const { appliances, applianceTelemetry, customers, brands, categories, jobCards, selectedBranchId, role, aliasFieldsEnabled, updateAppliance } = useStore();
   const [editOpen, setEditOpen] = useState(false);
   const [editTab, setEditTab] = useState("Basic");
   const [editForm, setEditForm] = useState<ApplianceFormState | null>(null);
@@ -67,7 +67,7 @@ export default function ApplianceDetail() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card><p className="text-xs text-[var(--color-ink-muted)]">{bi("Brand", "العلامة التجارية")}</p><p className="mt-1 text-sm font-medium">{brand?.name}</p></Card>
-        <Card><p className="text-xs text-[var(--color-ink-muted)]">{bi("Category", "الفئة")}</p><p className="mt-1 text-sm font-medium">{bi(appliance.category, APPLIANCE_CATEGORY_AR[appliance.category])}</p></Card>
+        <Card><p className="text-xs text-[var(--color-ink-muted)]">{bi("Category", "الفئة")}</p><p className="mt-1 text-sm font-medium">{bi(appliance.category, categoryNameAr(categories, appliance.category))}</p></Card>
         <Card><p className="text-xs text-[var(--color-ink-muted)]">{bi("Serial / IMEI", "الرقم التسلسلي / الآيمي")}</p><p className="mt-1 text-sm font-medium">{appliance.serialNo}{appliance.imeiNo ? ` / ${appliance.imeiNo}` : ""}</p></Card>
         <Card><p className="text-xs text-[var(--color-ink-muted)]">{bi("Warranty Status", "حالة الضمان")}</p><div className="mt-1"><Badge tone={appliance.warrantyStatus === "In Warranty" ? "good" : "neutral"}>{bi(appliance.warrantyStatus, WARRANTY_STATUS_AR[appliance.warrantyStatus])}</Badge></div></Card>
       </div>
@@ -135,7 +135,7 @@ export default function ApplianceDetail() {
         <Modal open={editOpen} onClose={() => setEditOpen(false)} title={bi("Edit Product", "تعديل المنتج")} width="lg">
           <div className="space-y-4">
             <Tabs tabs={EDIT_TABS} active={editTab} onChange={setEditTab} labels={EDIT_TAB_LABELS} />
-            {editTab === "Basic" && <ApplianceBasicFields value={editForm} onChange={(patch) => setEditForm({ ...editForm, ...patch })} brands={brands} aliasFieldsEnabled={aliasFieldsEnabled} />}
+            {editTab === "Basic" && <ApplianceBasicFields value={editForm} onChange={(patch) => setEditForm({ ...editForm, ...patch })} brands={brands} categories={categories} aliasFieldsEnabled={aliasFieldsEnabled} />}
             {editTab === "Purchase" && <AppliancePurchaseFields value={editForm} onChange={(patch) => setEditForm({ ...editForm, ...patch })} />}
             {editTab === "Compliance" && <ApplianceComplianceFields value={editForm} onChange={(patch) => setEditForm({ ...editForm, ...patch })} />}
             {editTab === "Site" && <ApplianceSiteFields value={editForm} onChange={(patch) => setEditForm({ ...editForm, ...patch })} />}

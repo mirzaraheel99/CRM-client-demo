@@ -1,16 +1,15 @@
 import { Field, Input, Select } from "./ui";
-import { APPLIANCE_CATEGORY_AR, bi } from "../lib/domainAr";
-import { APPLIANCE_CATEGORIES } from "../lib/applianceForm";
+import { categoryNameAr, bi } from "../lib/domainAr";
 import { isFieldRequired } from "../lib/requiredFields";
 import type { ApplianceFormState } from "../lib/applianceForm";
-import type { ApplianceCategory, Brand } from "../lib/types";
+import type { ApplianceCategory, Brand, Category } from "../lib/types";
 
 type FieldGroupProps = {
   value: ApplianceFormState;
   onChange: (patch: Partial<ApplianceFormState>) => void;
 };
 
-export function ApplianceBasicFields({ value, onChange, brands, aliasFieldsEnabled }: FieldGroupProps & { brands: Brand[]; aliasFieldsEnabled?: boolean }) {
+export function ApplianceBasicFields({ value, onChange, brands, categories, aliasFieldsEnabled }: FieldGroupProps & { brands: Brand[]; categories: Category[]; aliasFieldsEnabled?: boolean }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <Field label={bi("Brand", "العلامة التجارية")} required={isFieldRequired("appliance", "brandId")}>
@@ -21,7 +20,7 @@ export function ApplianceBasicFields({ value, onChange, brands, aliasFieldsEnabl
       </Field>
       <Field label={bi("Category", "الفئة")} required={isFieldRequired("appliance", "category")}>
         <Select value={value.category} onChange={(event) => onChange({ category: event.target.value as ApplianceCategory })}>
-          {APPLIANCE_CATEGORIES.map((item) => <option key={item} value={item}>{bi(item, APPLIANCE_CATEGORY_AR[item])}</option>)}
+          {categories.map((item) => <option key={item.id} value={item.name}>{bi(item.name, categoryNameAr(categories, item.name))}</option>)}
         </Select>
       </Field>
       <Field label={bi("Model", "الطراز")} required={isFieldRequired("appliance", "model")}>

@@ -44,7 +44,7 @@ function emptyLine(applianceId = ""): IntakeLine {
 export default function NewJobCard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { customers, appliances, brands, branches, technicians, selectedBranchId, createServiceOrder, addCustomer, addAppliance, aliasFieldsEnabled, requiredFieldsVersion } = useStore();
+  const { customers, appliances, brands, categories, branches, technicians, selectedBranchId, createServiceOrder, addCustomer, addAppliance, aliasFieldsEnabled, requiredFieldsVersion } = useStore();
   // requiredFieldsVersion (destructured above) forces a re-render whenever the module-level table in requiredFields.ts changes.
   void requiredFieldsVersion;
   const initialCustomerId = searchParams.get("customerId") ?? "";
@@ -319,7 +319,7 @@ export default function NewJobCard() {
                       <p className="text-sm font-medium">{bi("Register exact product unit", "تسجيل وحدة المنتج بالتحديد")}</p>
                       <Badge tone="brand">{bi("New Product No. after save", "رقم منتج جديد بعد الحفظ")}</Badge>
                     </div>
-                    <ApplianceBasicFields value={line.newProduct} onChange={(patch) => patchNewProduct(line.key, patch)} brands={brands} aliasFieldsEnabled={aliasFieldsEnabled} />
+                    <ApplianceBasicFields value={line.newProduct} onChange={(patch) => patchNewProduct(line.key, patch)} brands={brands} categories={categories} aliasFieldsEnabled={aliasFieldsEnabled} />
                     <div className="border-t pt-3 [border-color:var(--color-border)]">
                       <p className="mb-2 text-xs font-semibold text-[var(--color-ink-secondary)]">{bi("Purchase & warranty", "الشراء والضمان")}</p>
                       <AppliancePurchaseFields value={line.newProduct} onChange={(patch) => patchNewProduct(line.key, patch)} />

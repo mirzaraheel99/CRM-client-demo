@@ -1,4 +1,4 @@
-import type { JobStatus, JobType, StageName, ApplianceCategory, Role, CustomerType, Gender, PreferredLanguage, RequestSource } from "./types";
+import type { JobStatus, JobType, StageName, Role, CustomerType, Gender, PreferredLanguage, RequestSource } from "./types";
 
 // Arabic aliases for operational vocabulary that appears throughout the app —
 // separate from the customer-facing per-item alias in InventoryItem.nameAr.
@@ -33,7 +33,10 @@ export const STAGE_NAME_AR: Record<StageName, string> = {
   Delivered: "تم التسليم",
 };
 
-export const APPLIANCE_CATEGORY_AR: Record<ApplianceCategory, string> = {
+// Fallback Arabic names for the six original built-in categories. Categories
+// created later via the Categories admin page carry their own nameAr instead
+// — see categoryNameAr() below, which prefers that over this dictionary.
+export const APPLIANCE_CATEGORY_AR: Record<string, string> = {
   AC: "مكيف",
   Refrigerator: "ثلاجة",
   Washer: "غسالة",
@@ -41,6 +44,10 @@ export const APPLIANCE_CATEGORY_AR: Record<ApplianceCategory, string> = {
   TV: "تلفاز",
   Microwave: "ميكروويف",
 };
+
+export function categoryNameAr(categories: { name: string; nameAr?: string }[], name: string): string {
+  return categories.find((c) => c.name === name)?.nameAr ?? APPLIANCE_CATEGORY_AR[name] ?? name;
+}
 
 export const ROLE_AR: Record<Role, string> = {
   front_desk: "الاستقبال",

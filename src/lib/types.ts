@@ -87,7 +87,20 @@ export interface Brand {
   rules: string;
 }
 
-export type ApplianceCategory = "AC" | "Refrigerator" | "Washer" | "Mobile" | "TV" | "Microwave";
+// A soft reference by name (Appliance.category, Technician.skills are plain
+// strings, not a foreign key) — admins can add a new category at runtime
+// from the Categories page without any schema change.
+export interface Category {
+  id: string;
+  name: string;
+  nameAr?: string;
+  code?: string;
+  description?: string;
+  defaultWarrantyMonths?: number;
+  createdAt: string;
+}
+
+export type ApplianceCategory = string;
 
 // Saudi Energy Efficiency Program (SEEP) star rating shown on the appliance label.
 export type EnergyRating = 1 | 2 | 3 | 4 | 5;

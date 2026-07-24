@@ -2,13 +2,11 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 
-const APPLIANCE_CATEGORIES = ["AC", "Refrigerator", "Washer", "Mobile", "TV", "Microwave"] as const;
-
 const technicianSchema = z.object({
   name: z.string().min(1),
   nameAr: z.string().optional(),
   phone: z.string().min(1),
-  skills: z.array(z.enum(APPLIANCE_CATEGORIES)).min(1),
+  skills: z.array(z.string()).min(1),
   zone: z.string().min(1),
   branchId: z.string().min(1),
   status: z.enum(["Available", "On Job", "Off Duty"]).default("Available"),

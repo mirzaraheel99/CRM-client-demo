@@ -5,9 +5,8 @@ import { toast } from "../lib/toast";
 import type { ApplianceCategory } from "../lib/types";
 import { filterByBranch } from "../lib/selectors";
 import { fallbackDocumentNo } from "../lib/utils";
-import { APPLIANCE_CATEGORY_AR, TECHNICIAN_STATUS_AR, bi } from "../lib/domainAr";
+import { categoryNameAr, TECHNICIAN_STATUS_AR, bi } from "../lib/domainAr";
 
-const CATEGORIES: ApplianceCategory[] = ["AC", "Refrigerator", "Washer", "Mobile", "TV", "Microwave"];
 const TABS = ["Technician List", "Allocation Calendar"];
 const TAB_LABELS: Record<string, string> = {
   "Technician List": bi("Technician List", "قائمة الفنيين"),
@@ -15,7 +14,7 @@ const TAB_LABELS: Record<string, string> = {
 };
 
 export default function Technicians() {
-  const { technicians, jobCards, customers, branches, selectedBranchId, addTechnician, aliasFieldsEnabled } = useStore();
+  const { technicians, jobCards, customers, branches, categories, selectedBranchId, addTechnician, aliasFieldsEnabled } = useStore();
   const [tab, setTab] = useState(TABS[0]);
   const [open, setOpen] = useState(false);
   const defaultBranchId = selectedBranchId === "all" ? branches[0]?.id ?? "" : selectedBranchId;
@@ -73,7 +72,7 @@ export default function Technicians() {
                       <Badge tone={t.status === "Available" ? "good" : t.status === "On Job" ? "warning" : "neutral"} >{bi(t.status, TECHNICIAN_STATUS_AR[t.status])}</Badge>
                     </div>
                     <div className="flex flex-wrap gap-1">
-                      {t.skills.map((s) => <Badge key={s} tone="brand">{bi(s, APPLIANCE_CATEGORY_AR[s])}</Badge>)}
+                      {t.skills.map((s) => <Badge key={s} tone="brand">{bi(s, categoryNameAr(categories, s))}</Badge>)}
                     </div>
                     <p className="text-xs text-[var(--color-ink-muted)]">{activeJobs} active jobs · {t.phone}</p>
                   </Card>
@@ -143,14 +142,14 @@ export default function Technicians() {
           </Field>
           <Field label={bi("Skills", "المهارات")}>
             <div className="flex flex-wrap gap-2">
-              {CATEGORIES.map((c) => (
+              {categories.map((cat) => (
                 <button
-                  key={c}
+                  key={cat.id}
                   type="button"
-                  onClick={() => toggleSkill(c)}
-                  className={`rounded-full px-2.5 py-1 text-xs font-medium border transition-colors [border-color:var(--color-border)] ${form.skills.includes(c) ? "bg-[var(--color-brand-1)] text-white border-transparent" : "text-[var(--color-ink-secondary)]"}`}
+                  onClick={() => toggleSkill(cat.name)}
+                  className={`rounded-full px-2.5 py-1 text-xs font-medium border transition-colors [border-color:var(--color-border)] ${form.skills.includes(cat.name) ? "bg-[var(--color-brand-1)] text-white border-transparent" : "text-[var(--color-ink-secondary)]"}`}
                 >
-                  {bi(c, APPLIANCE_CATEGORY_AR[c])}
+                  {bi(cat.name, categoryNameAr(categories, cat.name))}
                 </button>
               ))}
             </div>

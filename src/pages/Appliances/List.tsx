@@ -4,14 +4,14 @@ import { PackageSearch, Search, Wifi } from "lucide-react";
 import { useStore } from "../../lib/store";
 import { Badge, Button, Card, EmptyState, Input, Modal, Pagination, Select, SortableTh, Tabs } from "../../components/ui";
 import { ApplianceBasicFields, ApplianceComplianceFields, AppliancePurchaseFields, ApplianceSiteFields } from "../../components/ApplianceFields";
-import { emptyApplianceForm, applianceFormToInput, APPLIANCE_CATEGORIES } from "../../lib/applianceForm";
+import { emptyApplianceForm, applianceFormToInput } from "../../lib/applianceForm";
 import { formatDate } from "../../lib/utils";
 import { toast } from "../../lib/toast";
 import { useSort } from "../../lib/useSort";
 import { appliancesByBranch } from "../../lib/selectors";
 import { canPerform } from "../../lib/permissions";
 import { getMissingRequiredFields } from "../../lib/requiredFields";
-import { APPLIANCE_CATEGORY_AR, WARRANTY_STATUS_AR, bi } from "../../lib/domainAr";
+import { categoryNameAr, WARRANTY_STATUS_AR, bi } from "../../lib/domainAr";
 import type { Appliance, ApplianceCategory } from "../../lib/types";
 
 const PAGE_SIZE = 15;
@@ -26,7 +26,7 @@ const FORM_TAB_LABELS: Record<string, string> = {
 };
 
 export default function ApplianceList() {
-  const { appliances, brands, jobCards, selectedBranchId, role, addAppliance, aliasFieldsEnabled, requiredFieldsVersion } = useStore();
+  const { appliances, brands, categories, jobCards, selectedBranchId, role, addAppliance, aliasFieldsEnabled, requiredFieldsVersion } = useStore();
   // requiredFieldsVersion (destructured above) forces a re-render whenever the module-level table in requiredFields.ts changes.
   void requiredFieldsVersion;
   const [search, setSearch] = useState("");
@@ -100,7 +100,7 @@ export default function ApplianceList() {
         <div className="w-44">
           <Select value={category} onChange={(event) => { setCategory(event.target.value as ApplianceCategory | "all"); setPage(1); }}>
             <option value="all">{bi("All categories", "جميع الفئات")}</option>
-            {APPLIANCE_CATEGORIES.map((item) => <option key={item} value={item}>{bi(item, APPLIANCE_CATEGORY_AR[item])}</option>)}
+            {categories.map((item) => <option key={item.id} value={item.name}>{bi(item.name, categoryNameAr(categories, item.name))}</option>)}
           </Select>
         </div>
       </Card>
@@ -140,7 +140,7 @@ export default function ApplianceList() {
                 <tr key={appliance.id} className="border-b last:border-0 hover:bg-black/[0.02] dark:hover:bg-white/[0.03] [border-color:var(--color-border)]">
                   <td className="px-5 py-3 font-medium tabular-nums text-[var(--color-ink-secondary)]">{appliance.documentNo}</td>
                   <td className="px-3 py-3"><Link to={`/appliances/${appliance.id}`} className="font-medium text-[var(--color-brand-1)]">{appliance.model}</Link>{appliance.isSmartConnected && <Wifi size={12} className="ml-1.5 inline text-[var(--color-status-good)]" />}{appliance.modelAr && <p dir="rtl" className="text-xs text-[var(--color-ink-muted)]">{appliance.modelAr}</p>}</td>
-                  <td className="px-3 py-3 text-[var(--color-ink-secondary)]">{bi(appliance.category, APPLIANCE_CATEGORY_AR[appliance.category])}</td>
+                  <td className="px-3 py-3 text-[var(--color-ink-secondary)]">{bi(appliance.category, categoryNameAr(categories, appliance.category))}</td>
                   <td className="px-3 py-3 text-[var(--color-ink-secondary)]">{brandMap.get(appliance.brandId)?.name ?? "-"}</td>
                   <td className="px-3 py-3 text-[var(--color-ink-secondary)]">{appliance.serialNo}</td>
                   <td className="px-3 py-3 text-[var(--color-ink-muted)]">{formatDate(appliance.purchaseDate)}</td>
@@ -158,7 +158,7 @@ export default function ApplianceList() {
         <div className="space-y-4">
           <p className="text-xs text-[var(--color-ink-muted)]">Products are registered independently. Select the customer when creating the service order.</p>
           <Tabs tabs={FORM_TABS} active={formTab} onChange={setFormTab} labels={FORM_TAB_LABELS} />
-          {formTab === "Basic" && <ApplianceBasicFields value={form} onChange={(patch) => setForm({ ...form, ...patch })} brands={brands} aliasFieldsEnabled={aliasFieldsEnabled} />}
+          {formTab === "Basic" && <ApplianceBasicFields value={form} onChange={(patch) => setForm({ ...form, ...patch })} brands={brands} categories={categories} aliasFieldsEnabled={aliasFieldsEnabled} />}
           {formTab === "Purchase" && <AppliancePurchaseFields value={form} onChange={(patch) => setForm({ ...form, ...patch })} />}
           {formTab === "Compliance" && <ApplianceComplianceFields value={form} onChange={(patch) => setForm({ ...form, ...patch })} />}
           {formTab === "Site" && <ApplianceSiteFields value={form} onChange={(patch) => setForm({ ...form, ...patch })} />}

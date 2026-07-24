@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { PackagePlus, Plus, Trash2 } from "lucide-react";
 import { useStore } from "../../lib/store";
 import { Card, CardHeader, Field, Select, Textarea, Button, Badge, Input } from "../../components/ui";
+import { Combobox } from "../../components/Combobox";
 import { ApplianceBasicFields, AppliancePurchaseFields, ApplianceComplianceFields, ApplianceSiteFields } from "../../components/ApplianceFields";
 import { emptyApplianceForm, applianceFormToInput, type ApplianceFormState } from "../../lib/applianceForm";
 import { JobTypeBadge } from "../../components/StatusBadge";
@@ -59,6 +60,14 @@ export default function NewJobCard() {
   });
 
   const scopedCustomers = useMemo(() => filterByBranch(customers, selectedBranchId), [customers, selectedBranchId]);
+  const customerOptions = useMemo(() => [
+    { value: NEW_CUSTOMER, label: `+ ${bi("Add new customer", "إضافة عميل جديد")}` },
+    ...scopedCustomers.map((customer) => ({
+      value: customer.id,
+      label: `${customer.documentNo} - ${customer.name} - ${customer.phone}`,
+      searchText: `${customer.documentNo} ${customer.name} ${customer.phone} ${customer.email ?? ""}`,
+    })),
+  ], [scopedCustomers]);
   const brandMap = useMemo(() => new Map(brands.map((brand) => [brand.id, brand])), [brands]);
   const applianceMap = useMemo(() => new Map(appliances.map((appliance) => [appliance.id, appliance])), [appliances]);
   const selectedIds = useMemo(() => new Set(lines.map((line) => line.applianceId).filter((id) => id && id !== NEW_PRODUCT)), [lines]);
@@ -175,11 +184,7 @@ export default function NewJobCard() {
         <CardHeader title={bi("Customer and receiving branch", "العميل والفرع المستقبل")} subtitle="The phone number identifies the customer; products are associated through this service order." />
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={bi("Customer", "العميل")}>
-            <Select value={customerId} onChange={(event) => selectCustomer(event.target.value)}>
-              <option value="">{bi("Choose by name or phone...", "اختر بالاسم أو الهاتف...")}</option>
-              <option value={NEW_CUSTOMER}>+ {bi("Add new customer", "إضافة عميل جديد")}</option>
-              {scopedCustomers.map((customer) => <option key={customer.id} value={customer.id}>{customer.documentNo} - {customer.name} - {customer.phone}</option>)}
-            </Select>
+            <Combobox value={customerId} onChange={selectCustomer} options={customerOptions} placeholder={bi("Choose by name or phone...", "اختر بالاسم أو الهاتف...")} />
           </Field>
           <Field label={bi("Receiving branch", "الفرع المستقبل")}>
             <Select value={branchId} disabled={Boolean(customerId && customerId !== NEW_CUSTOMER)} onChange={(event) => setBranchId(event.target.value)}>
@@ -284,15 +289,20 @@ export default function NewJobCard() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label={bi("Product / equipment", "المنتج / الجهاز")}>
-                    <Select value={line.applianceId} onChange={(event) => patchLine(line.key, { applianceId: event.target.value })}>
-                      <option value="">{bi("Choose a registered product...", "اختر منتجاً مسجلاً...")}</option>
-                      <option value={NEW_PRODUCT}>+ {bi("Register new product unit", "تسجيل وحدة منتج جديدة")}</option>
-                      {appliances.map((candidate) => (
-                        <option key={candidate.id} value={candidate.id} disabled={selectedIds.has(candidate.id) && candidate.id !== line.applianceId}>
-                          {candidate.documentNo} - {candidate.model} - SN {candidate.serialNo}
-                        </option>
-                      ))}
-                    </Select>
+                    <Combobox
+                      value={line.applianceId}
+                      onChange={(next) => patchLine(line.key, { applianceId: next })}
+                      placeholder={bi("Choose a registered product...", "اختر منتجاً مسجلاً...")}
+                      options={[
+                        { value: NEW_PRODUCT, label: `+ ${bi("Register new product unit", "تسجيل وحدة منتج جديدة")}` },
+                        ...appliances.map((candidate) => ({
+                          value: candidate.id,
+                          label: `${candidate.documentNo} - ${candidate.model} - SN ${candidate.serialNo}`,
+                          searchText: `${candidate.documentNo} ${candidate.model} ${candidate.serialNo}`,
+                          disabled: selectedIds.has(candidate.id) && candidate.id !== line.applianceId,
+                        })),
+                      ]}
+                    />
                   </Field>
                   <Field label={bi("Warranty handling", "معالجة الضمان")}>
                     <Select value={line.jobTypeOverride} onChange={(event) => patchLine(line.key, { jobTypeOverride: event.target.value as JobType | "auto" })}>

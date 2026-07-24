@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, MessageCircle, Smartphone, Mail, CheckCircle2, Circle, XCircle, ImagePlus, Printer, Sparkles, Trash2, AlertTriangle, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { useStore } from "../../lib/store";
 import { Card, CardHeader, Tabs, Button, Select, Textarea, Input, Field, Badge, Avatar, Modal, WorkflowStepper } from "../../components/ui";
+import { Combobox } from "../../components/Combobox";
 import { JobStatusBadge, JobTypeBadge } from "../../components/StatusBadge";
 import { PartsGrid } from "../../components/PartsGrid";
 import { TrackingShare } from "../../components/TrackingShare";
@@ -328,15 +329,20 @@ export default function JobCardDetail() {
           <p className="text-xs text-[var(--color-ink-muted)]">{bi("Adds a new numbered sequence to", "إضافة تسلسل مرقّم جديد إلى")} {serviceOrder?.documentNo}.</p>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={bi("Product / equipment", "المنتج / الجهاز")}>
-              <Select value={addProductForm.applianceId} onChange={(event) => setAddProductForm({ ...addProductForm, applianceId: event.target.value })}>
-                <option value="">{bi("Choose a registered product...", "اختر منتجاً مسجلاً...")}</option>
-                <option value={NEW_PRODUCT_OPTION}>+ {bi("Register new product unit", "تسجيل وحدة منتج جديدة")}</option>
-                {appliances.map((candidate) => (
-                  <option key={candidate.id} value={candidate.id} disabled={usedApplianceIds.has(candidate.id)}>
-                    {candidate.documentNo} - {candidate.model} - SN {candidate.serialNo}
-                  </option>
-                ))}
-              </Select>
+              <Combobox
+                value={addProductForm.applianceId}
+                onChange={(next) => setAddProductForm({ ...addProductForm, applianceId: next })}
+                placeholder={bi("Choose a registered product...", "اختر منتجاً مسجلاً...")}
+                options={[
+                  { value: NEW_PRODUCT_OPTION, label: `+ ${bi("Register new product unit", "تسجيل وحدة منتج جديدة")}` },
+                  ...appliances.map((candidate) => ({
+                    value: candidate.id,
+                    label: `${candidate.documentNo} - ${candidate.model} - SN ${candidate.serialNo}`,
+                    searchText: `${candidate.documentNo} ${candidate.model} ${candidate.serialNo}`,
+                    disabled: usedApplianceIds.has(candidate.id),
+                  })),
+                ]}
+              />
             </Field>
             <Field label={bi("Warranty handling", "معالجة الضمان")}>
               <Select value={addProductForm.jobTypeOverride} onChange={(event) => setAddProductForm({ ...addProductForm, jobTypeOverride: event.target.value as JobType | "auto" })}>

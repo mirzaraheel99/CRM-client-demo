@@ -2,7 +2,7 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, ClipboardList, Users, PackageSearch, Tag, Boxes, PackageCheck,
   UserCog, GitBranch, MessageSquare, BarChart3, Smartphone, Sun, Moon,
-  Languages, ChevronDown, Menu, RotateCcw, Radar, X, Search, Settings as SettingsIcon, LogOut,
+  Languages, ChevronDown, Menu, Radar, X, Search, Settings as SettingsIcon, LogOut,
 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { t } from "../lib/i18n";
@@ -11,7 +11,6 @@ import { Logo } from "./Logo";
 import { Toaster } from "./Toaster";
 import { CommandPalette } from "./CommandPalette";
 import { useCommandPaletteStore } from "../lib/commandPaletteStore";
-import { toast } from "../lib/toast";
 import { cx } from "../lib/utils";
 import { canAccessPath } from "../lib/permissions";
 import { bi } from "../lib/domainAr";
@@ -46,7 +45,7 @@ const ROLE_LABELS: Record<Role, string> = {
 export function Shell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { role, setRole, currentUser, logout, selectedBranchId, setBranch, branches, theme, setTheme, lang, setLang, sidebarCollapsed, toggleSidebar, resetDemoData } = useStore();
+  const { role, setRole, currentUser, logout, selectedBranchId, setBranch, branches, theme, setTheme, lang, setLang, sidebarCollapsed, toggleSidebar } = useStore();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const visibleNav = NAV.filter((item) => canAccessPath(role, item.to));
 
@@ -112,20 +111,6 @@ export function Shell({ children }: { children: ReactNode }) {
           ))}
         </nav>
         <div className="border-t [border-color:var(--color-border)]">
-          <button
-            onClick={() => {
-              if (confirm("Reset all demo data back to the original seed dataset?")) {
-                resetDemoData();
-                navigate("/", { replace: true });
-                toast("Demo data reset.");
-              }
-            }}
-            title="Reset demo data"
-            className="flex w-full items-center gap-2 px-4 py-3 text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink-primary)]"
-          >
-            <RotateCcw size={16} />
-            <span className={cx(sidebarCollapsed && "md:hidden")}>Reset demo data</span>
-          </button>
           <button
             onClick={toggleSidebar}
             className="hidden w-full items-center gap-2 border-t px-4 py-3 text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink-primary)] [border-color:var(--color-border)] md:flex"

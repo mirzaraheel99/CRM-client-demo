@@ -5,7 +5,7 @@
 // "locked": the backend/business logic hard-requires them (e.g. a customer
 // needs a phone number), so they can't be turned off by an admin.
 
-export type RequiredFieldEntity = "customer" | "appliance" | "jobCardLine" | "serviceOrder" | "jobCardStage";
+export type RequiredFieldEntity = "customer" | "appliance" | "jobCardLine" | "serviceOrder" | "jobCardStage" | "inventoryItem";
 
 export interface RequiredFieldDef {
   key: string;
@@ -21,6 +21,7 @@ export const REQUIRED_FIELD_ENTITY_LABEL: Record<RequiredFieldEntity, { en: stri
   jobCardLine: { en: "Job details", ar: "تفاصيل المهمة" },
   serviceOrder: { en: "Service address & intake", ar: "عنوان الخدمة والاستلام" },
   jobCardStage: { en: "Job Card workflow (Diagnosis, Repair, Handover)", ar: "سير عمل بطاقة العمل (التشخيص، الإصلاح، التسليم)" },
+  inventoryItem: { en: "Inventory item", ar: "صنف المخزون" },
 };
 
 export const REQUIRED_FIELD_DEFS: Record<RequiredFieldEntity, RequiredFieldDef[]> = {
@@ -91,6 +92,14 @@ export const REQUIRED_FIELD_DEFS: Record<RequiredFieldEntity, RequiredFieldDef[]
     { key: "purchaseBill", label: "Purchase bill (Warranty Validation)", labelAr: "فاتورة الشراء (التحقق من الضمان)", defaultRequired: true },
     { key: "finalAmount", label: "Final amount (non-warranty jobs)", labelAr: "المبلغ النهائي (المهام بدون ضمان)", defaultRequired: true },
     { key: "customerSignature", label: "Customer signature", labelAr: "توقيع العميل", defaultRequired: true },
+  ],
+  inventoryItem: [
+    { key: "name", label: "Name", labelAr: "الاسم", defaultRequired: true, locked: true },
+    { key: "nameAr", label: "Arabic alias", labelAr: "الاسم بالعربية", defaultRequired: false },
+    { key: "partNo", label: "Part no.", labelAr: "رقم القطعة", defaultRequired: true, locked: true },
+    { key: "brand", label: "Brand", labelAr: "العلامة التجارية", defaultRequired: false },
+    { key: "unitPrice", label: "Unit price", labelAr: "سعر الوحدة", defaultRequired: false },
+    { key: "reorderLevel", label: "Reorder level", labelAr: "حد إعادة الطلب", defaultRequired: false },
   ],
 };
 

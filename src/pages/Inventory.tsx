@@ -1,13 +1,14 @@
 import { useMemo, useState } from "react";
-import { PackagePlus, PackageMinus, ArrowLeftRight, Undo2, Sparkles } from "lucide-react";
+import { PackagePlus, PackageMinus, ArrowLeftRight, Undo2, Sparkles, Search } from "lucide-react";
 import { useStore } from "../lib/store";
-import { Card, CardHeader, Tabs, Button, Input, Select, Field, Modal, Badge, SortableTh } from "../components/ui";
+import { Card, CardHeader, Tabs, Button, Input, Select, Field, Modal, Badge, SortableTh, EmptyState } from "../components/ui";
 import { HorizontalBarChart } from "../components/charts";
 import { formatCurrency, formatDateTime } from "../lib/utils";
 import { inventoryLocationsByBranch, inventoryStockByBranch, inventoryTransactionsByBranch, stockByBranch, smartReorderSuggestions } from "../lib/selectors";
 import { toast } from "../lib/toast";
 import { canPerform } from "../lib/permissions";
 import { useSort } from "../lib/useSort";
+import { isFieldRequired, getMissingRequiredFields } from "../lib/requiredFields";
 import { INVENTORY_TXN_TYPE_AR, LOCATION_TYPE_AR, bi } from "../lib/domainAr";
 import type { InventoryTransaction, InventoryItem } from "../lib/types";
 
@@ -21,15 +22,20 @@ const TAB_LABELS: Record<string, string> = {
 };
 type ItemSortKey = "name" | "partNo" | "brand" | "unitPrice" | "reorderLevel" | "totalStock";
 
+const emptyItemForm = () => ({ name: "", nameAr: "", category: "Electrical", brand: "", partNo: "", unitPrice: 0, reorderLevel: 5 });
+
 export default function Inventory() {
-  const { branches, inventoryItems, inventoryLocations, inventoryStock, inventoryTransactions, selectedBranchId, role, addInventoryItem, addInventoryTransaction } = useStore();
+  const { branches, inventoryItems, inventoryLocations, inventoryStock, inventoryTransactions, brands, selectedBranchId, role, addInventoryItem, addInventoryTransaction, requiredFieldsVersion } = useStore();
+  // requiredFieldsVersion (destructured above) forces a re-render whenever the module-level table in requiredFields.ts changes.
+  void requiredFieldsVersion;
   const [tab, setTab] = useState(TABS[0]);
   const [txnModal, setTxnModal] = useState<InventoryTransaction["type"] | null>(null);
   const [itemModal, setItemModal] = useState(false);
   const [orderedItems, setOrderedItems] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState("");
 
   const [txnForm, setTxnForm] = useState({ itemId: "", locationId: "", destLocationId: "", qty: 1 });
-  const [itemForm, setItemForm] = useState({ name: "", nameAr: "", category: "Electrical", brand: "", partNo: "", unitPrice: 0, reorderLevel: 5 });
+  const [itemForm, setItemForm] = useState(emptyItemForm());
   const scopedLocations = useMemo(() => inventoryLocationsByBranch(inventoryLocations, selectedBranchId), [inventoryLocations, selectedBranchId]);
   const scopedStock = useMemo(() => inventoryStockByBranch(inventoryStock, inventoryLocations, selectedBranchId), [inventoryStock, inventoryLocations, selectedBranchId]);
   const scopedTransactions = useMemo(() => inventoryTransactionsByBranch(inventoryTransactions, inventoryLocations, selectedBranchId), [inventoryTransactions, inventoryLocations, selectedBranchId]);
@@ -49,7 +55,18 @@ export default function Inventory() {
     if (key === "reorderLevel") return i.reorderLevel;
     return stockByItem.get(i.id) ?? 0;
   };
-  const { sorted: sortedItems, sortKey: itemSortKey, dir: itemDir, toggle: toggleItemSort } = useSort<InventoryItem, ItemSortKey>(inventoryItems, itemSortValue, "name");
+  const filteredItems = useMemo(() => {
+    if (!search.trim()) return inventoryItems;
+    const query = search.toLowerCase();
+    return inventoryItems.filter((i) =>
+      i.name.toLowerCase().includes(query) ||
+      (i.nameAr ?? "").toLowerCase().includes(query) ||
+      i.partNo.toLowerCase().includes(query) ||
+      i.brand.toLowerCase().includes(query) ||
+      i.category.toLowerCase().includes(query)
+    );
+  }, [inventoryItems, search]);
+  const { sorted: sortedItems, sortKey: itemSortKey, dir: itemDir, toggle: toggleItemSort } = useSort<InventoryItem, ItemSortKey>(filteredItems, itemSortValue, "name");
 
   const branchStock = useMemo(
     () => stockByBranch(inventoryItems, scopedLocations, scopedStock, scopedBranches),
@@ -80,9 +97,9 @@ export default function Inventory() {
   }
 
   function submitItem() {
-    if (!itemForm.name.trim() || !itemForm.partNo.trim()) return;
+    if (getMissingRequiredFields("inventoryItem", itemForm).length > 0) return;
     addInventoryItem({ ...itemForm, nameAr: itemForm.nameAr.trim() || undefined });
-    setItemForm({ name: "", nameAr: "", category: "Electrical", brand: "", partNo: "", unitPrice: 0, reorderLevel: 5 });
+    setItemForm(emptyItemForm());
     setItemModal(false);
     toast(`${itemForm.name} added to inventory.`);
   }
@@ -107,37 +124,44 @@ export default function Inventory() {
         <div className="px-5 pt-3"><Tabs tabs={TABS} active={tab} onChange={setTab} labels={TAB_LABELS} /></div>
         <div className="p-5">
           {tab === "Item Master" && (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="sticky top-0 z-10 bg-[var(--color-surface-1)] text-left text-xs text-[var(--color-ink-muted)] border-b [border-color:var(--color-border)]">
-                  <SortableTh label={bi("Name", "الاسم")} active={itemSortKey === "name"} direction={itemDir} onClick={() => toggleItemSort("name")} className="py-2" />
-                  <th className="py-2 pr-6 font-medium">{bi("Arabic Alias", "الاسم بالعربية")}</th>
-                  <SortableTh label={bi("Part No.", "رقم القطعة")} active={itemSortKey === "partNo"} direction={itemDir} onClick={() => toggleItemSort("partNo")} className="py-2" />
-                  <SortableTh label={bi("Brand", "العلامة التجارية")} active={itemSortKey === "brand"} direction={itemDir} onClick={() => toggleItemSort("brand")} className="py-2" />
-                  <SortableTh label={bi("Unit Price", "سعر الوحدة")} active={itemSortKey === "unitPrice"} direction={itemDir} onClick={() => toggleItemSort("unitPrice")} className="py-2" />
-                  <SortableTh label={bi("Reorder Level", "حد إعادة الطلب")} active={itemSortKey === "reorderLevel"} direction={itemDir} onClick={() => toggleItemSort("reorderLevel")} className="py-2" />
-                  <SortableTh label={bi("Total Stock", "إجمالي المخزون")} active={itemSortKey === "totalStock"} direction={itemDir} onClick={() => toggleItemSort("totalStock")} className="py-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {sortedItems.map((i) => {
-                  const total = stockByItem.get(i.id) ?? 0;
-                  return (
-                    <tr key={i.id} className="border-b last:border-0 [border-color:var(--color-border)] transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.03]">
-                      <td className="py-2.5 font-medium">{i.name}</td>
-                      <td className="py-2.5 pr-6 text-[var(--color-ink-secondary)]" dir="rtl">{i.nameAr ?? "—"}</td>
-                      <td className="py-2.5 text-[var(--color-ink-secondary)]">{i.partNo}</td>
-                      <td className="py-2.5 text-[var(--color-ink-secondary)]">{i.brand}</td>
-                      <td className="py-2.5 tabular-nums">{formatCurrency(i.unitPrice)}</td>
-                      <td className="py-2.5 tabular-nums">{i.reorderLevel}</td>
-                      <td className="py-2.5 tabular-nums">
-                        <Badge tone={total <= i.reorderLevel ? "critical" : "good"}>{total}</Badge>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className="space-y-3">
+              <div className="relative max-w-md">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-ink-muted)]" />
+                <Input placeholder={bi("Search name, part no., brand, category...", "بحث بالاسم أو رقم القطعة أو العلامة التجارية أو الفئة...")} value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8" />
+              </div>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="sticky top-0 z-10 bg-[var(--color-surface-1)] text-left text-xs text-[var(--color-ink-muted)] border-b [border-color:var(--color-border)]">
+                    <SortableTh label={bi("Name", "الاسم")} active={itemSortKey === "name"} direction={itemDir} onClick={() => toggleItemSort("name")} className="py-2" />
+                    <th className="py-2 pr-6 font-medium">{bi("Arabic Alias", "الاسم بالعربية")}</th>
+                    <SortableTh label={bi("Part No.", "رقم القطعة")} active={itemSortKey === "partNo"} direction={itemDir} onClick={() => toggleItemSort("partNo")} className="py-2" />
+                    <SortableTh label={bi("Brand", "العلامة التجارية")} active={itemSortKey === "brand"} direction={itemDir} onClick={() => toggleItemSort("brand")} className="py-2" />
+                    <SortableTh label={bi("Unit Price", "سعر الوحدة")} active={itemSortKey === "unitPrice"} direction={itemDir} onClick={() => toggleItemSort("unitPrice")} className="py-2" />
+                    <SortableTh label={bi("Reorder Level", "حد إعادة الطلب")} active={itemSortKey === "reorderLevel"} direction={itemDir} onClick={() => toggleItemSort("reorderLevel")} className="py-2" />
+                    <SortableTh label={bi("Total Stock", "إجمالي المخزون")} active={itemSortKey === "totalStock"} direction={itemDir} onClick={() => toggleItemSort("totalStock")} className="py-2" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedItems.map((i) => {
+                    const total = stockByItem.get(i.id) ?? 0;
+                    return (
+                      <tr key={i.id} className="border-b last:border-0 [border-color:var(--color-border)] transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.03]">
+                        <td className="py-2.5 font-medium">{i.name}</td>
+                        <td className="py-2.5 pr-6 text-[var(--color-ink-secondary)]" dir="rtl">{i.nameAr ?? "—"}</td>
+                        <td className="py-2.5 text-[var(--color-ink-secondary)]">{i.partNo}</td>
+                        <td className="py-2.5 text-[var(--color-ink-secondary)]">{i.brand}</td>
+                        <td className="py-2.5 tabular-nums">{formatCurrency(i.unitPrice)}</td>
+                        <td className="py-2.5 tabular-nums">{i.reorderLevel}</td>
+                        <td className="py-2.5 tabular-nums">
+                          <Badge tone={total <= i.reorderLevel ? "critical" : "good"}>{total}</Badge>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              {sortedItems.length === 0 && <EmptyState icon={<Search size={18} />} title={bi("No items found", "لم يتم العثور على أصناف")} subtitle="Try a different search term." />}
+            </div>
           )}
 
           {tab === "Stock Ledger" && (
@@ -306,13 +330,18 @@ export default function Inventory() {
 
       <Modal open={itemModal} onClose={() => setItemModal(false)} title={bi("Add Inventory Item", "إضافة صنف للمخزون")}>
         <div className="space-y-3">
-          <Field label={bi("Name", "الاسم")}><Input value={itemForm.name} onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })} /></Field>
-          <Field label={bi("Arabic Alias (shown on customer invoices/messages)", "الاسم بالعربية (يظهر في فواتير ورسائل العميل)")}><Input dir="rtl" value={itemForm.nameAr} onChange={(e) => setItemForm({ ...itemForm, nameAr: e.target.value })} /></Field>
-          <Field label={bi("Part No.", "رقم القطعة")}><Input value={itemForm.partNo} onChange={(e) => setItemForm({ ...itemForm, partNo: e.target.value })} /></Field>
-          <Field label={bi("Brand", "العلامة التجارية")}><Input value={itemForm.brand} onChange={(e) => setItemForm({ ...itemForm, brand: e.target.value })} /></Field>
-          <Field label={bi("Unit price (SAR)", "سعر الوحدة (ريال)")}><Input type="number" value={itemForm.unitPrice} onChange={(e) => setItemForm({ ...itemForm, unitPrice: Number(e.target.value) })} /></Field>
-          <Field label={bi("Reorder level", "حد إعادة الطلب")}><Input type="number" value={itemForm.reorderLevel} onChange={(e) => setItemForm({ ...itemForm, reorderLevel: Number(e.target.value) })} /></Field>
-          <Button className="w-full justify-center" onClick={submitItem}>{bi("Save Item", "حفظ الصنف")}</Button>
+          <Field label={bi("Name", "الاسم")} required={isFieldRequired("inventoryItem", "name")}><Input value={itemForm.name} onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })} /></Field>
+          <Field label={bi("Arabic Alias (shown on customer invoices/messages)", "الاسم بالعربية (يظهر في فواتير ورسائل العميل)")} required={isFieldRequired("inventoryItem", "nameAr")}><Input dir="rtl" value={itemForm.nameAr} onChange={(e) => setItemForm({ ...itemForm, nameAr: e.target.value })} /></Field>
+          <Field label={bi("Part No.", "رقم القطعة")} required={isFieldRequired("inventoryItem", "partNo")}><Input value={itemForm.partNo} onChange={(e) => setItemForm({ ...itemForm, partNo: e.target.value })} /></Field>
+          <Field label={bi("Brand", "العلامة التجارية")} required={isFieldRequired("inventoryItem", "brand")}>
+            <Select value={itemForm.brand} onChange={(e) => setItemForm({ ...itemForm, brand: e.target.value })}>
+              <option value="">{bi("Choose brand...", "اختر العلامة التجارية...")}</option>
+              {brands.map((b) => <option key={b.id} value={b.name}>{b.name}</option>)}
+            </Select>
+          </Field>
+          <Field label={bi("Unit price (SAR)", "سعر الوحدة (ريال)")} required={isFieldRequired("inventoryItem", "unitPrice")}><Input type="number" value={itemForm.unitPrice} onChange={(e) => setItemForm({ ...itemForm, unitPrice: Number(e.target.value) })} /></Field>
+          <Field label={bi("Reorder level", "حد إعادة الطلب")} required={isFieldRequired("inventoryItem", "reorderLevel")}><Input type="number" value={itemForm.reorderLevel} onChange={(e) => setItemForm({ ...itemForm, reorderLevel: Number(e.target.value) })} /></Field>
+          <Button className="w-full justify-center" onClick={submitItem} disabled={getMissingRequiredFields("inventoryItem", itemForm).length > 0}>{bi("Save Item", "حفظ الصنف")}</Button>
         </div>
       </Modal>
     </div>

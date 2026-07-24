@@ -86,7 +86,12 @@ export default function CustomerList() {
     let list = filterByBranch(customers, selectedBranchId);
     if (search.trim()) {
       const query = search.toLowerCase();
-      list = list.filter((customer) => customer.documentNo.toLowerCase().includes(query) || customer.name.toLowerCase().includes(query) || customer.phone.includes(query) || customer.email.toLowerCase().includes(query));
+      const fields = (customer: Customer) => [
+        customer.documentNo, customer.name, customer.nameAr, customer.phone, customer.homePhone, customer.whatsapp,
+        customer.email, customer.address, customer.nationalId, customer.nationality, customer.companyName,
+        customer.crNumber, customer.vatNumber, customer.contactPersonName, customer.notes,
+      ];
+      list = list.filter((customer) => fields(customer).some((value) => (value ?? "").toLowerCase().includes(query)));
     }
     return list;
   }, [customers, selectedBranchId, search]);

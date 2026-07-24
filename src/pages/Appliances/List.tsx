@@ -43,12 +43,15 @@ export default function ApplianceList() {
     if (category !== "all") list = list.filter((appliance) => appliance.category === category);
     if (search.trim()) {
       const query = search.toLowerCase();
-      list = list.filter((appliance) =>
-        appliance.documentNo.toLowerCase().includes(query) ||
-        appliance.model.toLowerCase().includes(query) ||
-        appliance.serialNo.toLowerCase().includes(query) ||
-        (appliance.imeiNo ?? "").includes(query)
-      );
+      list = list.filter((appliance) => {
+        const brand = brandMap.get(appliance.brandId);
+        const fields = [
+          appliance.documentNo, appliance.model, appliance.modelAr, appliance.serialNo, appliance.imeiNo,
+          appliance.purchaseInvoiceNo, appliance.retailerName, appliance.sasoCertNo, appliance.countryOfManufacture,
+          appliance.color, appliance.specification, appliance.installedLocation, appliance.category, brand?.name,
+        ];
+        return fields.some((value) => (value ?? "").toLowerCase().includes(query));
+      });
     }
     return list;
   }, [scopedAppliances, category, search]);

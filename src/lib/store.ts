@@ -152,8 +152,6 @@ interface DemoState {
   logRemovedPart: (jobcardId: string, description: string, serialNo: string | undefined) => Promise<ActionResult>;
   notifyCustomerOfRemovedPart: (removedPartId: string) => Promise<ActionResult>;
   confirmPartReturned: (removedPartId: string) => Promise<ActionResult>;
-
-  resetDemoData: () => void;
 }
 
 const COUNTER_START = 100000;
@@ -942,20 +940,6 @@ export const useStore = create<DemoState>()(
           jobCards: state.jobCards.map((candidate) => candidate.id === jobcardId ? { ...candidate, updatedAt: now } : candidate),
         });
         return { ...result(true, `Payment of SAR ${amount.toLocaleString()} recorded.`), payment };
-      },
-
-      resetDemoData: () => {
-        counter = COUNTER_START;
-        const { branches, customers, brands, technicians, appliances, serviceOrders, jobCards, stageHistory, removedParts, estimateLineItems } = get();
-        set({
-          ...initialSlice(),
-          branches, customers, brands, technicians, appliances, serviceOrders, jobCards, stageHistory, removedParts, estimateLineItems,
-          theme: "light",
-          lang: "en",
-          sidebarCollapsed: false,
-          maintenanceRemindersSent: {},
-          aliasFieldsEnabled: true,
-        });
       },
 
       logRemovedPart: async (jobcardId, description, serialNo) => {

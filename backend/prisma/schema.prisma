@@ -177,6 +177,7 @@ model Appliance {
   installationDate  DateTime?
   installedLocation String?
   photoUrl          String?
+  notes             String?
 
   telemetry ApplianceTelemetry?
   jobCards  JobCard[]
@@ -204,6 +205,7 @@ model Technician {
   branch      Branch   @relation(fields: [branchId], references: [id])
   status      String   @default("Available")
   avatarColor String   @default("#2a78d6")
+  notes       String?
 
   jobCards JobCard[]
 }

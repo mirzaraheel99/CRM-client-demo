@@ -1,4 +1,4 @@
-import { Field, Input, Select } from "./ui";
+import { Field, Input, Select, Textarea } from "./ui";
 import { categoryNameAr, bi } from "../lib/domainAr";
 import { isFieldRequired } from "../lib/requiredFields";
 import type { ApplianceFormState } from "../lib/applianceForm";
@@ -89,6 +89,9 @@ export function ApplianceSiteFields({ value, onChange }: FieldGroupProps) {
         />
       </Field>
       {value.photoUrl && <img src={value.photoUrl} alt="Product preview" className="h-20 w-20 rounded-md border object-cover [border-color:var(--color-border)]" />}
+      <Field label={bi("Notes", "ملاحظات")} required={isFieldRequired("appliance", "notes")}>
+        <Textarea rows={3} value={value.notes} onChange={(event) => onChange({ notes: event.target.value })} placeholder={bi("Any extra remarks about this unit...", "أي ملاحظات إضافية حول هذا الجهاز...")} />
+      </Field>
     </div>
   );
 }

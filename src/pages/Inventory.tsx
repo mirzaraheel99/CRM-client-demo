@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { PackagePlus, PackageMinus, ArrowLeftRight, Undo2, Sparkles, Search, Building2 } from "lucide-react";
 import { useStore } from "../lib/store";
-import { Card, CardHeader, Tabs, Button, Input, Select, Field, Modal, Badge, SortableTh, EmptyState } from "../components/ui";
+import { Card, CardHeader, Tabs, Button, Input, Select, Field, Modal, Badge, SortableTh, EmptyState, Textarea } from "../components/ui";
 import { HorizontalBarChart } from "../components/charts";
 import { formatCurrency, formatDateTime } from "../lib/utils";
 import { inventoryLocationsByBranch, inventoryStockByBranch, inventoryTransactionsByBranch, stockByBranch, totalStockByItem, smartReorderSuggestions } from "../lib/selectors";
@@ -22,7 +22,7 @@ const TAB_LABELS: Record<string, string> = {
 };
 type ItemSortKey = "name" | "partNo" | "brand" | "unitPrice" | "reorderLevel" | "totalStock";
 
-const emptyItemForm = () => ({ name: "", nameAr: "", category: "Electrical", brand: "", partNo: "", unit: "", unitPrice: 0, reorderLevel: 5 });
+const emptyItemForm = () => ({ name: "", nameAr: "", category: "Electrical", brand: "", partNo: "", unit: "", unitPrice: 0, reorderLevel: 5, notes: "" });
 
 export default function Inventory() {
   const { branches, inventoryItems, inventoryLocations, inventoryStock, inventoryTransactions, brands, units, selectedBranchId, role, addInventoryItem, addInventoryTransaction, requiredFieldsVersion } = useStore();
@@ -108,7 +108,7 @@ export default function Inventory() {
 
   function submitItem() {
     if (getMissingRequiredFields("inventoryItem", itemForm).length > 0) return;
-    addInventoryItem({ ...itemForm, nameAr: itemForm.nameAr.trim() || undefined });
+    addInventoryItem({ ...itemForm, nameAr: itemForm.nameAr.trim() || undefined, notes: itemForm.notes.trim() || undefined });
     setItemForm(emptyItemForm());
     setItemModal(false);
     toast(`${itemForm.name} added to inventory.`);
@@ -370,6 +370,9 @@ export default function Inventory() {
           </Field>
           <Field label={bi("Unit price (SAR)", "سعر الوحدة (ريال)")} required={isFieldRequired("inventoryItem", "unitPrice")}><Input type="number" value={itemForm.unitPrice} onChange={(e) => setItemForm({ ...itemForm, unitPrice: Number(e.target.value) })} /></Field>
           <Field label={bi("Reorder level", "حد إعادة الطلب")} required={isFieldRequired("inventoryItem", "reorderLevel")}><Input type="number" value={itemForm.reorderLevel} onChange={(e) => setItemForm({ ...itemForm, reorderLevel: Number(e.target.value) })} /></Field>
+          <Field label={bi("Notes (optional)", "ملاحظات (اختياري)")} required={isFieldRequired("inventoryItem", "notes")}>
+            <Textarea rows={3} value={itemForm.notes} onChange={(e) => setItemForm({ ...itemForm, notes: e.target.value })} />
+          </Field>
           <Button className="w-full justify-center" onClick={submitItem} disabled={getMissingRequiredFields("inventoryItem", itemForm).length > 0}>{bi("Save Item", "حفظ الصنف")}</Button>
         </div>
       </Modal>

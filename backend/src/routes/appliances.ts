@@ -25,6 +25,7 @@ const applianceSchema = z.object({
   installationDate: z.string().optional(),
   installedLocation: z.string().optional(),
   photoUrl: z.string().optional(),
+  notes: z.string().optional(),
 });
 
 function computeWarrantyStatus(purchaseDate: string, warrantyMonths: number): string {
@@ -83,6 +84,7 @@ export default async function applianceRoutes(fastify: FastifyInstance) {
           installationDate: input.installationDate ? new Date(input.installationDate) : undefined,
           installedLocation: input.installedLocation,
           photoUrl: input.photoUrl,
+          notes: input.notes,
         },
       });
       return appliance;

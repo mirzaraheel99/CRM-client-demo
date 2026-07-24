@@ -146,6 +146,7 @@ export interface Appliance {
   // Site & photo
   installedLocation?: string;
   photoUrl?: string;
+  notes?: string;
 }
 
 // Simulated IoT telemetry — in production this would come from the brand's
@@ -169,6 +170,7 @@ export interface Technician {
   branchId: string;
   status: "Available" | "On Job" | "Off Duty";
   avatarColor: string;
+  notes?: string;
 }
 
 export interface InventoryLocation {
@@ -188,6 +190,7 @@ export interface InventoryItem {
   unit?: string;
   unitPrice: number;
   reorderLevel: number;
+  notes?: string;
 }
 
 export interface InventoryStock {

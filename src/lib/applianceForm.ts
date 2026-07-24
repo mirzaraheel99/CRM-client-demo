@@ -25,6 +25,7 @@ export type ApplianceFormState = {
   installationDate: string;
   installedLocation: string;
   photoUrl: string;
+  notes: string;
 };
 
 export function emptyApplianceForm(category: ApplianceCategory = "AC"): ApplianceFormState {
@@ -49,6 +50,7 @@ export function emptyApplianceForm(category: ApplianceCategory = "AC"): Applianc
     installationDate: "",
     installedLocation: "",
     photoUrl: "",
+    notes: "",
   };
 }
 
@@ -76,6 +78,7 @@ export function applianceToForm(appliance: Appliance): ApplianceFormState {
     installationDate: appliance.installationDate ? appliance.installationDate.slice(0, 10) : "",
     installedLocation: appliance.installedLocation ?? "",
     photoUrl: appliance.photoUrl ?? "",
+    notes: appliance.notes ?? "",
   };
 }
 
@@ -102,5 +105,6 @@ export function applianceFormToInput(form: ApplianceFormState): Omit<Appliance, 
     installationDate: form.installationDate || undefined,
     installedLocation: form.installedLocation.trim() || undefined,
     photoUrl: form.photoUrl || undefined,
+    notes: form.notes.trim() || undefined,
   };
 }

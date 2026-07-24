@@ -99,6 +99,7 @@ export default function ApplianceDetail() {
             {appliance.specification && <p><span className="text-[var(--color-ink-muted)]">{bi("Specification", "المواصفات")}:</span> {appliance.specification}</p>}
             {appliance.installationDate && <p><span className="text-[var(--color-ink-muted)]">{bi("Installed", "تاريخ التركيب")}:</span> {formatDate(appliance.installationDate)}</p>}
             {appliance.installedLocation && <p><span className="text-[var(--color-ink-muted)]">{bi("Site location", "موقع التركيب")}:</span> {appliance.installedLocation}</p>}
+            {appliance.notes && <p><span className="text-[var(--color-ink-muted)]">{bi("Notes", "ملاحظات")}:</span> {appliance.notes}</p>}
             {appliance.photoUrl && <img src={appliance.photoUrl} alt={appliance.model} className="mt-2 h-20 w-20 rounded-md border object-cover [border-color:var(--color-border)]" />}
           </div>
         </Card>

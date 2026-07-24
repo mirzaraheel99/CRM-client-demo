@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useStore } from "../lib/store";
-import { Card, Button, Input, Select, Field, Modal, Badge, Avatar, Tabs } from "../components/ui";
+import { Card, Button, Input, Select, Field, Modal, Badge, Avatar, Tabs, Textarea } from "../components/ui";
 import { toast } from "../lib/toast";
 import type { ApplianceCategory } from "../lib/types";
 import { filterByBranch } from "../lib/selectors";
@@ -18,7 +18,7 @@ export default function Technicians() {
   const [tab, setTab] = useState(TABS[0]);
   const [open, setOpen] = useState(false);
   const defaultBranchId = selectedBranchId === "all" ? branches[0]?.id ?? "" : selectedBranchId;
-  const [form, setForm] = useState({ name: "", nameAr: "", phone: "", zone: "Zone A", skills: [] as ApplianceCategory[], branchId: defaultBranchId, status: "Available" as const, avatarColor: "#2a78d6" });
+  const [form, setForm] = useState({ name: "", nameAr: "", phone: "", zone: "Zone A", skills: [] as ApplianceCategory[], branchId: defaultBranchId, status: "Available" as const, avatarColor: "#2a78d6", notes: "" });
   const scopedTechnicians = filterByBranch(technicians, selectedBranchId);
   const scopedJobs = filterByBranch(jobCards, selectedBranchId);
 
@@ -28,8 +28,8 @@ export default function Technicians() {
 
   async function submit() {
     if (!form.name.trim() || !form.phone.trim() || !form.branchId || form.skills.length === 0) return;
-    await addTechnician({ ...form, nameAr: form.nameAr.trim() || undefined });
-    setForm({ name: "", nameAr: "", phone: "", zone: "Zone A", skills: [], branchId: defaultBranchId, status: "Available", avatarColor: "#2a78d6" });
+    await addTechnician({ ...form, nameAr: form.nameAr.trim() || undefined, notes: form.notes.trim() || undefined });
+    setForm({ name: "", nameAr: "", phone: "", zone: "Zone A", skills: [], branchId: defaultBranchId, status: "Available", avatarColor: "#2a78d6", notes: "" });
     setOpen(false);
     toast(`${form.name} added to technicians.`);
   }
@@ -75,6 +75,7 @@ export default function Technicians() {
                       {t.skills.map((s) => <Badge key={s} tone="brand">{bi(s, categoryNameAr(categories, s))}</Badge>)}
                     </div>
                     <p className="text-xs text-[var(--color-ink-muted)]">{activeJobs} active jobs · {t.phone}</p>
+                    {t.notes && <p className="text-xs text-[var(--color-ink-secondary)]">{t.notes}</p>}
                   </Card>
                 );
               })}
@@ -153,6 +154,9 @@ export default function Technicians() {
                 </button>
               ))}
             </div>
+          </Field>
+          <Field label={bi("Notes (optional)", "ملاحظات (اختياري)")}>
+            <Textarea rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           </Field>
 
           <Button className="w-full justify-center" onClick={submit}>{bi("Save Technician", "حفظ الفني")}</Button>

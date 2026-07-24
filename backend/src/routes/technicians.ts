@@ -11,6 +11,7 @@ const technicianSchema = z.object({
   branchId: z.string().min(1),
   status: z.enum(["Available", "On Job", "Off Duty"]).default("Available"),
   avatarColor: z.string().default("#2a78d6"),
+  notes: z.string().optional(),
 });
 
 export default async function technicianRoutes(fastify: FastifyInstance) {

@@ -65,6 +65,7 @@ export const REQUIRED_FIELD_DEFS: Record<RequiredFieldEntity, RequiredFieldDef[]
     { key: "installationDate", label: "Installation date", labelAr: "تاريخ التركيب", defaultRequired: false },
     { key: "installedLocation", label: "Installed location at site", labelAr: "موقع التركيب في الموقع", defaultRequired: false },
     { key: "photoUrl", label: "Product / serial-plate photo", labelAr: "صورة المنتج / لوحة الرقم التسلسلي", defaultRequired: false },
+    { key: "notes", label: "Notes", labelAr: "ملاحظات", defaultRequired: false },
   ],
   jobCardLine: [
     { key: "problem", label: "Reported problem", labelAr: "المشكلة المُبلّغ عنها", defaultRequired: true, locked: true },
@@ -101,6 +102,7 @@ export const REQUIRED_FIELD_DEFS: Record<RequiredFieldEntity, RequiredFieldDef[]
     { key: "unit", label: "Unit of measure", labelAr: "وحدة القياس", defaultRequired: false },
     { key: "unitPrice", label: "Unit price", labelAr: "سعر الوحدة", defaultRequired: false },
     { key: "reorderLevel", label: "Reorder level", labelAr: "حد إعادة الطلب", defaultRequired: false },
+    { key: "notes", label: "Notes", labelAr: "ملاحظات", defaultRequired: false },
   ],
 };
 

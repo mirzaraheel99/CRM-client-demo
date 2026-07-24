@@ -22,10 +22,10 @@ const TAB_LABELS: Record<string, string> = {
 };
 type ItemSortKey = "name" | "partNo" | "brand" | "unitPrice" | "reorderLevel" | "totalStock";
 
-const emptyItemForm = () => ({ name: "", nameAr: "", category: "Electrical", brand: "", partNo: "", unitPrice: 0, reorderLevel: 5 });
+const emptyItemForm = () => ({ name: "", nameAr: "", category: "Electrical", brand: "", partNo: "", unit: "", unitPrice: 0, reorderLevel: 5 });
 
 export default function Inventory() {
-  const { branches, inventoryItems, inventoryLocations, inventoryStock, inventoryTransactions, brands, selectedBranchId, role, addInventoryItem, addInventoryTransaction, requiredFieldsVersion } = useStore();
+  const { branches, inventoryItems, inventoryLocations, inventoryStock, inventoryTransactions, brands, units, selectedBranchId, role, addInventoryItem, addInventoryTransaction, requiredFieldsVersion } = useStore();
   // requiredFieldsVersion (destructured above) forces a re-render whenever the module-level table in requiredFields.ts changes.
   void requiredFieldsVersion;
   const [tab, setTab] = useState(TABS[0]);
@@ -136,6 +136,7 @@ export default function Inventory() {
                     <th className="py-2 pr-6 font-medium">{bi("Arabic Alias", "الاسم بالعربية")}</th>
                     <SortableTh label={bi("Part No.", "رقم القطعة")} active={itemSortKey === "partNo"} direction={itemDir} onClick={() => toggleItemSort("partNo")} className="py-2" />
                     <SortableTh label={bi("Brand", "العلامة التجارية")} active={itemSortKey === "brand"} direction={itemDir} onClick={() => toggleItemSort("brand")} className="py-2" />
+                    <th className="py-2 pr-6 font-medium">{bi("Unit", "الوحدة")}</th>
                     <SortableTh label={bi("Unit Price", "سعر الوحدة")} active={itemSortKey === "unitPrice"} direction={itemDir} onClick={() => toggleItemSort("unitPrice")} className="py-2" />
                     <SortableTh label={bi("Reorder Level", "حد إعادة الطلب")} active={itemSortKey === "reorderLevel"} direction={itemDir} onClick={() => toggleItemSort("reorderLevel")} className="py-2" />
                     <SortableTh label={bi("Total Stock", "إجمالي المخزون")} active={itemSortKey === "totalStock"} direction={itemDir} onClick={() => toggleItemSort("totalStock")} className="py-2" />
@@ -150,6 +151,7 @@ export default function Inventory() {
                         <td className="py-2.5 pr-6 text-[var(--color-ink-secondary)]" dir="rtl">{i.nameAr ?? "—"}</td>
                         <td className="py-2.5 text-[var(--color-ink-secondary)]">{i.partNo}</td>
                         <td className="py-2.5 text-[var(--color-ink-secondary)]">{i.brand}</td>
+                        <td className="py-2.5 pr-6 text-[var(--color-ink-secondary)]">{i.unit ?? "—"}</td>
                         <td className="py-2.5 tabular-nums">{formatCurrency(i.unitPrice)}</td>
                         <td className="py-2.5 tabular-nums">{i.reorderLevel}</td>
                         <td className="py-2.5 tabular-nums">
@@ -337,6 +339,12 @@ export default function Inventory() {
             <Select value={itemForm.brand} onChange={(e) => setItemForm({ ...itemForm, brand: e.target.value })}>
               <option value="">{bi("Choose brand...", "اختر العلامة التجارية...")}</option>
               {brands.map((b) => <option key={b.id} value={b.name}>{b.name}</option>)}
+            </Select>
+          </Field>
+          <Field label={bi("Unit of measure", "وحدة القياس")} required={isFieldRequired("inventoryItem", "unit")}>
+            <Select value={itemForm.unit} onChange={(e) => setItemForm({ ...itemForm, unit: e.target.value })}>
+              <option value="">{bi("Choose unit...", "اختر الوحدة...")}</option>
+              {units.map((u) => <option key={u.id} value={u.name}>{u.name}</option>)}
             </Select>
           </Field>
           <Field label={bi("Unit price (SAR)", "سعر الوحدة (ريال)")} required={isFieldRequired("inventoryItem", "unitPrice")}><Input type="number" value={itemForm.unitPrice} onChange={(e) => setItemForm({ ...itemForm, unitPrice: Number(e.target.value) })} /></Field>

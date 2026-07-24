@@ -9,6 +9,7 @@ export type DemoAction =
   | "create_job"
   | "manage_brand"
   | "manage_category"
+  | "manage_unit"
   | "manage_inventory"
   | "assign_technician"
   | "edit_workflow"
@@ -35,6 +36,7 @@ export const DEFAULT_ACTION_ROLES: Record<DemoAction, Role[]> = {
   create_job: OFFICE,
   manage_brand: ["manager", "admin"],
   manage_category: ["manager", "admin"],
+  manage_unit: ["manager", "admin"],
   manage_inventory: MANAGEMENT,
   assign_technician: MANAGEMENT,
   edit_workflow: ["manager", "admin"],

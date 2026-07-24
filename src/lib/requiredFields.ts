@@ -98,6 +98,7 @@ export const REQUIRED_FIELD_DEFS: Record<RequiredFieldEntity, RequiredFieldDef[]
     { key: "nameAr", label: "Arabic alias", labelAr: "الاسم بالعربية", defaultRequired: false },
     { key: "partNo", label: "Part no.", labelAr: "رقم القطعة", defaultRequired: true, locked: true },
     { key: "brand", label: "Brand", labelAr: "العلامة التجارية", defaultRequired: false },
+    { key: "unit", label: "Unit of measure", labelAr: "وحدة القياس", defaultRequired: false },
     { key: "unitPrice", label: "Unit price", labelAr: "سعر الوحدة", defaultRequired: false },
     { key: "reorderLevel", label: "Reorder level", labelAr: "حد إعادة الطلب", defaultRequired: false },
   ],

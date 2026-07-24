@@ -45,6 +45,16 @@ async function main() {
     ].map((c) => prisma.category.create({ data: c }))
   );
 
+  await Promise.all(
+    [
+      { name: "Piece", nameAr: "قطعة", code: "PCS", unitType: "Base", decimalPlaces: 0 },
+      { name: "Box", nameAr: "صندوق", code: "BOX", unitType: "Alternate", baseUnitName: "Piece", conversionFactor: 12, decimalPlaces: 0 },
+      { name: "Kilogram", nameAr: "كيلوغرام", code: "KG", unitType: "Base", decimalPlaces: 3 },
+      { name: "Meter", nameAr: "متر", code: "MTR", unitType: "Base", decimalPlaces: 2 },
+      { name: "Liter", nameAr: "لتر", code: "LTR", unitType: "Base", decimalPlaces: 2 },
+    ].map((u) => prisma.unitOfMeasure.create({ data: u }))
+  );
+
   const brands = await Promise.all(
     [
       { name: "Samsung", warrantyMonths: 12, rules: "Standard 12-month manufacturer warranty from purchase date; OEM claim required for parts over SAR 200." },

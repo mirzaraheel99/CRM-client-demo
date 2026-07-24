@@ -21,6 +21,7 @@ const ACTION_LABELS: Record<DemoAction, string> = {
   create_job: bi("Create job card", "إنشاء بطاقة عمل"),
   manage_brand: bi("Manage brands", "إدارة العلامات التجارية"),
   manage_category: bi("Manage categories", "إدارة الفئات"),
+  manage_unit: bi("Manage units of measure", "إدارة وحدات القياس"),
   manage_inventory: bi("Manage inventory", "إدارة المخزون"),
   assign_technician: bi("Assign technician", "إسناد فني"),
   edit_workflow: bi("Edit workflow", "تعديل سير العمل"),

@@ -102,6 +102,19 @@ export interface Category {
 
 export type ApplianceCategory = string;
 
+export interface UnitOfMeasure {
+  id: string;
+  name: string;
+  nameAr?: string;
+  code?: string;
+  unitType: "Base" | "Alternate";
+  roundingType?: string;
+  decimalPlaces: number;
+  baseUnitName?: string;
+  conversionFactor?: number;
+  createdAt: string;
+}
+
 // Saudi Energy Efficiency Program (SEEP) star rating shown on the appliance label.
 export type EnergyRating = 1 | 2 | 3 | 4 | 5;
 
@@ -172,6 +185,7 @@ export interface InventoryItem {
   category: string;
   brand: string;
   partNo: string;
+  unit?: string;
   unitPrice: number;
   reorderLevel: number;
 }

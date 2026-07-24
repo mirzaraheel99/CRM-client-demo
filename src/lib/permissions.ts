@@ -6,6 +6,7 @@ export type DemoAction =
   | "create_job"
   | "manage_brand"
   | "manage_category"
+  | "manage_unit"
   | "manage_inventory"
   | "assign_technician"
   | "edit_workflow"
@@ -32,6 +33,7 @@ const DEFAULT_ACTION_ROLES: Record<DemoAction, Role[]> = {
   create_job: OFFICE,
   manage_brand: ["manager", "admin"],
   manage_category: ["manager", "admin"],
+  manage_unit: ["manager", "admin"],
   manage_inventory: MANAGEMENT,
   assign_technician: MANAGEMENT,
   edit_workflow: ["manager", "admin"],
@@ -100,6 +102,7 @@ export function canAccessPath(role: Role, path: string) {
   if (path.startsWith("/predictive-maintenance")) return MANAGEMENT.includes(role);
   if (path.startsWith("/brands")) return ["manager", "admin"].includes(role);
   if (path.startsWith("/categories")) return ["manager", "admin"].includes(role);
+  if (path.startsWith("/units")) return ["manager", "admin"].includes(role);
   if (path.startsWith("/technicians")) return MANAGEMENT.includes(role);
   if (path.startsWith("/workflow")) return ["manager", "admin"].includes(role);
   if (path.startsWith("/reports")) return MANAGEMENT.includes(role);

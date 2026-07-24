@@ -136,6 +136,21 @@ model Category {
   createdAt             DateTime @default(now())
 }
 
+// Soft reference like Category: InventoryItem.unit (mock/local data, not yet
+// backend-persisted) stores this unit's name as plain text, not a FK.
+model UnitOfMeasure {
+  id               String   @id @default(cuid())
+  name             String   @unique
+  nameAr           String?
+  code             String?
+  unitType         String   @default("Base")
+  roundingType     String?
+  decimalPlaces    Int      @default(0)
+  baseUnitName     String?
+  conversionFactor Float?
+  createdAt        DateTime @default(now())
+}
+
 model Appliance {
   id                String   @id @default(cuid())
   documentNo        String   @unique

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ArrowRight, CheckCircle2, MessageCircle, Smartphone, Mail, ShieldCheck } from "lucide-react";
 import { useStore } from "../lib/store";
-import { Card, CardHeader, Button, Badge } from "../components/ui";
+import { Card, CardHeader, Badge } from "../components/ui";
 import { toast } from "../lib/toast";
 import { cx } from "../lib/utils";
 import { canAccessPath, canPerform } from "../lib/permissions";
@@ -92,9 +92,8 @@ export default function Workflow() {
             </div>
             <button
               type="button"
-              disabled
-              title="Approval safeguards are fixed in this demo"
-              className={cx("h-6 w-11 rounded-full relative cursor-not-allowed opacity-70", step.approvalRequired ? "bg-[var(--color-brand-1)]" : "bg-black/15 dark:bg-white/15")}
+              onClick={() => { const result = updateWorkflowStep(workflow.id, step.stepOrder, { approvalRequired: !step.approvalRequired }); toast(result.message, result.ok ? "success" : "error"); }}
+              className={cx("h-6 w-11 rounded-full relative transition-colors", step.approvalRequired ? "bg-[var(--color-brand-1)]" : "bg-black/15 dark:bg-white/15")}
             >
               <span className={cx("absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform", step.approvalRequired ? "translate-x-5" : "translate-x-0.5")} />
             </button>
@@ -115,7 +114,9 @@ export default function Workflow() {
             ))}
           </div>
 
-          <Button variant="secondary" className="w-full justify-center" disabled>Save &amp; Assign to Job Type (auto-saved)</Button>
+          <p className="flex items-center justify-center gap-1.5 rounded-md bg-[var(--color-status-good)]/10 py-2 text-xs font-medium text-[var(--color-status-good)]">
+            <CheckCircle2 size={13} /> {bi("Changes save automatically", "يتم حفظ التغييرات تلقائياً")}
+          </p>
         </Card>
       )}
 

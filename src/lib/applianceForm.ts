@@ -54,6 +54,33 @@ export function emptyApplianceForm(category: ApplianceCategory = "AC"): Applianc
   };
 }
 
+// Reverse of applianceFormToInput — seeds the edit form from an existing
+// appliance record.
+export function applianceToForm(appliance: Appliance): ApplianceFormState {
+  return {
+    brandId: appliance.brandId,
+    category: appliance.category,
+    model: appliance.model,
+    modelAr: appliance.modelAr ?? "",
+    serialNo: appliance.serialNo,
+    imeiNo: appliance.imeiNo ?? "",
+    purchaseDate: appliance.purchaseDate.slice(0, 10),
+    purchaseInvoiceNo: appliance.purchaseInvoiceNo ?? "",
+    retailerName: appliance.retailerName ?? "",
+    purchasePrice: appliance.purchasePrice != null ? String(appliance.purchasePrice) : "",
+    amcActive: appliance.amcActive ?? false,
+    amcExpiryDate: appliance.amcExpiryDate ? appliance.amcExpiryDate.slice(0, 10) : "",
+    sasoCertNo: appliance.sasoCertNo ?? "",
+    energyRating: appliance.energyRating ? (String(appliance.energyRating) as ApplianceFormState["energyRating"]) : "",
+    countryOfManufacture: appliance.countryOfManufacture ?? "",
+    color: appliance.color ?? "",
+    specification: appliance.specification ?? "",
+    installationDate: appliance.installationDate ? appliance.installationDate.slice(0, 10) : "",
+    installedLocation: appliance.installedLocation ?? "",
+    photoUrl: appliance.photoUrl ?? "",
+  };
+}
+
 export function applianceFormToInput(form: ApplianceFormState): Omit<Appliance, "id" | "documentNo" | "warrantyStatus"> {
   return {
     brandId: form.brandId,

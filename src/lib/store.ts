@@ -90,6 +90,7 @@ interface DemoState {
   addCustomer: (customer: Omit<Customer, "id" | "documentNo" | "createdAt" | "whatsappVerified" | "name">) => Promise<Customer>;
   verifyWhatsapp: (customerId: string) => void;
   addAppliance: (appliance: Omit<Appliance, "id" | "documentNo">) => Promise<Appliance>;
+  updateAppliance: (id: string, patch: Partial<Omit<Appliance, "id" | "documentNo">>) => Promise<ActionResult>;
   addBrand: (brand: Omit<Brand, "id">) => Promise<Brand>;
   addTechnician: (technician: Omit<Technician, "id">) => Promise<Technician>;
   addInventoryItem: (item: Omit<InventoryItem, "id">) => InventoryItem;
@@ -414,6 +415,15 @@ export const useStore = create<DemoState>()(
         const appliance = await api.post<Appliance>("/api/appliances", input);
         await get().hydrate();
         return appliance;
+      },
+      updateAppliance: async (id, patch) => {
+        try {
+          await api.patch(`/api/appliances/${id}`, patch);
+          await get().hydrate();
+          return result(true, "Product updated.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to update product.");
+        }
       },
       addBrand: async (input) => {
         const brand = await api.post<Brand>("/api/brands", input);

@@ -90,4 +90,37 @@ export default async function applianceRoutes(fastify: FastifyInstance) {
       return appliance;
     }
   );
+
+  fastify.patch(
+    "/api/appliances/:id",
+    { preHandler: [fastify.authenticate, fastify.requirePermission("create_appliance")] },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const existing = await prisma.appliance.findUnique({ where: { id } });
+      if (!existing) return reply.code(404).send({ ok: false, message: "Product not found." });
+
+      const parsed = applianceSchema.partial().safeParse(request.body);
+      if (!parsed.success) return reply.code(400).send({ ok: false, message: parsed.error.issues[0]?.message ?? "Invalid input." });
+      const input = parsed.data;
+
+      let brand = input.brandId ? await prisma.brand.findUnique({ where: { id: input.brandId } }) : null;
+      if (input.brandId && !brand) return reply.code(400).send({ ok: false, message: "Choose a valid brand." });
+      if (!brand) brand = await prisma.brand.findUnique({ where: { id: existing.brandId } });
+
+      const purchaseDate = input.purchaseDate ?? existing.purchaseDate.toISOString();
+      const warrantyStatus = brand ? computeWarrantyStatus(purchaseDate, brand.warrantyMonths) : existing.warrantyStatus;
+
+      const appliance = await prisma.appliance.update({
+        where: { id },
+        data: {
+          ...input,
+          warrantyStatus,
+          purchaseDate: input.purchaseDate ? new Date(input.purchaseDate) : undefined,
+          amcExpiryDate: input.amcExpiryDate ? new Date(input.amcExpiryDate) : undefined,
+          installationDate: input.installationDate ? new Date(input.installationDate) : undefined,
+        },
+      });
+      return appliance;
+    }
+  );
 }

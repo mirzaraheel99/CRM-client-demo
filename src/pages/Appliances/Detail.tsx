@@ -1,15 +1,31 @@
+import { useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { ArrowLeft, Wifi } from "lucide-react";
+import { ArrowLeft, Wifi, Pencil } from "lucide-react";
 import { useStore } from "../../lib/store";
-import { Badge, Card, CardHeader } from "../../components/ui";
+import { Badge, Card, CardHeader, Button, Modal, Tabs } from "../../components/ui";
+import { ApplianceBasicFields, AppliancePurchaseFields, ApplianceComplianceFields, ApplianceSiteFields } from "../../components/ApplianceFields";
+import { applianceToForm, applianceFormToInput, type ApplianceFormState } from "../../lib/applianceForm";
 import { JobStatusBadge, JobTypeBadge } from "../../components/StatusBadge";
 import { formatCurrency, formatDate, relativeTime } from "../../lib/utils";
+import { toast } from "../../lib/toast";
+import { canPerform } from "../../lib/permissions";
 import { APPLIANCE_CATEGORY_AR, WARRANTY_STATUS_AR, bi } from "../../lib/domainAr";
+
+const EDIT_TABS = ["Basic", "Purchase", "Compliance", "Site"];
+const EDIT_TAB_LABELS: Record<string, string> = {
+  Basic: bi("Basic", "أساسي"),
+  Purchase: bi("Purchase & Warranty", "الشراء والضمان"),
+  Compliance: bi("Compliance & Specs", "المطابقة والمواصفات"),
+  Site: bi("Site & Photo", "الموقع والصورة"),
+};
 
 export default function ApplianceDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { appliances, applianceTelemetry, customers, brands, jobCards, selectedBranchId } = useStore();
+  const { appliances, applianceTelemetry, customers, brands, jobCards, selectedBranchId, role, aliasFieldsEnabled, updateAppliance } = useStore();
+  const [editOpen, setEditOpen] = useState(false);
+  const [editTab, setEditTab] = useState("Basic");
+  const [editForm, setEditForm] = useState<ApplianceFormState | null>(null);
   const history = jobCards.filter((job) => job.applianceId === id && (selectedBranchId === "all" || job.branchId === selectedBranchId)).sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
   const appliance = appliances.find((candidate) => candidate.id === id && (selectedBranchId === "all" || history.length > 0));
   if (!appliance) return <p className="text-sm text-[var(--color-ink-muted)]">{bi("Product not found for this branch.", "لم يتم العثور على المنتج لهذا الفرع.")}</p>;
@@ -17,16 +33,36 @@ export default function ApplianceDetail() {
   const brand = brands.find((candidate) => candidate.id === appliance.brandId);
   const telemetry = applianceTelemetry.find((candidate) => candidate.applianceId === appliance.id);
 
+  function openEdit() {
+    setEditForm(applianceToForm(appliance!));
+    setEditTab("Basic");
+    setEditOpen(true);
+  }
+
+  async function submitEdit() {
+    if (!editForm || !appliance) return;
+    if (!editForm.brandId || !editForm.model.trim() || !editForm.serialNo.trim() || !editForm.purchaseDate) {
+      toast("Fill in the required Basic fields.", "error");
+      return;
+    }
+    const outcome = await updateAppliance(appliance.id, applianceFormToInput(editForm));
+    toast(outcome.message, outcome.ok ? "success" : "error");
+    if (outcome.ok) setEditOpen(false);
+  }
+
   return (
     <div className="space-y-5">
       <button onClick={() => navigate(-1)} className="flex items-center gap-1.5 text-sm text-[var(--color-ink-muted)] hover:text-[var(--color-ink-primary)]"><ArrowLeft size={15} /> {bi("Back", "رجوع")}</button>
-      <div className="animate-rise-in">
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-xl font-semibold tracking-tight">{appliance.model}</h1>
-          {appliance.isSmartConnected && <Badge tone="good" icon={<Wifi size={11} />}>{bi("Smart Connected", "متصل ذكي")}</Badge>}
+      <div className="animate-rise-in flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-xl font-semibold tracking-tight">{appliance.model}</h1>
+            {appliance.isSmartConnected && <Badge tone="good" icon={<Wifi size={11} />}>{bi("Smart Connected", "متصل ذكي")}</Badge>}
+          </div>
+          {appliance.modelAr && <p dir="rtl" className="text-sm text-[var(--color-ink-secondary)]">{appliance.modelAr}</p>}
+          <p className="text-sm text-[var(--color-ink-muted)]">Product No. {appliance.documentNo} | Customer association is recorded per service order.</p>
         </div>
-        {appliance.modelAr && <p dir="rtl" className="text-sm text-[var(--color-ink-secondary)]">{appliance.modelAr}</p>}
-        <p className="text-sm text-[var(--color-ink-muted)]">Product No. {appliance.documentNo} | Customer association is recorded per service order.</p>
+        {canPerform(role, "create_appliance") && <Button variant="secondary" size="sm" onClick={openEdit}><Pencil size={14} /> {bi("Edit", "تعديل")}</Button>}
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -94,6 +130,19 @@ export default function ApplianceDetail() {
           </table>
         </div>
       </Card>
+
+      {editForm && (
+        <Modal open={editOpen} onClose={() => setEditOpen(false)} title={bi("Edit Product", "تعديل المنتج")} width="lg">
+          <div className="space-y-4">
+            <Tabs tabs={EDIT_TABS} active={editTab} onChange={setEditTab} labels={EDIT_TAB_LABELS} />
+            {editTab === "Basic" && <ApplianceBasicFields value={editForm} onChange={(patch) => setEditForm({ ...editForm, ...patch })} brands={brands} aliasFieldsEnabled={aliasFieldsEnabled} />}
+            {editTab === "Purchase" && <AppliancePurchaseFields value={editForm} onChange={(patch) => setEditForm({ ...editForm, ...patch })} />}
+            {editTab === "Compliance" && <ApplianceComplianceFields value={editForm} onChange={(patch) => setEditForm({ ...editForm, ...patch })} />}
+            {editTab === "Site" && <ApplianceSiteFields value={editForm} onChange={(patch) => setEditForm({ ...editForm, ...patch })} />}
+            <Button className="w-full justify-center" onClick={submitEdit}>{bi("Save Changes", "حفظ التغييرات")}</Button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

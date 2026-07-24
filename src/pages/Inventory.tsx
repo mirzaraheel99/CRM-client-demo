@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
-import { PackagePlus, PackageMinus, ArrowLeftRight, Undo2, Sparkles, Search } from "lucide-react";
+import { PackagePlus, PackageMinus, ArrowLeftRight, Undo2, Sparkles, Search, Building2 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { Card, CardHeader, Tabs, Button, Input, Select, Field, Modal, Badge, SortableTh, EmptyState } from "../components/ui";
 import { HorizontalBarChart } from "../components/charts";
 import { formatCurrency, formatDateTime } from "../lib/utils";
-import { inventoryLocationsByBranch, inventoryStockByBranch, inventoryTransactionsByBranch, stockByBranch, smartReorderSuggestions } from "../lib/selectors";
+import { inventoryLocationsByBranch, inventoryStockByBranch, inventoryTransactionsByBranch, stockByBranch, totalStockByItem, smartReorderSuggestions } from "../lib/selectors";
 import { toast } from "../lib/toast";
 import { canPerform } from "../lib/permissions";
 import { useSort } from "../lib/useSort";
@@ -33,6 +33,7 @@ export default function Inventory() {
   const [itemModal, setItemModal] = useState(false);
   const [orderedItems, setOrderedItems] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
+  const [breakdownItem, setBreakdownItem] = useState<InventoryItem | null>(null);
 
   const [txnForm, setTxnForm] = useState({ itemId: "", locationId: "", destLocationId: "", qty: 1 });
   const [itemForm, setItemForm] = useState(emptyItemForm());
@@ -46,6 +47,15 @@ export default function Inventory() {
     for (const s of scopedStock) map.set(s.itemId, (map.get(s.itemId) ?? 0) + s.qty);
     return map;
   }, [scopedStock]);
+
+  // Unlike stockByItem (scoped to the top-nav branch selector), this always
+  // reflects every branch, so admins can see true company-wide stock even
+  // while viewing a single branch's scope.
+  const companyStockByItem = useMemo(() => totalStockByItem(inventoryStock), [inventoryStock]);
+  const companyStockByBranch = useMemo(
+    () => stockByBranch(inventoryItems, inventoryLocations, inventoryStock, branches),
+    [inventoryItems, inventoryLocations, inventoryStock, branches]
+  );
 
   const itemSortValue = (i: InventoryItem, key: ItemSortKey) => {
     if (key === "name") return i.name;
@@ -139,12 +149,15 @@ export default function Inventory() {
                     <th className="py-2 pr-6 font-medium">{bi("Unit", "الوحدة")}</th>
                     <SortableTh label={bi("Unit Price", "سعر الوحدة")} active={itemSortKey === "unitPrice"} direction={itemDir} onClick={() => toggleItemSort("unitPrice")} className="py-2" />
                     <SortableTh label={bi("Reorder Level", "حد إعادة الطلب")} active={itemSortKey === "reorderLevel"} direction={itemDir} onClick={() => toggleItemSort("reorderLevel")} className="py-2" />
-                    <SortableTh label={bi("Total Stock", "إجمالي المخزون")} active={itemSortKey === "totalStock"} direction={itemDir} onClick={() => toggleItemSort("totalStock")} className="py-2" />
+                    <SortableTh label={selectedBranchId === "all" ? bi("Total Stock", "إجمالي المخزون") : bi("Stock (This Branch)", "المخزون (هذا الفرع)")} active={itemSortKey === "totalStock"} direction={itemDir} onClick={() => toggleItemSort("totalStock")} className="py-2" />
+                    {selectedBranchId !== "all" && <th className="py-2 pr-6 font-medium">{bi("Company-wide Stock", "المخزون على مستوى الشركة")}</th>}
+                    <th className="py-2 font-medium">{bi("By Branch", "حسب الفرع")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {sortedItems.map((i) => {
                     const total = stockByItem.get(i.id) ?? 0;
+                    const companyTotal = companyStockByItem.get(i.id) ?? 0;
                     return (
                       <tr key={i.id} className="border-b last:border-0 [border-color:var(--color-border)] transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.03]">
                         <td className="py-2.5 font-medium">{i.name}</td>
@@ -156,6 +169,14 @@ export default function Inventory() {
                         <td className="py-2.5 tabular-nums">{i.reorderLevel}</td>
                         <td className="py-2.5 tabular-nums">
                           <Badge tone={total <= i.reorderLevel ? "critical" : "good"}>{total}</Badge>
+                        </td>
+                        {selectedBranchId !== "all" && (
+                          <td className="py-2.5 pr-6 tabular-nums text-[var(--color-ink-secondary)]">{companyTotal}</td>
+                        )}
+                        <td className="py-2.5">
+                          <Button size="sm" variant="secondary" onClick={() => setBreakdownItem(i)}>
+                            <Building2 size={13} /> {bi("View", "عرض")}
+                          </Button>
                         </td>
                       </tr>
                     );
@@ -351,6 +372,26 @@ export default function Inventory() {
           <Field label={bi("Reorder level", "حد إعادة الطلب")} required={isFieldRequired("inventoryItem", "reorderLevel")}><Input type="number" value={itemForm.reorderLevel} onChange={(e) => setItemForm({ ...itemForm, reorderLevel: Number(e.target.value) })} /></Field>
           <Button className="w-full justify-center" onClick={submitItem} disabled={getMissingRequiredFields("inventoryItem", itemForm).length > 0}>{bi("Save Item", "حفظ الصنف")}</Button>
         </div>
+      </Modal>
+
+      <Modal open={!!breakdownItem} onClose={() => setBreakdownItem(null)} title={breakdownItem ? bi(`Stock by branch — ${breakdownItem.name}`, `المخزون حسب الفرع — ${breakdownItem.name}`) : ""}>
+        {breakdownItem && (
+          <div className="space-y-2">
+            {companyStockByBranch.map(({ branch, totals }) => {
+              const qty = totals.get(breakdownItem.id) ?? 0;
+              return (
+                <div key={branch.id} className="flex items-center justify-between rounded-md border px-3 py-2 [border-color:var(--color-border)]">
+                  <span className="text-sm text-[var(--color-ink-secondary)]">{branch.name}</span>
+                  <Badge tone={qty <= breakdownItem.reorderLevel ? "critical" : "good"}>{qty}</Badge>
+                </div>
+              );
+            })}
+            <div className="flex items-center justify-between pt-2 mt-1 border-t [border-color:var(--color-border)]">
+              <span className="text-sm font-medium">{bi("Company-wide total", "الإجمالي على مستوى الشركة")}</span>
+              <Badge tone="brand">{companyStockByItem.get(breakdownItem.id) ?? 0}</Badge>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

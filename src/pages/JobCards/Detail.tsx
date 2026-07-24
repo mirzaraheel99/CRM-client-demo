@@ -498,8 +498,7 @@ export default function JobCardDetail() {
                     </div>
                   </div>
                 )}
-                {job.jobType === "non_warranty" ? (
-                  <>
+                <>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <p className="text-xs text-[var(--color-ink-muted)]">{bi("Estimate amount", "مبلغ التقدير")}</p>
@@ -533,7 +532,7 @@ export default function JobCardDetail() {
                       </Link>
                     </div>
 
-                    {job.currentStage === "Customer Approval" && job.customerApproved !== true && canPerform(role, "record_customer_approval") && (
+                    {(job.estimateAmount ?? 0) > 0 && job.customerApproved !== true && canPerform(role, "record_customer_approval") && (
                       <div className="border-t pt-4 [border-color:var(--color-border)] flex gap-2">
                         <Button onClick={() => showResult(approveCustomer(job.id, true))}><CheckCircle2 size={14} /> {bi("Approve", "موافقة")}</Button>
                         {job.customerApproved == null && <Button variant="danger" onClick={() => showResult(approveCustomer(job.id, false))}><XCircle size={14} /> {bi("Decline", "رفض")}</Button>}
@@ -560,13 +559,7 @@ export default function JobCardDetail() {
                         <PaymentPanel jobcardId={job.id} amount={job.finalAmount} payments={jobPayments} />
                       </div>
                     )}
-                  </>
-                ) : (
-                  <div>
-                    <p className="text-xs text-[var(--color-ink-muted)]">{bi("Created", "تاريخ الإنشاء")}</p>
-                    <p className="font-medium">{formatDateTime(job.createdAt)}</p>
-                  </div>
-                )}
+                </>
               </div>
             )}
 

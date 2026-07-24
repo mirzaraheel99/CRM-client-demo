@@ -97,15 +97,6 @@ export default function EstimatePage() {
     );
   }
 
-  if (job.jobType !== "non_warranty") {
-    return (
-      <div className="text-center py-20">
-        <p className="text-sm text-[var(--color-ink-muted)]">{bi("Warranty jobs do not carry a customer estimate.", "لا تتضمن مهام الضمان تقديراً للعميل.")}</p>
-        <Link to={`/jobcards/${job.id}`} className="text-sm text-[var(--color-brand-1)]">{bi("Back to job card", "العودة إلى بطاقة العمل")}</Link>
-      </div>
-    );
-  }
-
   const editable = canPerform(role, "set_estimate");
   // Estimates can be built or amended at any stage once diagnosis notes exist —
   // revisiting one after repair, QA, etc. is expected, e.g. when repair turns
@@ -516,7 +507,7 @@ export default function EstimatePage() {
         )}
       </Card>
 
-      {job.currentStage === "Customer Approval" && job.customerApproved !== true && canPerform(role, "record_customer_approval") && (
+      {(job.estimateAmount ?? 0) > 0 && job.customerApproved !== true && canPerform(role, "record_customer_approval") && (
         <div className="flex gap-2">
           <Button onClick={() => showResult(approveCustomer(job.id, true))}><CheckCircle2 size={14} /> {bi("Approve", "موافقة")}</Button>
           {job.customerApproved == null && <Button variant="danger" onClick={() => showResult(approveCustomer(job.id, false))}><XCircle size={14} /> {bi("Decline", "رفض")}</Button>}

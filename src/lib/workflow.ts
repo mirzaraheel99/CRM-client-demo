@@ -43,7 +43,7 @@ export function stageRequirements(job: JobCard, context: JobFlowContext): StageR
   }
   if (job.currentStage === "Ready for Handover") {
     const requirements: StageRequirement[] = [];
-    if (job.jobType === "non_warranty" && isFieldRequired("jobCardStage", "finalAmount")) {
+    if ((job.jobType === "non_warranty" || job.finalAmount != null) && isFieldRequired("jobCardStage", "finalAmount")) {
       requirements.push(
         { label: "Final amount confirmed", met: (job.finalAmount ?? 0) > 0 },
         { label: "Payment collected", met: (job.finalAmount ?? 0) > 0 && paidTotal(context.payments) >= (job.finalAmount ?? 0) }

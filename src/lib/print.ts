@@ -41,7 +41,7 @@ export function printEstimate({
   const subtotal = total / 1.15;
   const vatTotal = total - subtotal;
   const estimateNo = `EST-${job.documentNo}`;
-  const needsApproval = job.jobType === "non_warranty" && job.currentStage === "Customer Approval" && job.customerApproved !== true;
+  const needsApproval = (job.estimateAmount ?? 0) > 0 && job.customerApproved !== true;
   const showDecision = needsApproval && Boolean(onApprove || onDecline);
 
   const html = `<!doctype html>

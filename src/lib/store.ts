@@ -828,7 +828,6 @@ export const useStore = create<DemoState>()(
         if (!canPerform(state.role, "finalize_job")) return result(false, "Your role cannot finalize charges.");
         const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
         if (!job) return result(false, "Job card not found.");
-        if (job.jobType !== "non_warranty") return result(false, "Warranty jobs do not require customer payment.");
         const partsTotal = state.partsUsed.filter((part) => part.jobcardId === jobcardId).reduce((sum, part) => sum + part.totalPrice, 0);
         if (!Number.isFinite(amount) || amount <= 0) return result(false, "Final amount must be greater than zero.");
         if (amount < partsTotal) return result(false, `Final amount cannot be below the ${partsTotal.toLocaleString()} SAR parts total.`);
@@ -895,7 +894,7 @@ export const useStore = create<DemoState>()(
         if (job.currentStage !== "Diagnosis" && job.currentStage !== "Repair") return result(false, "Parts can only be issued during Diagnosis or Repair.");
         if (!Number.isInteger(qty) || qty <= 0) return result(false, "Part quantity must be a positive whole number.");
         const currentPartsTotal = state.partsUsed.filter((part) => part.jobcardId === jobcardId).reduce((sum, part) => sum + part.totalPrice, 0);
-        if (job.jobType === "non_warranty" && job.currentStage === "Repair" && job.customerApproved === true && currentPartsTotal + item.unitPrice * qty > (job.estimateAmount ?? 0)) {
+        if (job.currentStage === "Repair" && job.customerApproved === true && currentPartsTotal + item.unitPrice * qty > (job.estimateAmount ?? 0)) {
           return result(false, "This part would exceed the approved estimate. Record a revised estimate and customer approval before repair.");
         }
         const branchLocations = state.inventoryLocations.filter((location) => location.branchId === job.branchId);

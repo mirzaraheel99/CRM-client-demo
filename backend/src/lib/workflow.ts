@@ -33,7 +33,7 @@ export function stageRequirements(job: JobCard): StageRequirement[] {
         { label: "Customer signature captured", met: Boolean(job.customerSignature?.trim()) },
         { label: "Asset handover confirmed", met: job.assetHandedOver === true },
       ];
-      if (job.jobType === "non_warranty") {
+      if (job.jobType === "non_warranty" || job.finalAmount != null) {
         requirements.unshift(
           { label: "Final amount confirmed", met: (job.finalAmount ?? 0) > 0 },
           { label: "Payment collected", met: true } // TODO Phase 2: Payment table

@@ -25,12 +25,14 @@ type ItemSortKey = "name" | "partNo" | "brand" | "unitPrice" | "reorderLevel" | 
 const emptyItemForm = () => ({ name: "", nameAr: "", category: "Electrical", brand: "", partNo: "", unit: "", unitPrice: 0, reorderLevel: 5, notes: "" });
 
 export default function Inventory() {
-  const { branches, inventoryItems, inventoryLocations, inventoryStock, inventoryTransactions, brands, units, selectedBranchId, role, addInventoryItem, addInventoryTransaction, requiredFieldsVersion } = useStore();
+  const { branches, inventoryItems, inventoryLocations, inventoryStock, inventoryTransactions, brands, units, selectedBranchId, role, addInventoryItem, updateInventoryItem, deleteInventoryItem, addInventoryTransaction, requiredFieldsVersion } = useStore();
   // requiredFieldsVersion (destructured above) forces a re-render whenever the module-level table in requiredFields.ts changes.
   void requiredFieldsVersion;
+  const canManageInventory = canPerform(role, "manage_inventory");
   const [tab, setTab] = useState(TABS[0]);
   const [txnModal, setTxnModal] = useState<InventoryTransaction["type"] | null>(null);
   const [itemModal, setItemModal] = useState(false);
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [orderedItems, setOrderedItems] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [breakdownItem, setBreakdownItem] = useState<InventoryItem | null>(null);
@@ -106,12 +108,40 @@ export default function Inventory() {
     }
   }
 
+  function openAddItem() {
+    setEditingItem(null);
+    setItemForm(emptyItemForm());
+    setItemModal(true);
+  }
+
+  function openEditItem(item: InventoryItem) {
+    setEditingItem(item);
+    setItemForm({
+      name: item.name, nameAr: item.nameAr ?? "", category: item.category, brand: item.brand, partNo: item.partNo,
+      unit: item.unit ?? "", unitPrice: item.unitPrice, reorderLevel: item.reorderLevel, notes: item.notes ?? "",
+    });
+    setItemModal(true);
+  }
+
   function submitItem() {
     if (getMissingRequiredFields("inventoryItem", itemForm).length > 0) return;
-    addInventoryItem({ ...itemForm, nameAr: itemForm.nameAr.trim() || undefined, notes: itemForm.notes.trim() || undefined });
+    const payload = { ...itemForm, nameAr: itemForm.nameAr.trim() || undefined, notes: itemForm.notes.trim() || undefined };
+    if (editingItem) {
+      const outcome = updateInventoryItem(editingItem.id, payload);
+      toast(outcome.message, outcome.ok ? "success" : "error");
+      if (!outcome.ok) return;
+    } else {
+      addInventoryItem(payload);
+      toast(`${itemForm.name} added to inventory.`);
+    }
     setItemForm(emptyItemForm());
     setItemModal(false);
-    toast(`${itemForm.name} added to inventory.`);
+  }
+
+  function removeItem(item: InventoryItem) {
+    if (!confirm(`Delete inventory item "${item.name}"?`)) return;
+    const outcome = deleteInventoryItem(item.id);
+    toast(outcome.message, outcome.ok ? "success" : "error");
   }
 
   return (
@@ -126,7 +156,7 @@ export default function Inventory() {
           <Button variant="secondary" onClick={() => setTxnModal("issue")}><PackageMinus size={14} /> {bi("Issue", "صرف")}</Button>
           <Button variant="secondary" onClick={() => setTxnModal("return")}><Undo2 size={14} /> {bi("Return", "إرجاع")}</Button>
           <Button variant="secondary" onClick={() => setTxnModal("transfer")}><ArrowLeftRight size={14} /> {bi("Transfer", "نقل")}</Button>
-          <Button onClick={() => setItemModal(true)}>+ {bi("Add Item", "إضافة صنف")}</Button>
+          <Button onClick={openAddItem}>+ {bi("Add Item", "إضافة صنف")}</Button>
         </div>}
       </div>
 
@@ -174,9 +204,17 @@ export default function Inventory() {
                           <td className="py-2.5 pr-6 tabular-nums text-[var(--color-ink-secondary)]">{companyTotal}</td>
                         )}
                         <td className="py-2.5">
-                          <Button size="sm" variant="secondary" onClick={() => setBreakdownItem(i)}>
-                            <Building2 size={13} /> {bi("View", "عرض")}
-                          </Button>
+                          <div className="flex gap-1.5 flex-wrap">
+                            <Button size="sm" variant="secondary" onClick={() => setBreakdownItem(i)}>
+                              <Building2 size={13} /> {bi("View", "عرض")}
+                            </Button>
+                            {canManageInventory && (
+                              <>
+                                <Button size="sm" variant="secondary" onClick={() => openEditItem(i)}>{bi("Edit", "تعديل")}</Button>
+                                <Button size="sm" variant="danger" onClick={() => removeItem(i)}>{bi("Delete", "حذف")}</Button>
+                              </>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -351,7 +389,7 @@ export default function Inventory() {
         </div>
       </Modal>
 
-      <Modal open={itemModal} onClose={() => setItemModal(false)} title={bi("Add Inventory Item", "إضافة صنف للمخزون")}>
+      <Modal open={itemModal} onClose={() => setItemModal(false)} title={editingItem ? bi("Edit Inventory Item", "تعديل صنف المخزون") : bi("Add Inventory Item", "إضافة صنف للمخزون")}>
         <div className="space-y-3">
           <Field label={bi("Name", "الاسم")} required={isFieldRequired("inventoryItem", "name")}><Input value={itemForm.name} onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })} /></Field>
           <Field label={bi("Arabic Alias (shown on customer invoices/messages)", "الاسم بالعربية (يظهر في فواتير ورسائل العميل)")} required={isFieldRequired("inventoryItem", "nameAr")}><Input dir="rtl" value={itemForm.nameAr} onChange={(e) => setItemForm({ ...itemForm, nameAr: e.target.value })} /></Field>

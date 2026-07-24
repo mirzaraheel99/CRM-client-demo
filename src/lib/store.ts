@@ -94,6 +94,8 @@ interface DemoState {
   addAppliance: (appliance: Omit<Appliance, "id" | "documentNo">) => Promise<Appliance>;
   updateAppliance: (id: string, patch: Partial<Omit<Appliance, "id" | "documentNo">>) => Promise<ActionResult>;
   addBrand: (brand: Omit<Brand, "id">) => Promise<Brand>;
+  updateBrand: (id: string, patch: Partial<Omit<Brand, "id">>) => Promise<ActionResult>;
+  deleteBrand: (id: string) => Promise<ActionResult>;
   addCategory: (category: Omit<Category, "id" | "createdAt">) => Promise<ActionResult>;
   updateCategory: (id: string, patch: Partial<Omit<Category, "id" | "createdAt">>) => Promise<ActionResult>;
   deleteCategory: (id: string) => Promise<ActionResult>;
@@ -101,7 +103,11 @@ interface DemoState {
   updateUnit: (id: string, patch: Partial<Omit<UnitOfMeasure, "id" | "createdAt">>) => Promise<ActionResult>;
   deleteUnit: (id: string) => Promise<ActionResult>;
   addTechnician: (technician: Omit<Technician, "id">) => Promise<Technician>;
+  updateTechnician: (id: string, patch: Partial<Omit<Technician, "id">>) => Promise<ActionResult>;
+  deleteTechnician: (id: string) => Promise<ActionResult>;
   addInventoryItem: (item: Omit<InventoryItem, "id">) => InventoryItem;
+  updateInventoryItem: (id: string, patch: Partial<Omit<InventoryItem, "id">>) => ActionResult;
+  deleteInventoryItem: (id: string) => ActionResult;
   addInventoryTransaction: (transaction: Omit<InventoryTransaction, "id" | "timestamp">) => ActionResult;
 
   createServiceOrder: (input: {
@@ -443,6 +449,24 @@ export const useStore = create<DemoState>()(
         await get().hydrate();
         return brand;
       },
+      updateBrand: async (id, patch) => {
+        try {
+          await api.patch(`/api/brands/${id}`, patch);
+          await get().hydrate();
+          return result(true, "Brand updated.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to update brand.");
+        }
+      },
+      deleteBrand: async (id) => {
+        try {
+          await api.delete(`/api/brands/${id}`);
+          await get().hydrate();
+          return result(true, "Brand deleted.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to delete brand.");
+        }
+      },
       addCategory: async (input) => {
         try {
           await api.post<Category>("/api/categories", input);
@@ -502,10 +526,49 @@ export const useStore = create<DemoState>()(
         await get().hydrate();
         return technician;
       },
+      updateTechnician: async (id, patch) => {
+        try {
+          await api.patch(`/api/technicians/${id}`, patch);
+          await get().hydrate();
+          return result(true, "Technician updated.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to update technician.");
+        }
+      },
+      deleteTechnician: async (id) => {
+        try {
+          await api.delete(`/api/technicians/${id}`);
+          await get().hydrate();
+          return result(true, "Technician deleted.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to delete technician.");
+        }
+      },
       addInventoryItem: (input) => {
         const item: InventoryItem = { ...input, id: nextId("item") };
         set((state) => ({ inventoryItems: [item, ...state.inventoryItems] }));
         return item;
+      },
+      updateInventoryItem: (id, patch) => {
+        const state = get();
+        if (!canPerform(state.role, "manage_inventory")) return result(false, "Your role cannot manage inventory.");
+        if (!state.inventoryItems.some((item) => item.id === id)) return result(false, "Inventory item not found.");
+        set((current) => ({ inventoryItems: current.inventoryItems.map((item) => item.id === id ? { ...item, ...patch } : item) }));
+        return result(true, "Inventory item updated.");
+      },
+      deleteInventoryItem: (id) => {
+        const state = get();
+        if (!canPerform(state.role, "manage_inventory")) return result(false, "Your role cannot manage inventory.");
+        const item = state.inventoryItems.find((candidate) => candidate.id === id);
+        if (!item) return result(false, "Inventory item not found.");
+        const stockQty = state.inventoryStock.filter((s) => s.itemId === id).reduce((sum, s) => sum + s.qty, 0);
+        if (stockQty > 0) return result(false, `Cannot delete: ${stockQty} unit${stockQty === 1 ? "" : "s"} of this item are still in stock.`);
+        const hasTransactions = state.inventoryTransactions.some((t) => t.itemId === id);
+        if (hasTransactions) return result(false, "Cannot delete: this item has recorded stock transactions.");
+        const usedInJobs = state.partsUsed.some((p) => p.itemId === id) || state.estimateLineItems.some((line) => line.itemId === id);
+        if (usedInJobs) return result(false, "Cannot delete: this item is referenced by a job card's parts or estimate.");
+        set((current) => ({ inventoryItems: current.inventoryItems.filter((candidate) => candidate.id !== id) }));
+        return result(true, "Inventory item deleted.");
       },
       addInventoryTransaction: (input) => {
         const state = get();

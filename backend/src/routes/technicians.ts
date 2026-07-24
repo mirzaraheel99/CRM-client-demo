@@ -39,4 +39,34 @@ export default async function technicianRoutes(fastify: FastifyInstance) {
       return prisma.technician.update({ where: { id }, data: { status: body.data.status } });
     }
   );
+
+  fastify.patch(
+    "/api/technicians/:id",
+    { preHandler: [fastify.authenticate, fastify.requirePermission("assign_technician")] },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const existing = await prisma.technician.findUnique({ where: { id } });
+      if (!existing) return reply.code(404).send({ ok: false, message: "Technician not found." });
+
+      const parsed = technicianSchema.partial().safeParse(request.body);
+      if (!parsed.success) return reply.code(400).send({ ok: false, message: parsed.error.issues[0]?.message ?? "Invalid input." });
+      return prisma.technician.update({ where: { id }, data: parsed.data });
+    }
+  );
+
+  fastify.delete(
+    "/api/technicians/:id",
+    { preHandler: [fastify.authenticate, fastify.requirePermission("assign_technician")] },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const technician = await prisma.technician.findUnique({ where: { id } });
+      if (!technician) return reply.code(404).send({ ok: false, message: "Technician not found." });
+
+      const inUse = await prisma.jobCard.count({ where: { technicianId: id } });
+      if (inUse > 0) return reply.code(400).send({ ok: false, message: `Cannot delete: ${inUse} job card${inUse === 1 ? "" : "s"} reference this technician.` });
+
+      await prisma.technician.delete({ where: { id } });
+      return { ok: true };
+    }
+  );
 }

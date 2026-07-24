@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useStore } from "../lib/store";
 import { Card, Button, Input, Select, Field, Modal, Badge, Avatar, Tabs, Textarea } from "../components/ui";
 import { toast } from "../lib/toast";
-import type { ApplianceCategory } from "../lib/types";
+import { canPerform } from "../lib/permissions";
+import type { ApplianceCategory, Technician } from "../lib/types";
 import { filterByBranch } from "../lib/selectors";
 import { fallbackDocumentNo } from "../lib/utils";
 import { categoryNameAr, TECHNICIAN_STATUS_AR, bi } from "../lib/domainAr";
@@ -14,11 +15,14 @@ const TAB_LABELS: Record<string, string> = {
 };
 
 export default function Technicians() {
-  const { technicians, jobCards, customers, branches, categories, selectedBranchId, addTechnician, aliasFieldsEnabled } = useStore();
+  const { technicians, jobCards, customers, branches, categories, role, selectedBranchId, addTechnician, updateTechnician, deleteTechnician, aliasFieldsEnabled } = useStore();
+  const canManage = canPerform(role, "assign_technician");
   const [tab, setTab] = useState(TABS[0]);
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<Technician | null>(null);
   const defaultBranchId = selectedBranchId === "all" ? branches[0]?.id ?? "" : selectedBranchId;
-  const [form, setForm] = useState({ name: "", nameAr: "", phone: "", zone: "Zone A", skills: [] as ApplianceCategory[], branchId: defaultBranchId, status: "Available" as const, avatarColor: "#2a78d6", notes: "" });
+  const emptyForm = () => ({ name: "", nameAr: "", phone: "", zone: "Zone A", skills: [] as ApplianceCategory[], branchId: defaultBranchId, status: "Available" as const, avatarColor: "#2a78d6", notes: "" });
+  const [form, setForm] = useState(emptyForm());
   const scopedTechnicians = filterByBranch(technicians, selectedBranchId);
   const scopedJobs = filterByBranch(jobCards, selectedBranchId);
 
@@ -26,12 +30,40 @@ export default function Technicians() {
     setForm((f) => ({ ...f, skills: f.skills.includes(s) ? f.skills.filter((x) => x !== s) : [...f.skills, s] }));
   }
 
+  function openAdd() {
+    setEditing(null);
+    setForm({ ...emptyForm(), branchId: defaultBranchId });
+    setOpen(true);
+  }
+
+  function openEdit(technician: Technician) {
+    setEditing(technician);
+    setForm({
+      name: technician.name, nameAr: technician.nameAr ?? "", phone: technician.phone, zone: technician.zone,
+      skills: technician.skills, branchId: technician.branchId, status: technician.status as "Available",
+      avatarColor: technician.avatarColor, notes: technician.notes ?? "",
+    });
+    setOpen(true);
+  }
+
   async function submit() {
     if (!form.name.trim() || !form.phone.trim() || !form.branchId || form.skills.length === 0) return;
-    await addTechnician({ ...form, nameAr: form.nameAr.trim() || undefined, notes: form.notes.trim() || undefined });
-    setForm({ name: "", nameAr: "", phone: "", zone: "Zone A", skills: [], branchId: defaultBranchId, status: "Available", avatarColor: "#2a78d6", notes: "" });
-    setOpen(false);
-    toast(`${form.name} added to technicians.`);
+    const payload = { ...form, nameAr: form.nameAr.trim() || undefined, notes: form.notes.trim() || undefined };
+    if (editing) {
+      const outcome = await updateTechnician(editing.id, payload);
+      toast(outcome.message, outcome.ok ? "success" : "error");
+      if (outcome.ok) setOpen(false);
+    } else {
+      await addTechnician(payload);
+      setOpen(false);
+      toast(`${form.name} added to technicians.`);
+    }
+  }
+
+  async function remove(technician: Technician) {
+    if (!confirm(`Delete technician "${technician.name}"?`)) return;
+    const outcome = await deleteTechnician(technician.id);
+    toast(outcome.message, outcome.ok ? "success" : "error");
   }
 
   const days = Array.from({ length: 7 }, (_, i) => {
@@ -49,7 +81,7 @@ export default function Technicians() {
           <h1 className="text-xl font-semibold tracking-tight">{bi("Technicians", "الفنيون")}</h1>
           <p className="text-sm text-[var(--color-ink-muted)] mt-0.5">{scopedTechnicians.length} technicians in the selected branch scope</p>
         </div>
-        <Button onClick={() => { setForm((current) => ({ ...current, branchId: defaultBranchId })); setOpen(true); }}>+ {bi("Add Technician", "إضافة فني")}</Button>
+        {canManage && <Button onClick={openAdd}>+ {bi("Add Technician", "إضافة فني")}</Button>}
       </div>
 
       <Card padded={false}>
@@ -76,6 +108,12 @@ export default function Technicians() {
                     </div>
                     <p className="text-xs text-[var(--color-ink-muted)]">{activeJobs} active jobs · {t.phone}</p>
                     {t.notes && <p className="text-xs text-[var(--color-ink-secondary)]">{t.notes}</p>}
+                    {canManage && (
+                      <div className="flex gap-2 pt-1">
+                        <Button size="sm" variant="secondary" onClick={() => openEdit(t)}>{bi("Edit", "تعديل")}</Button>
+                        <Button size="sm" variant="danger" onClick={() => remove(t)}>{bi("Delete", "حذف")}</Button>
+                      </div>
+                    )}
                   </Card>
                 );
               })}
@@ -124,7 +162,7 @@ export default function Technicians() {
         </div>
       </Card>
 
-      <Modal open={open} onClose={() => setOpen(false)} title={bi("Add Technician", "إضافة فني")}>
+      <Modal open={open} onClose={() => setOpen(false)} title={editing ? bi("Edit Technician", "تعديل الفني") : bi("Add Technician", "إضافة فني")}>
         <div className="space-y-3">
           <Field label={bi("Name", "الاسم")}>
             <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />

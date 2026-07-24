@@ -146,7 +146,8 @@ interface DemoState {
   setQaApproved: (jobcardId: string, approved: boolean) => Promise<ActionResult>;
   setFinalAmount: (jobcardId: string, amount: number) => Promise<ActionResult>;
   captureCustomerSignature: (jobcardId: string, signature: string) => Promise<ActionResult>;
-  confirmAssetHandover: (jobcardId: string, confirmedBy: string) => Promise<ActionResult>;
+  confirmAssetReceived: (jobcardId: string, ref: string, receivedBy: string) => Promise<ActionResult>;
+  confirmAssetHandover: (jobcardId: string, ref: string, confirmedBy: string) => Promise<ActionResult>;
   savePurchaseBill: (jobcardId: string, bill: Omit<PurchaseBill, "id" | "jobcardId">) => ActionResult;
   addPartUsed: (jobcardId: string, itemId: string, qty: number) => ActionResult;
   removePartUsed: (partUsedId: string) => ActionResult;
@@ -855,14 +856,30 @@ export const useStore = create<DemoState>()(
           return result(false, err instanceof ApiError ? err.message : "Failed to capture signature.");
         }
       },
-      confirmAssetHandover: async (jobcardId, confirmedBy) => {
+      confirmAssetReceived: async (jobcardId, ref, receivedBy) => {
+        const state = get();
+        if (!canPerform(state.role, "create_job")) return result(false, "Your role cannot confirm asset receipt.");
+        if (!ref.trim()) return result(false, "A reference/tag number is required.");
+        if (!receivedBy.trim()) return result(false, "The receiving technician is required.");
+        const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
+        if (!job) return result(false, "Job card not found.");
+        try {
+          await api.patch(`/api/job-cards/${jobcardId}/asset-received`, { ref: ref.trim(), receivedBy: receivedBy.trim() });
+          await get().hydrate();
+          return result(true, "Asset receipt custody confirmed.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to confirm asset receipt.");
+        }
+      },
+      confirmAssetHandover: async (jobcardId, ref, confirmedBy) => {
         const state = get();
         if (!canPerform(state.role, "capture_signature")) return result(false, "Your role cannot confirm asset handover.");
+        if (!ref.trim()) return result(false, "A reference/tag number is required.");
         if (!confirmedBy.trim()) return result(false, "Confirming staff member is required.");
         const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
         if (!job) return result(false, "Job card not found.");
         try {
-          await api.patch(`/api/job-cards/${jobcardId}/asset-handover`, {});
+          await api.patch(`/api/job-cards/${jobcardId}/asset-handover`, { ref: ref.trim(), confirmedBy: confirmedBy.trim() });
           await get().hydrate();
           return result(true, "Asset handover confirmed.");
         } catch (err) {

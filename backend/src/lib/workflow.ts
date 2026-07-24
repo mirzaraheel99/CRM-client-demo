@@ -12,7 +12,10 @@ export interface StageRequirement {
 export function stageRequirements(job: JobCard): StageRequirement[] {
   switch (job.currentStage) {
     case "Received":
-      return [{ label: "Qualified technician assigned", met: Boolean(job.technicianId) }];
+      return [
+        { label: "Qualified technician assigned", met: Boolean(job.technicianId) },
+        { label: "Asset receipt custody confirmed", met: Boolean(job.assetReceivedRef) },
+      ];
     case "Warranty Validation":
       return [{ label: "Purchase bill recorded", met: true }]; // TODO Phase 2: PurchaseBill table
     case "Diagnosis":

@@ -18,7 +18,10 @@ export function paidTotal(payments: Payment[]) {
 
 export function stageRequirements(job: JobCard, context: JobFlowContext): StageRequirement[] {
   if (job.currentStage === "Received") {
-    return [{ label: "Qualified technician assigned", met: Boolean(job.technicianId) }];
+    return [
+      { label: "Qualified technician assigned", met: Boolean(job.technicianId) },
+      { label: "Asset receipt custody confirmed", met: Boolean(job.assetReceivedRef) },
+    ];
   }
   if (job.currentStage === "Warranty Validation") {
     if (!isFieldRequired("jobCardStage", "purchaseBill")) return [];

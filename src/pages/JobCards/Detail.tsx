@@ -73,7 +73,7 @@ export default function JobCardDetail() {
     jobCards, serviceOrders, customers, appliances, applianceTelemetry, brands, categories, technicians, workflows, aliasFieldsEnabled,
     stageHistory, attachments, partsUsed, estimateLineItems, communicationLogs, inventoryItems, inventoryLocations, inventoryStock, purchaseBills, payments, removedParts,
     role, selectedBranchId, advanceStage, assignTechnician, setDiagnosis, approveCustomer, setRepairNotes, setQaApproved,
-    setFinalAmount, captureCustomerSignature, confirmAssetHandover, savePurchaseBill, addPartUsed, removePartUsed, addAttachment, sendCommunication,
+    setFinalAmount, captureCustomerSignature, confirmAssetReceived, confirmAssetHandover, savePurchaseBill, addPartUsed, removePartUsed, addAttachment, sendCommunication,
     logRemovedPart, notifyCustomerOfRemovedPart, confirmPartReturned, addAppliance, addProductToOrder, requiredFieldsVersion,
   } = useStore();
   // requiredFieldsVersion (destructured above) forces a re-render whenever the module-level table in requiredFields.ts changes.
@@ -90,6 +90,10 @@ export default function JobCardDetail() {
   const [repairInput, setRepairInput] = useState("");
   const [finalAmountInput, setFinalAmountInput] = useState("");
   const [signatureInput, setSignatureInput] = useState("");
+  const [receivedRefInput, setReceivedRefInput] = useState("");
+  const [receivedTechSelect, setReceivedTechSelect] = useState("");
+  const [handoverRefInput, setHandoverRefInput] = useState("");
+  const [handoverTechSelect, setHandoverTechSelect] = useState("");
   const [billForm, setBillForm] = useState({ billNo: "", billDate: new Date().toISOString().slice(0, 10), vendorName: "" });
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
   // null = "show the live current stage"; set when the user clicks a completed
@@ -794,6 +798,38 @@ export default function JobCardDetail() {
                 </div>
               )}
 
+              {activeStage === "Received" && canPerform(role, "create_job") && (
+                <div className="space-y-2 border-t pt-3 [border-color:var(--color-border)]">
+                  {job.assetReceivedRef ? (
+                    <p className="flex items-center gap-1.5 text-xs text-[var(--color-status-good,#16a34a)]">
+                      <CheckCircle2 size={12} />
+                      {bi("Received", "تم الاستلام")} · {bi("Ref", "المرجع")} {job.assetReceivedRef} · {job.assetReceivedBy} · {job.assetReceivedAt && formatDateTime(job.assetReceivedAt)}
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-[11px] text-[var(--color-ink-muted)]">
+                        {bi("Record a custody reference and the technician taking receipt of the physical unit.", "سجّل مرجع العهدة والفني المستلم للجهاز فعليًا.")}
+                      </p>
+                      <Field label={bi("Custody reference / tag no.", "مرجع العهدة / رقم البطاقة")}><Input value={receivedRefInput} onChange={(event) => setReceivedRefInput(event.target.value)} placeholder="e.g. TAG-00231" /></Field>
+                      <Field label={bi("Received by (technician)", "استُلم بواسطة (فني)")}>
+                        <Select value={receivedTechSelect} onChange={(event) => setReceivedTechSelect(event.target.value)}>
+                          <option value="">{bi("Choose technician...", "اختر فنياً...")}</option>
+                          {branchTechnicians.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
+                        </Select>
+                      </Field>
+                      <Button
+                        variant="secondary"
+                        className="w-full justify-center"
+                        disabled={!receivedRefInput.trim() || !receivedTechSelect}
+                        onClick={() => showResult(confirmAssetReceived(job.id, receivedRefInput, receivedTechSelect), () => { setReceivedRefInput(""); setReceivedTechSelect(""); })}
+                      >
+                        {bi("Confirm Asset Received", "تأكيد استلام الجهاز")}
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )}
+
               {activeStage === "Warranty Validation" && canPerform(role, "create_job") && (
                 <div className="space-y-2 border-t pt-3 [border-color:var(--color-border)]">
                   <Field label={bi("Purchase bill number", "رقم فاتورة الشراء")} required={isFieldRequired("jobCardStage", "purchaseBill")}><Input value={billForm.billNo} onChange={(event) => setBillForm({ ...billForm, billNo: event.target.value })} /></Field>
@@ -872,12 +908,26 @@ export default function JobCardDetail() {
                       {job.assetHandedOver ? (
                         <p className="flex items-center gap-1.5 text-[11px] text-[var(--color-status-good,#16a34a)]">
                           <CheckCircle2 size={12} />
-                          {bi("Handed over", "تم التسليم")} · {job.assetHandedOverBy} · {job.assetHandedOverAt && formatDateTime(job.assetHandedOverAt)}
+                          {bi("Handed over", "تم التسليم")} · {bi("Ref", "المرجع")} {job.assetHandedOverRef} · {job.assetHandedOverBy} · {job.assetHandedOverAt && formatDateTime(job.assetHandedOverAt)}
                         </p>
                       ) : (
-                        <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(confirmAssetHandover(job.id, "You"))}>
-                          {bi("Confirm Asset Given to Customer", "تأكيد تسليم الجهاز للعميل")}
-                        </Button>
+                        <>
+                          <Field label={bi("Custody reference / tag no.", "مرجع العهدة / رقم البطاقة")}><Input value={handoverRefInput} onChange={(event) => setHandoverRefInput(event.target.value)} placeholder="e.g. TAG-00231" /></Field>
+                          <Field label={bi("Handed over by (technician)", "سُلّم بواسطة (فني)")}>
+                            <Select value={handoverTechSelect} onChange={(event) => setHandoverTechSelect(event.target.value)}>
+                              <option value="">{bi("Choose technician...", "اختر فنياً...")}</option>
+                              {branchTechnicians.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
+                            </Select>
+                          </Field>
+                          <Button
+                            variant="secondary"
+                            className="w-full justify-center"
+                            disabled={!handoverRefInput.trim() || !handoverTechSelect}
+                            onClick={() => showResult(confirmAssetHandover(job.id, handoverRefInput, handoverTechSelect), () => { setHandoverRefInput(""); setHandoverTechSelect(""); })}
+                          >
+                            {bi("Confirm Asset Given to Customer", "تأكيد تسليم الجهاز للعميل")}
+                          </Button>
+                        </>
                       )}
                     </div>
                   )}

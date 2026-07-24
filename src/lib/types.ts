@@ -354,7 +354,11 @@ export interface JobCard {
   estimateCustomerRequest?: string;
   estimateDeliveryLeadTime?: string;
   estimateSubject?: string;
+  assetReceivedRef?: string;
+  assetReceivedBy?: string;
+  assetReceivedAt?: string;
   assetHandedOver: boolean;
+  assetHandedOverRef?: string;
   assetHandedOverAt?: string;
   assetHandedOverBy?: string;
 }

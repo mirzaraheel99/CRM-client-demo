@@ -272,7 +272,11 @@ model JobCard {
   estimateCustomerRequest String?
   estimateDeliveryLeadTime String?
   estimateSubject String?
+  assetReceivedRef String?
+  assetReceivedBy  String?
+  assetReceivedAt  DateTime?
   assetHandedOver Boolean  @default(false)
+  assetHandedOverRef String?
   assetHandedOverAt DateTime?
   assetHandedOverBy String?
 

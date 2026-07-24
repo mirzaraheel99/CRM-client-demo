@@ -88,16 +88,35 @@ export default async function jobCardRoutes(fastify: FastifyInstance) {
   );
 
   fastify.patch(
+    "/api/job-cards/:id/asset-received",
+    { preHandler: [fastify.authenticate, fastify.requirePermission("create_job")] },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const body = z.object({ ref: z.string().min(1), receivedBy: z.string().min(1) }).safeParse(request.body);
+      if (!body.success) return reply.code(400).send({ ok: false, message: "Reference and receiving technician are required." });
+      const jobCard = await prisma.jobCard.findUnique({ where: { id } });
+      if (!jobCard) return reply.code(404).send({ ok: false, message: "Job card not found." });
+      await recordAmendmentIfPast(jobCard, "Received", request.currentUser!.name, "Asset receipt custody");
+      return prisma.jobCard.update({
+        where: { id },
+        data: { assetReceivedRef: body.data.ref, assetReceivedBy: body.data.receivedBy, assetReceivedAt: new Date() },
+      });
+    }
+  );
+
+  fastify.patch(
     "/api/job-cards/:id/asset-handover",
     { preHandler: [fastify.authenticate, fastify.requirePermission("finalize_job")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
+      const body = z.object({ ref: z.string().min(1), confirmedBy: z.string().min(1) }).safeParse(request.body);
+      if (!body.success) return reply.code(400).send({ ok: false, message: "Reference and receiving technician are required." });
       const jobCard = await prisma.jobCard.findUnique({ where: { id } });
       if (!jobCard) return reply.code(404).send({ ok: false, message: "Job card not found." });
       await recordAmendmentIfPast(jobCard, "Ready for Handover", request.currentUser!.name, "Asset handover confirmation");
       return prisma.jobCard.update({
         where: { id },
-        data: { assetHandedOver: true, assetHandedOverAt: new Date(), assetHandedOverBy: request.currentUser!.name },
+        data: { assetHandedOver: true, assetHandedOverAt: new Date(), assetHandedOverBy: body.data.confirmedBy, assetHandedOverRef: body.data.ref },
       });
     }
   );

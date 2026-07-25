@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { nextApplianceDocumentNo } from "../lib/documentNo.js";
+import { computeWarrantyStatus } from "../lib/warranty.js";
 
 const applianceSchema = z.object({
   brandId: z.string().min(1),
@@ -28,21 +29,21 @@ const applianceSchema = z.object({
   notes: z.string().optional(),
 });
 
-function computeWarrantyStatus(purchaseDate: string, warrantyMonths: number): string {
-  const months = (Date.now() - new Date(purchaseDate).getTime()) / (1000 * 60 * 60 * 24 * 30);
-  return months < warrantyMonths ? "In Warranty" : "Out of Warranty";
-}
-
 export default async function applianceRoutes(fastify: FastifyInstance) {
+  // warrantyStatus is stored as a snapshot (see create/update below) but never
+  // recomputes on its own, so a unit registered as "In Warranty" would stay
+  // labeled that way forever if nobody happened to re-save the record after
+  // the manufacturer window lapsed. Every read recomputes it live instead.
   fastify.get("/api/appliances", { preHandler: fastify.authenticate }, async () => {
-    return prisma.appliance.findMany({ orderBy: { id: "desc" }, include: { brand: true } });
+    const appliances = await prisma.appliance.findMany({ orderBy: { id: "desc" }, include: { brand: true } });
+    return appliances.map((appliance) => ({ ...appliance, warrantyStatus: computeWarrantyStatus(appliance.purchaseDate, appliance.brand.warrantyMonths) }));
   });
 
   fastify.get("/api/appliances/:id", { preHandler: fastify.authenticate }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const appliance = await prisma.appliance.findUnique({ where: { id }, include: { brand: true, telemetry: true } });
     if (!appliance) return reply.code(404).send({ ok: false, message: "Product not found." });
-    return appliance;
+    return { ...appliance, warrantyStatus: computeWarrantyStatus(appliance.purchaseDate, appliance.brand.warrantyMonths) };
   });
 
   fastify.post(

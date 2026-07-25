@@ -9,6 +9,7 @@ import { PartsGrid } from "../../components/PartsGrid";
 import { TrackingShare } from "../../components/TrackingShare";
 import { ApplianceBasicFields, AppliancePurchaseFields, ApplianceComplianceFields, ApplianceSiteFields } from "../../components/ApplianceFields";
 import { emptyApplianceForm, applianceFormToInput, type ApplianceFormState } from "../../lib/applianceForm";
+import { isUnderWarrantyCoverage } from "../../lib/warranty";
 import { formatCurrency, formatDate, formatDateTime, formatSequence, relativeTime } from "../../lib/utils";
 import { inventoryStockByBranch, totalStockByItem } from "../../lib/selectors";
 import { MESSAGE_TEMPLATES, renderTemplate } from "../../lib/templates";
@@ -73,7 +74,7 @@ export default function JobCardDetail() {
     jobCards, serviceOrders, customers, appliances, applianceTelemetry, brands, categories, technicians, workflows, aliasFieldsEnabled,
     stageHistory, attachments, partsUsed, estimateLineItems, communicationLogs, inventoryItems, inventoryLocations, inventoryStock, purchaseBills, payments, removedParts,
     role, selectedBranchId, advanceStage, assignTechnician, setDiagnosis, approveCustomer, setRepairNotes, setQaApproved,
-    setFinalAmount, captureCustomerSignature, confirmAssetReceived, confirmAssetHandover, savePurchaseBill, addPartUsed, removePartUsed, addAttachment, sendCommunication,
+    setFinalAmount, captureCustomerSignature, confirmAssetReceived, confirmAssetHandover, savePurchaseBill, setOemClaimNo, reclassifyWarrantyJob, addPartUsed, removePartUsed, addAttachment, sendCommunication,
     logRemovedPart, notifyCustomerOfRemovedPart, confirmPartReturned, addAppliance, addProductToOrder, requiredFieldsVersion,
   } = useStore();
   // requiredFieldsVersion (destructured above) forces a re-render whenever the module-level table in requiredFields.ts changes.
@@ -97,6 +98,8 @@ export default function JobCardDetail() {
   const [handoverTechSelect, setHandoverTechSelect] = useState("");
   const [handoverConditionNotes, setHandoverConditionNotes] = useState("");
   const [billForm, setBillForm] = useState({ billNo: "", billDate: new Date().toISOString().slice(0, 10), vendorName: "" });
+  const [oemClaimInput, setOemClaimInput] = useState("");
+  const [warrantyRejectReason, setWarrantyRejectReason] = useState("");
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
   // null = "show the live current stage"; set when the user clicks a completed
   // step in the workflow timeline to amend it (e.g. repair turned up something
@@ -142,12 +145,13 @@ export default function JobCardDetail() {
     setRepairInput(job?.repairNotes ?? "");
     setFinalAmountInput(job?.finalAmount?.toString() ?? "");
     setSignatureInput(job?.customerSignature ?? "");
+    setOemClaimInput(job?.oemClaimNo ?? "");
     setBillForm({
       billNo: bill?.billNo ?? "",
       billDate: bill?.billDate.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
       vendorName: bill?.vendorName ?? "",
     });
-  }, [job?.id, job?.diagnosisNotes, job?.repairNotes, job?.finalAmount, job?.customerSignature, bill?.id, bill?.billNo, bill?.billDate, bill?.vendorName]);
+  }, [job?.id, job?.diagnosisNotes, job?.repairNotes, job?.finalAmount, job?.customerSignature, job?.oemClaimNo, bill?.id, bill?.billNo, bill?.billDate, bill?.vendorName]);
 
   const timelineEntries = useMemo(() => {
     const stageEntries = jobHistory.map((h) => ({ kind: "stage" as const, id: h.id, timestamp: h.timestamp, data: h }));
@@ -158,14 +162,25 @@ export default function JobCardDetail() {
   const usedApplianceIds = useMemo(() => new Set(siblingJobs.map((line) => line.applianceId)), [siblingJobs]);
   const branchTechnicians = useMemo(() => technicians.filter((technician) => technician.branchId === job?.branchId && technician.status !== "Off Duty"), [technicians, job?.branchId]);
   const [addProductOpen, setAddProductOpen] = useState(false);
-  const [addProductForm, setAddProductForm] = useState({ applianceId: "", technicianId: "", problem: "", jobTypeOverride: "auto" as JobType | "auto" });
+  const [addProductForm, setAddProductForm] = useState({ applianceId: "", technicianId: "", problem: "", jobTypeOverride: "auto" as JobType | "auto", jobTypeOverrideReason: "" });
   const [addProductTab, setAddProductTab] = useState("Basic");
   const [newProductForm, setNewProductForm] = useState<ApplianceFormState>(emptyApplianceForm());
   const selectedNewApplianceForOrder = appliances.find((candidate) => candidate.id === addProductForm.applianceId);
-  const addProductDetectedType: JobType = selectedNewApplianceForOrder?.warrantyStatus === "In Warranty" ? "warranty" : "non_warranty";
+  const addProductIsUnderCoverage = (() => {
+    if (addProductForm.applianceId === NEW_PRODUCT_OPTION) {
+      const brand = brands.find((candidate) => candidate.id === newProductForm.brandId);
+      if (!brand) return false;
+      return isUnderWarrantyCoverage({ purchaseDate: newProductForm.purchaseDate, amcActive: newProductForm.amcActive, amcExpiryDate: newProductForm.amcExpiryDate }, brand.warrantyMonths);
+    }
+    const brand = selectedNewApplianceForOrder ? brands.find((candidate) => candidate.id === selectedNewApplianceForOrder.brandId) : undefined;
+    if (!selectedNewApplianceForOrder || !brand) return false;
+    return isUnderWarrantyCoverage(selectedNewApplianceForOrder, brand.warrantyMonths);
+  })();
+  const addProductDetectedType: JobType = addProductIsUnderCoverage ? "warranty" : "non_warranty";
+  const addProductNeedsOverrideReason = addProductForm.jobTypeOverride !== "auto" && addProductForm.jobTypeOverride !== addProductDetectedType;
 
   function resetAddProductForm() {
-    setAddProductForm({ applianceId: "", technicianId: "", problem: "", jobTypeOverride: "auto" });
+    setAddProductForm({ applianceId: "", technicianId: "", problem: "", jobTypeOverride: "auto", jobTypeOverrideReason: "" });
     setNewProductForm(emptyApplianceForm());
     setAddProductTab("Basic");
   }
@@ -173,6 +188,7 @@ export default function JobCardDetail() {
   function addProductReady() {
     if (!addProductForm.problem.trim() || addProductForm.problem.trim().length <= 3) return false;
     if (getMissingRequiredFields("jobCardLine", addProductForm).length > 0) return false;
+    if (addProductNeedsOverrideReason && !addProductForm.jobTypeOverrideReason.trim()) return false;
     if (addProductForm.applianceId === NEW_PRODUCT_OPTION) return getMissingRequiredFields("appliance", newProductForm).length === 0;
     return Boolean(addProductForm.applianceId);
   }
@@ -180,7 +196,7 @@ export default function JobCardDetail() {
   async function submitAddProduct() {
     if (!job || !serviceOrder || !addProductReady()) return;
     let applianceId = addProductForm.applianceId;
-    let jobType: JobType;
+    let detected: JobType;
     if (applianceId === NEW_PRODUCT_OPTION) {
       if (getMissingRequiredFields("appliance", newProductForm).length > 0) {
         toast("Fill in the required Basic fields for the new product.", "error");
@@ -191,20 +207,22 @@ export default function JobCardDetail() {
       const warrantyStatus = months < brand.warrantyMonths ? "In Warranty" as const : "Out of Warranty" as const;
       const created = await addAppliance({ ...applianceFormToInput(newProductForm), warrantyStatus });
       applianceId = created.id;
-      jobType = warrantyStatus === "In Warranty" ? "warranty" : "non_warranty";
+      detected = isUnderWarrantyCoverage(created, brand.warrantyMonths) ? "warranty" : "non_warranty";
     } else {
       const appliance = appliances.find((candidate) => candidate.id === applianceId);
-      if (!appliance) {
+      const brand = appliance ? brands.find((candidate) => candidate.id === appliance.brandId) : undefined;
+      if (!appliance || !brand) {
         toast("Choose or register a product.", "error");
         return;
       }
-      jobType = appliance.warrantyStatus === "In Warranty" ? "warranty" : "non_warranty";
+      detected = isUnderWarrantyCoverage(appliance, brand.warrantyMonths) ? "warranty" : "non_warranty";
     }
-    if (addProductForm.jobTypeOverride !== "auto") jobType = addProductForm.jobTypeOverride;
+    const jobType = addProductForm.jobTypeOverride === "auto" ? detected : addProductForm.jobTypeOverride;
     const outcome = await addProductToOrder({
       serviceOrderId: serviceOrder.id,
       applianceId,
       jobType,
+      jobTypeOverrideReason: jobType !== detected ? addProductForm.jobTypeOverrideReason.trim() : undefined,
       problemDescription: addProductForm.problem,
       technicianId: addProductForm.technicianId || null,
     });
@@ -232,7 +250,7 @@ export default function JobCardDetail() {
 
   const currentStepIdx = workflow?.steps.findIndex((s) => s.stepName === job.currentStage) ?? -1;
   const nextStep = workflow && currentStepIdx >= 0 ? workflow.steps[currentStepIdx + 1] : undefined;
-  const requirements = stageRequirements(job, { payments: jobPayments, purchaseBill: bill, removedParts: jobRemovedParts });
+  const requirements = stageRequirements(job, { payments: jobPayments, purchaseBill: bill, removedParts: jobRemovedParts, attachments: jobAttachments });
   const accessBlocker = stageAccessBlocker(job, role);
   const activeStage: StageName = viewedStage ?? job.currentStage;
   const isViewingPastStage = activeStage !== job.currentStage;
@@ -359,6 +377,17 @@ export default function JobCardDetail() {
               </Select>
             </Field>
           </div>
+
+          {addProductNeedsOverrideReason && (
+            <Field label={bi("Reason for overriding the detected warranty status", "سبب تجاوز حالة الضمان المكتشفة")} required>
+              <Textarea
+                rows={2}
+                value={addProductForm.jobTypeOverrideReason}
+                onChange={(event) => setAddProductForm({ ...addProductForm, jobTypeOverrideReason: event.target.value })}
+                placeholder={bi("Required when forcing a classification that disagrees with the system's detection — recorded on the job's history.", "مطلوب عند فرض تصنيف يخالف الكشف التلقائي للنظام - يتم تسجيله في سجل بطاقة العمل.")}
+              />
+            </Field>
+          )}
 
           {addProductForm.applianceId === NEW_PRODUCT_OPTION && (
             <div className="space-y-4 rounded-md bg-black/[0.03] p-3 dark:bg-white/[0.05]">
@@ -844,6 +873,31 @@ export default function JobCardDetail() {
                   <Field label={bi("Vendor", "المورد")} required={isFieldRequired("jobCardStage", "purchaseBill")}><Input value={billForm.vendorName} onChange={(event) => setBillForm({ ...billForm, vendorName: event.target.value })} /></Field>
                   <Field label={bi("Bill date", "تاريخ الفاتورة")} required={isFieldRequired("jobCardStage", "purchaseBill")}><Input type="date" value={billForm.billDate} onChange={(event) => setBillForm({ ...billForm, billDate: event.target.value })} /></Field>
                   <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(savePurchaseBill(job.id, billForm))}>{bi("Save Purchase Bill", "حفظ فاتورة الشراء")}</Button>
+
+                  <div className="space-y-1.5 border-t pt-3 [border-color:var(--color-border)]">
+                    <p className="text-[11px] text-[var(--color-ink-muted)]">{bi("Proof of purchase (required to advance)", "إثبات الشراء (مطلوب للمتابعة)")}</p>
+                    <StagePhotoUpload compact label={bi("Attach proof of purchase", "إرفاق إثبات الشراء")} onFile={(file) => uploadPhoto("Warranty Validation", file)} />
+                  </div>
+
+                  <div className="space-y-1.5 border-t pt-3 [border-color:var(--color-border)]">
+                    <Field label={bi("OEM claim number", "رقم مطالبة الشركة المصنّعة")}><Input value={oemClaimInput} onChange={(event) => setOemClaimInput(event.target.value)} placeholder="e.g. OEM-482913" /></Field>
+                    <Button variant="secondary" className="w-full justify-center" disabled={!oemClaimInput.trim()} onClick={() => showResult(setOemClaimNo(job.id, oemClaimInput))}>{bi("Save OEM Claim Number", "حفظ رقم مطالبة الشركة المصنّعة")}</Button>
+                  </div>
+
+                  {canPerform(role, "reclassify_warranty") && (
+                    <div className="space-y-1.5 rounded-lg border border-dashed p-2.5 [border-color:var(--color-status-serious)]">
+                      <p className="text-[11px] font-medium text-[var(--color-status-serious)]">{bi("Can't validate this warranty claim?", "غير قادر على التحقق من مطالبة الضمان؟")}</p>
+                      <Textarea rows={2} value={warrantyRejectReason} onChange={(event) => setWarrantyRejectReason(event.target.value)} placeholder={bi("Reason the warranty claim is being rejected...", "سبب رفض مطالبة الضمان...")} />
+                      <Button
+                        variant="danger"
+                        className="w-full justify-center"
+                        disabled={!warrantyRejectReason.trim()}
+                        onClick={() => showResult(reclassifyWarrantyJob(job.id, warrantyRejectReason), () => setWarrantyRejectReason(""))}
+                      >
+                        {bi("Reject — Reclassify as Non-Warranty", "رفض - إعادة التصنيف كبدون ضمان")}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
 

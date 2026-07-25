@@ -27,6 +27,7 @@ type PaymentResult = ActionResult & { payment?: Payment };
 type ServiceOrderLineInput = {
   applianceId: string;
   jobType: JobCard["jobType"];
+  jobTypeOverrideReason?: string;
   problemDescription: string;
   technicianId?: string | null;
 };
@@ -143,6 +144,7 @@ interface DemoState {
     serviceOrderId: string;
     applianceId: string;
     jobType: JobCard["jobType"];
+    jobTypeOverrideReason?: string;
     problemDescription: string;
     technicianId?: string | null;
   }) => Promise<JobResult>;
@@ -169,6 +171,8 @@ interface DemoState {
   confirmAssetReceived: (jobcardId: string, ref: string, technicianId: string) => Promise<ActionResult>;
   confirmAssetHandover: (jobcardId: string, ref: string, technicianId: string) => Promise<ActionResult>;
   savePurchaseBill: (jobcardId: string, bill: Omit<PurchaseBill, "id" | "jobcardId">) => ActionResult;
+  setOemClaimNo: (jobcardId: string, oemClaimNo: string) => Promise<ActionResult>;
+  reclassifyWarrantyJob: (jobcardId: string, reason: string) => Promise<ActionResult>;
   addPartUsed: (jobcardId: string, itemId: string, qty: number) => Promise<ActionResult>;
   removePartUsed: (partUsedId: string) => Promise<ActionResult>;
   addAttachment: (jobcardId: string, stageName: StageName, label: string, fileUrl?: string, conditionNotes?: string) => Promise<ActionResult>;
@@ -731,12 +735,12 @@ export const useStore = create<DemoState>()(
         }
       },
 
-      addProductToOrder: async ({ serviceOrderId, applianceId, jobType, problemDescription, technicianId }) => {
+      addProductToOrder: async ({ serviceOrderId, applianceId, jobType, jobTypeOverrideReason, problemDescription, technicianId }) => {
         if (!canPerform(get().role, "create_job")) return result(false, "Your role cannot add products to service orders.");
         try {
           const response = await api.post<{ ok: boolean; message: string; jobCard: JobCard }>(
             `/api/service-orders/${serviceOrderId}/lines`,
-            { applianceId, jobType, problemDescription, technicianId }
+            { applianceId, jobType, jobTypeOverrideReason, problemDescription, technicianId }
           );
           await get().hydrate();
           return { ok: true, message: response.message, job: response.jobCard };
@@ -1092,6 +1096,38 @@ export const useStore = create<DemoState>()(
           jobCards: state.jobCards.map((candidate) => candidate.id === jobcardId ? { ...candidate, updatedAt: new Date().toISOString() } : candidate),
         });
         return result(true, "Purchase bill recorded.");
+      },
+      setOemClaimNo: async (jobcardId, oemClaimNo) => {
+        const state = get();
+        if (!canPerform(state.role, "create_job")) return result(false, "Your role cannot record OEM claim numbers.");
+        const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
+        if (!job) return result(false, "Job card not found.");
+        if (job.jobType !== "warranty") return result(false, "OEM claim numbers only apply to warranty jobs.");
+        if (!oemClaimNo.trim()) return result(false, "OEM claim number is required.");
+        try {
+          await api.patch(`/api/job-cards/${jobcardId}/oem-claim`, { oemClaimNo: oemClaimNo.trim() });
+          await get().hydrate();
+          return result(true, "OEM claim number recorded.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to record OEM claim number.");
+        }
+      },
+      reclassifyWarrantyJob: async (jobcardId, reason) => {
+        const state = get();
+        if (!canPerform(state.role, "reclassify_warranty")) return result(false, "Your role cannot reject a warranty claim.");
+        const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
+        if (!job) return result(false, "Job card not found.");
+        if (job.jobType !== "warranty" || job.currentStage !== "Warranty Validation") {
+          return result(false, "Warranty can only be rejected while the job is at the Warranty Validation stage.");
+        }
+        if (!reason.trim()) return result(false, "A reason is required to reject this warranty claim.");
+        try {
+          await api.patch(`/api/job-cards/${jobcardId}/reclassify-warranty`, { reason: reason.trim() });
+          await get().hydrate();
+          return result(true, "Job reclassified as non-warranty.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to reclassify job.");
+        }
       },
 
       addPartUsed: async (jobcardId, itemId, qty) => {

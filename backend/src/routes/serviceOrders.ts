@@ -3,13 +3,33 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { nextServiceOrderDocumentNo } from "../lib/documentNo.js";
 import { nextStageRefNo } from "../lib/stageRefNo.js";
+import { isUnderWarrantyCoverage } from "../lib/warranty.js";
 
 const lineSchema = z.object({
   applianceId: z.string().min(1),
   jobType: z.enum(["warranty", "non_warranty"]),
+  jobTypeOverrideReason: z.string().optional(),
   problemDescription: z.string().min(4),
   technicianId: z.string().optional().nullable(),
 });
+
+// The client's jobType is never trusted at face value -- it's re-derived here
+// from the product's actual purchase date, brand warranty length, and AMC
+// status. A line whose requested classification disagrees with that gets
+// rejected unless a reason was given, and the mismatch (with its reason) is
+// written into the job's own history so an override can't happen silently.
+async function resolveLineClassification(line: z.infer<typeof lineSchema>) {
+  const appliance = await prisma.appliance.findUnique({ where: { id: line.applianceId }, include: { brand: true } });
+  if (!appliance) return { error: "Choose a valid product." as const };
+  const detected: "warranty" | "non_warranty" = isUnderWarrantyCoverage(appliance, appliance.brand.warrantyMonths) ? "warranty" : "non_warranty";
+  if (line.jobType !== detected && !line.jobTypeOverrideReason?.trim()) {
+    return { error: `This product is detected as ${detected === "warranty" ? "under warranty" : "out of warranty"} — a reason is required to classify it as ${line.jobType === "warranty" ? "warranty" : "non-warranty"}.` as const };
+  }
+  const overrideNote = line.jobType !== detected
+    ? ` Warranty classification overridden to ${line.jobType} (detected ${detected}) — reason: ${line.jobTypeOverrideReason!.trim()}.`
+    : "";
+  return { appliance, overrideNote };
+}
 
 const createSchema = z.object({
   customerId: z.string().min(1),
@@ -49,6 +69,13 @@ export default async function serviceOrderRoutes(fastify: FastifyInstance) {
       const applianceIds = input.lines.map((l) => l.applianceId);
       if (new Set(applianceIds).size !== applianceIds.length) {
         return reply.code(400).send({ ok: false, message: "Each product can appear only once in the same service order." });
+      }
+
+      const overrideNotes: string[] = [];
+      for (const line of input.lines) {
+        const resolved = await resolveLineClassification(line);
+        if ("error" in resolved) return reply.code(400).send({ ok: false, message: resolved.error });
+        overrideNotes.push(resolved.overrideNote);
       }
 
       const documentNo = await nextServiceOrderDocumentNo();
@@ -103,7 +130,7 @@ export default async function serviceOrderRoutes(fastify: FastifyInstance) {
               jobcardId: jobCard.id,
               stageName: "Received",
               changedBy: request.currentUser!.name,
-              notes: `Product sequence ${String(sequenceNo).padStart(2, "0")} received at counter.`,
+              notes: `Product sequence ${String(sequenceNo).padStart(2, "0")} received at counter.${overrideNotes[i]}`,
               stageRefNo,
             },
           });
@@ -129,8 +156,9 @@ export default async function serviceOrderRoutes(fastify: FastifyInstance) {
       const serviceOrder = await prisma.serviceOrder.findUnique({ where: { id } });
       if (!serviceOrder) return reply.code(404).send({ ok: false, message: "Service order not found." });
 
-      const appliance = await prisma.appliance.findUnique({ where: { id: line.applianceId } });
-      if (!appliance) return reply.code(400).send({ ok: false, message: "Choose a valid product." });
+      const resolved = await resolveLineClassification(line);
+      if ("error" in resolved) return reply.code(400).send({ ok: false, message: resolved.error });
+      const { appliance, overrideNote } = resolved;
 
       const existingLines = await prisma.jobCard.findMany({ where: { serviceOrderId: id } });
       if (existingLines.some((existing) => existing.applianceId === line.applianceId)) {
@@ -179,7 +207,7 @@ export default async function serviceOrderRoutes(fastify: FastifyInstance) {
             jobcardId: jobCard.id,
             stageName: "Received",
             changedBy: request.currentUser!.name,
-            notes: `Product sequence ${String(sequenceNo).padStart(2, "0")} received at counter.`,
+            notes: `Product sequence ${String(sequenceNo).padStart(2, "0")} received at counter.${overrideNote}`,
             stageRefNo,
           },
         });

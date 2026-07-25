@@ -25,7 +25,8 @@ export type DemoAction =
   | "capture_signature"
   | "collect_payment"
   | "send_message"
-  | "manage_settings";
+  | "manage_settings"
+  | "reclassify_warranty";
 
 const ALL_ROLES: Role[] = ["front_desk", "technician", "supervisor", "manager", "admin"];
 const MANAGEMENT: Role[] = ["supervisor", "manager", "admin"];
@@ -55,6 +56,7 @@ export const DEFAULT_ACTION_ROLES: Record<DemoAction, Role[]> = {
   collect_payment: OFFICE,
   send_message: ALL_ROLES,
   manage_settings: ["admin"],
+  reclassify_warranty: MANAGEMENT,
 };
 
 export const ALL_ACTIONS = Object.keys(DEFAULT_ACTION_ROLES) as DemoAction[];

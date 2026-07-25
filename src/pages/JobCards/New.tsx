@@ -6,6 +6,7 @@ import { Card, CardHeader, Field, Select, Textarea, Button, Badge, Input } from 
 import { Combobox } from "../../components/Combobox";
 import { ApplianceBasicFields, AppliancePurchaseFields, ApplianceComplianceFields, ApplianceSiteFields } from "../../components/ApplianceFields";
 import { emptyApplianceForm, applianceFormToInput, type ApplianceFormState } from "../../lib/applianceForm";
+import { isUnderWarrantyCoverage } from "../../lib/warranty";
 import { JobTypeBadge } from "../../components/StatusBadge";
 import { toast } from "../../lib/toast";
 import { filterByBranch } from "../../lib/selectors";
@@ -25,6 +26,7 @@ type IntakeLine = {
   technicianId: string;
   problem: string;
   jobTypeOverride: JobType | "auto";
+  jobTypeOverrideReason: string;
   newProduct: ApplianceFormState;
 };
 
@@ -37,6 +39,7 @@ function emptyLine(applianceId = ""): IntakeLine {
     technicianId: "",
     problem: "",
     jobTypeOverride: "auto",
+    jobTypeOverrideReason: "",
     newProduct: emptyApplianceForm(),
   };
 }
@@ -77,9 +80,33 @@ export default function NewJobCard() {
     : Boolean(customerId);
   const isCorporateBuyer = customerId !== NEW_CUSTOMER && customers.find((candidate) => candidate.id === customerId)?.customerType === "corporate";
   const serviceOrderReady = getMissingRequiredFields("serviceOrder", orderDetails).filter((def) => def.key !== "buyerVatNumber" || isCorporateBuyer).length === 0;
+  // A brand-new, not-yet-registered product has no appliance record yet, so
+  // detection has to read straight off the in-progress registration form
+  // instead of an Appliance row.
+  function lineIsUnderCoverage(line: IntakeLine): boolean {
+    if (line.applianceId === NEW_PRODUCT) {
+      const brand = brands.find((candidate) => candidate.id === line.newProduct.brandId);
+      if (!brand) return false;
+      return isUnderWarrantyCoverage({ purchaseDate: line.newProduct.purchaseDate, amcActive: line.newProduct.amcActive, amcExpiryDate: line.newProduct.amcExpiryDate }, brand.warrantyMonths);
+    }
+    const appliance = applianceMap.get(line.applianceId);
+    const brand = appliance ? brandMap.get(appliance.brandId) : undefined;
+    if (!appliance || !brand) return false;
+    return isUnderWarrantyCoverage(appliance, brand.warrantyMonths);
+  }
+  function lineDetectedJobType(line: IntakeLine): JobType {
+    return lineIsUnderCoverage(line) ? "warranty" : "non_warranty";
+  }
+  // Forcing a classification that disagrees with what the system actually
+  // detected (from the product's purchase date, manufacturer warranty, and
+  // AMC) is exactly the kind of decision that needs a paper trail.
+  function lineNeedsOverrideReason(line: IntakeLine): boolean {
+    return line.jobTypeOverride !== "auto" && line.jobTypeOverride !== lineDetectedJobType(line);
+  }
   const lineReady = (line: IntakeLine) => {
     if (!line.problem.trim() || line.problem.trim().length <= 3) return false;
     if (getMissingRequiredFields("jobCardLine", line).length > 0) return false;
+    if (lineNeedsOverrideReason(line) && !line.jobTypeOverrideReason.trim()) return false;
     if (line.applianceId === NEW_PRODUCT) return getMissingRequiredFields("appliance", line.newProduct).length === 0;
     return Boolean(line.applianceId);
   };
@@ -145,10 +172,13 @@ export default function NewJobCard() {
         toast("Choose or register a product for every sequence.", "error");
         return;
       }
-      const detected: JobType = appliance.warrantyStatus === "In Warranty" ? "warranty" : "non_warranty";
+      const brand = brandMap.get(appliance.brandId);
+      const detected: JobType = brand && isUnderWarrantyCoverage(appliance, brand.warrantyMonths) ? "warranty" : "non_warranty";
+      const jobType = line.jobTypeOverride === "auto" ? detected : line.jobTypeOverride;
       preparedLines.push({
         applianceId: appliance.id,
-        jobType: line.jobTypeOverride === "auto" ? detected : line.jobTypeOverride,
+        jobType,
+        jobTypeOverrideReason: jobType !== detected ? line.jobTypeOverrideReason.trim() : undefined,
         problemDescription: line.problem,
         technicianId: line.technicianId || null,
       });
@@ -266,7 +296,8 @@ export default function NewJobCard() {
           {lines.map((line, index) => {
             const appliance = applianceMap.get(line.applianceId);
             const brand = appliance ? brandMap.get(appliance.brandId) : undefined;
-            const detectedJobType: JobType = appliance?.warrantyStatus === "In Warranty" ? "warranty" : "non_warranty";
+            const detectedJobType = lineDetectedJobType(line);
+            const needsOverrideReason = lineNeedsOverrideReason(line);
             return (
               <section key={line.key} className="py-5 first:pt-1 last:pb-1">
                 <div className="mb-3 flex items-center justify-between gap-3">
@@ -312,6 +343,20 @@ export default function NewJobCard() {
                     </Select>
                   </Field>
                 </div>
+
+                {needsOverrideReason && (
+                  <Field
+                    label={bi("Reason for overriding the detected warranty status", "سبب تجاوز حالة الضمان المكتشفة")}
+                    required
+                  >
+                    <Textarea
+                      rows={2}
+                      value={line.jobTypeOverrideReason}
+                      onChange={(event) => patchLine(line.key, { jobTypeOverrideReason: event.target.value })}
+                      placeholder={bi("Required when forcing a classification that disagrees with the system's detection — recorded on the job's history.", "مطلوب عند فرض تصنيف يخالف الكشف التلقائي للنظام - يتم تسجيله في سجل بطاقة العمل.")}
+                    />
+                  </Field>
+                )}
 
                 {line.applianceId === NEW_PRODUCT && (
                   <div className="mt-3 space-y-4 rounded-md bg-black/[0.03] p-3 dark:bg-white/[0.05]">

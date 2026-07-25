@@ -155,6 +155,62 @@ export default async function jobCardRoutes(fastify: FastifyInstance) {
   );
 
   fastify.patch(
+    "/api/job-cards/:id/oem-claim",
+    { preHandler: [fastify.authenticate, fastify.requirePermission("create_job")] },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const body = z.object({ oemClaimNo: z.string().min(1) }).safeParse(request.body);
+      if (!body.success) return reply.code(400).send({ ok: false, message: "OEM claim number is required." });
+      const jobCard = await prisma.jobCard.findUnique({ where: { id } });
+      if (!jobCard) return reply.code(404).send({ ok: false, message: "Job card not found." });
+      if (jobCard.jobType !== "warranty") return reply.code(400).send({ ok: false, message: "OEM claim numbers only apply to warranty jobs." });
+      await recordAmendmentIfPast(jobCard, "Warranty Validation", request.currentUser!.name, "OEM claim number");
+      return prisma.jobCard.update({ where: { id }, data: { oemClaimNo: body.data.oemClaimNo.trim() } });
+    }
+  );
+
+  // Escape hatch for a warranty claim that turns out not to hold up -- only
+  // while the job is still sitting at the validation gate, so it can't be
+  // used to silently rewrite a job's classification after work has already
+  // been billed/repaired under one assumption or the other.
+  fastify.patch(
+    "/api/job-cards/:id/reclassify-warranty",
+    { preHandler: [fastify.authenticate, fastify.requirePermission("reclassify_warranty")] },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const body = z.object({ reason: z.string().min(1) }).safeParse(request.body);
+      if (!body.success) return reply.code(400).send({ ok: false, message: "A reason is required to reclassify this job." });
+      const jobCard = await prisma.jobCard.findUnique({ where: { id } });
+      if (!jobCard) return reply.code(404).send({ ok: false, message: "Job card not found." });
+      if (jobCard.jobType !== "warranty") return reply.code(400).send({ ok: false, message: "This job is not classified as warranty." });
+      if (jobCard.currentStage !== "Warranty Validation") {
+        return reply.code(400).send({ ok: false, message: "Warranty can only be rejected while the job is at the Warranty Validation stage." });
+      }
+      const result = await prisma.$transaction(async (tx) => {
+        const updated = await tx.jobCard.update({
+          where: { id },
+          data: { jobType: "non_warranty", currentStage: "Diagnosis", status: statusForStage("Diagnosis") },
+        });
+        const stageRefNo = await nextStageRefNo(
+          (stageName) => tx.jobCardStageHistory.count({ where: { stageName } }),
+          "Diagnosis"
+        );
+        await tx.jobCardStageHistory.create({
+          data: {
+            jobcardId: id,
+            stageName: "Diagnosis",
+            changedBy: request.currentUser!.name,
+            notes: `Warranty claim rejected — reclassified as non-warranty. Reason: ${body.data.reason.trim()}.`,
+            stageRefNo,
+          },
+        });
+        return updated;
+      });
+      return { ok: true, message: "Job reclassified as non-warranty.", jobCard: result };
+    }
+  );
+
+  fastify.patch(
     "/api/job-cards/:id/estimate",
     { preHandler: [fastify.authenticate, fastify.requirePermission("set_estimate")] },
     async (request, reply) => {
@@ -248,7 +304,8 @@ export default async function jobCardRoutes(fastify: FastifyInstance) {
       }
 
       const removedParts = await prisma.removedPart.findMany({ where: { jobcardId: id }, select: { returnStatus: true } });
-      const blockers = stageBlockers(jobCard, removedParts);
+      const attachments = await prisma.jobCardAttachment.findMany({ where: { jobcardId: id }, select: { stageName: true } });
+      const blockers = stageBlockers(jobCard, removedParts, attachments);
       if (blockers.length > 0) {
         return reply.code(400).send({ ok: false, message: `Cannot advance: ${blockers.join(", ")}` });
       }

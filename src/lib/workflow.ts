@@ -1,4 +1,4 @@
-import type { JobCard, Payment, PurchaseBill, RemovedPart, Role } from "./types";
+import type { JobCard, JobCardAttachment, Payment, PurchaseBill, RemovedPart, Role } from "./types";
 import { canAdvanceCurrentStage } from "./permissions";
 import { isFieldRequired } from "./requiredFields";
 
@@ -11,6 +11,7 @@ export interface JobFlowContext {
   payments: Payment[];
   purchaseBill?: PurchaseBill;
   removedParts?: RemovedPart[];
+  attachments?: JobCardAttachment[];
 }
 
 export function paidTotal(payments: Payment[]) {
@@ -25,8 +26,10 @@ export function stageRequirements(job: JobCard, context: JobFlowContext): StageR
     ];
   }
   if (job.currentStage === "Warranty Validation") {
-    if (!isFieldRequired("jobCardStage", "purchaseBill")) return [];
-    return [{ label: "Purchase bill recorded", met: Boolean(context.purchaseBill) }];
+    const requirements: StageRequirement[] = [];
+    if (isFieldRequired("jobCardStage", "purchaseBill")) requirements.push({ label: "Purchase bill recorded", met: Boolean(context.purchaseBill) });
+    requirements.push({ label: "Proof of purchase attached", met: (context.attachments ?? []).some((a) => a.stageName === "Warranty Validation") });
+    return requirements;
   }
   if (job.currentStage === "Diagnosis") {
     if (!isFieldRequired("jobCardStage", "diagnosisNotes")) return [];

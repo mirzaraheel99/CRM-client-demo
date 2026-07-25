@@ -38,6 +38,7 @@ const ACTION_LABELS: Record<DemoAction, string> = {
   collect_payment: bi("Collect payment", "تحصيل الدفع"),
   send_message: bi("Send messages", "إرسال الرسائل"),
   manage_settings: bi("Manage system settings", "إدارة إعدادات النظام"),
+  reclassify_warranty: bi("Reject a warranty claim (reclassify)", "رفض مطالبة الضمان (إعادة التصنيف)"),
 };
 
 function ToggleSwitch({ checked, onChange, disabled }: { checked: boolean; onChange: (next: boolean) => void; disabled?: boolean }) {

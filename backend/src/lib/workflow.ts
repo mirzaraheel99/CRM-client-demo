@@ -1,4 +1,4 @@
-import type { JobCard, RemovedPart } from "@prisma/client";
+import type { JobCard, JobCardAttachment, RemovedPart } from "@prisma/client";
 
 export interface StageRequirement {
   label: string;
@@ -7,9 +7,12 @@ export interface StageRequirement {
 
 // Phase 1 port of the frontend's src/lib/workflow.ts stageRequirements().
 // Payments and PurchaseBill aren't modeled server-side yet (Phase 2), so the
-// two checks that depend on them are stubbed as met — revisit once those
-// tables exist.
-export function stageRequirements(job: JobCard, removedParts: Pick<RemovedPart, "returnStatus">[] = []): StageRequirement[] {
+// purchase-bill check is stubbed as met — revisit once that table exists.
+export function stageRequirements(
+  job: JobCard,
+  removedParts: Pick<RemovedPart, "returnStatus">[] = [],
+  attachments: Pick<JobCardAttachment, "stageName">[] = []
+): StageRequirement[] {
   switch (job.currentStage) {
     case "Received":
       return [
@@ -17,7 +20,10 @@ export function stageRequirements(job: JobCard, removedParts: Pick<RemovedPart, 
         { label: "Asset receipt custody confirmed", met: Boolean(job.assetReceivedRef) },
       ];
     case "Warranty Validation":
-      return [{ label: "Purchase bill recorded", met: true }]; // TODO Phase 2: PurchaseBill table
+      return [
+        { label: "Purchase bill recorded", met: true }, // TODO Phase 2: PurchaseBill table
+        { label: "Proof of purchase attached", met: attachments.some((a) => a.stageName === "Warranty Validation") },
+      ];
     case "Diagnosis":
       return [{ label: "Diagnosis notes saved", met: Boolean(job.diagnosisNotes?.trim()) }];
     case "Estimate":
@@ -50,8 +56,12 @@ export function stageRequirements(job: JobCard, removedParts: Pick<RemovedPart, 
   }
 }
 
-export function stageBlockers(job: JobCard, removedParts: Pick<RemovedPart, "returnStatus">[] = []): string[] {
-  return stageRequirements(job, removedParts).filter((r) => !r.met).map((r) => r.label);
+export function stageBlockers(
+  job: JobCard,
+  removedParts: Pick<RemovedPart, "returnStatus">[] = [],
+  attachments: Pick<JobCardAttachment, "stageName">[] = []
+): string[] {
+  return stageRequirements(job, removedParts, attachments).filter((r) => !r.met).map((r) => r.label);
 }
 
 const STAGE_ORDER_WARRANTY = ["Received", "Warranty Validation", "Diagnosis", "Repair", "QA", "Ready for Handover", "Delivered"];

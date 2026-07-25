@@ -118,3 +118,11 @@ export function canAdvanceCurrentStage(role: Role, stage: StageName) {
 export function accessLabel(role: Role) {
   return role === "front_desk" ? "Front Desk" : role.charAt(0).toUpperCase() + role.slice(1);
 }
+
+// Front_desk/technician are pinned to their own home branch everywhere in the
+// UI -- supervisor/manager/admin are the "main branch sees everything" tier
+// and can switch to any branch or "All Branches". Mirrors
+// backend/src/lib/branchScope.ts's canViewAllBranches -- keep both in sync.
+export function canViewOtherBranches(role: Role) {
+  return MANAGEMENT.includes(role);
+}

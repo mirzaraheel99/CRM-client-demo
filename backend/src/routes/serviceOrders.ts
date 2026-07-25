@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma.js";
 import { nextServiceOrderDocumentNo } from "../lib/documentNo.js";
 import { nextStageRefNo } from "../lib/stageRefNo.js";
 import { isUnderWarrantyCoverage } from "../lib/warranty.js";
+import { resolveBranchScope } from "../lib/branchScope.js";
 
 const lineSchema = z.object({
   applianceId: z.string().min(1),
@@ -48,8 +49,14 @@ const createSchema = z.object({
 });
 
 export default async function serviceOrderRoutes(fastify: FastifyInstance) {
-  fastify.get("/api/service-orders", { preHandler: fastify.authenticate }, async () => {
-    return prisma.serviceOrder.findMany({ orderBy: { createdAt: "desc" }, include: { customer: true, jobCards: true } });
+  fastify.get("/api/service-orders", { preHandler: fastify.authenticate }, async (request) => {
+    const { branchId } = request.query as { branchId?: string };
+    const scope = resolveBranchScope(request, branchId);
+    return prisma.serviceOrder.findMany({
+      where: scope ? { branchId: scope } : undefined,
+      orderBy: { createdAt: "desc" },
+      include: { customer: true, jobCards: true },
+    });
   });
 
   fastify.post(

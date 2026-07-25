@@ -26,18 +26,19 @@ const FORM_TAB_LABELS: Record<string, string> = {
 };
 
 export default function ApplianceList() {
-  const { appliances, brands, categories, jobCards, selectedBranchId, role, addAppliance, aliasFieldsEnabled, requiredFieldsVersion } = useStore();
+  const { appliances, brands, categories, branches, selectedBranchId, role, addAppliance, aliasFieldsEnabled, requiredFieldsVersion } = useStore();
   // requiredFieldsVersion (destructured above) forces a re-render whenever the module-level table in requiredFields.ts changes.
   void requiredFieldsVersion;
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<ApplianceCategory | "all">("all");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(emptyApplianceForm());
+  const [productBranchId, setProductBranchId] = useState("");
   const [formTab, setFormTab] = useState("Basic");
   const [page, setPage] = useState(1);
 
   const brandMap = useMemo(() => new Map(brands.map((brand) => [brand.id, brand])), [brands]);
-  const scopedAppliances = useMemo(() => appliancesByBranch(appliances, jobCards, selectedBranchId), [appliances, jobCards, selectedBranchId]);
+  const scopedAppliances = useMemo(() => appliancesByBranch(appliances, selectedBranchId), [appliances, selectedBranchId]);
   const filtered = useMemo(() => {
     let list = scopedAppliances;
     if (category !== "all") list = list.filter((appliance) => appliance.category === category);
@@ -70,13 +71,19 @@ export default function ApplianceList() {
 
   async function submit() {
     if (getMissingRequiredFields("appliance", form).length > 0) return;
+    if (!productBranchId) {
+      toast("Choose the receiving branch for this product.", "error");
+      return;
+    }
     const brand = brands.find((candidate) => candidate.id === form.brandId)!;
     const months = (Date.now() - new Date(form.purchaseDate).getTime()) / (1000 * 60 * 60 * 24 * 30);
     const appliance = await addAppliance({
       ...applianceFormToInput(form),
+      branchId: productBranchId,
       warrantyStatus: months < brand.warrantyMonths ? "In Warranty" : "Out of Warranty",
     });
     setForm(emptyApplianceForm());
+    setProductBranchId("");
     setFormTab("Basic");
     setOpen(false);
     toast(`${appliance.documentNo} added to the product registry.`);
@@ -89,7 +96,7 @@ export default function ApplianceList() {
           <h1 className="text-xl font-semibold tracking-tight">{bi("Product Registry", "سجل المنتجات")}</h1>
           <p className="mt-0.5 text-sm text-[var(--color-ink-muted)]">{rows.length} independent product records; customer association is created on each service order.</p>
         </div>
-        {canPerform(role, "create_appliance") && <Button onClick={() => { setForm(emptyApplianceForm()); setFormTab("Basic"); setOpen(true); }}>+ {bi("Add Product", "إضافة منتج")}</Button>}
+        {canPerform(role, "create_appliance") && <Button onClick={() => { setForm(emptyApplianceForm()); setProductBranchId(selectedBranchId !== "all" ? selectedBranchId : ""); setFormTab("Basic"); setOpen(true); }}>+ {bi("Add Product", "إضافة منتج")}</Button>}
       </div>
 
       <Card className="flex flex-wrap gap-3">
@@ -157,12 +164,19 @@ export default function ApplianceList() {
       <Modal open={open} onClose={() => setOpen(false)} title={bi("Add Product", "إضافة منتج")} width="lg">
         <div className="space-y-4">
           <p className="text-xs text-[var(--color-ink-muted)]">Products are registered independently. Select the customer when creating the service order.</p>
+          <div className="w-full">
+            <p className="mb-1 text-xs font-medium text-[var(--color-ink-secondary)]">{bi("Receiving branch", "الفرع المستلم")} *</p>
+            <Select value={productBranchId} onChange={(event) => setProductBranchId(event.target.value)}>
+              <option value="">{bi("Choose branch...", "اختر فرعاً...")}</option>
+              {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </Select>
+          </div>
           <Tabs tabs={FORM_TABS} active={formTab} onChange={setFormTab} labels={FORM_TAB_LABELS} />
           {formTab === "Basic" && <ApplianceBasicFields value={form} onChange={(patch) => setForm({ ...form, ...patch })} brands={brands} categories={categories} aliasFieldsEnabled={aliasFieldsEnabled} />}
           {formTab === "Purchase" && <AppliancePurchaseFields value={form} onChange={(patch) => setForm({ ...form, ...patch })} />}
           {formTab === "Compliance" && <ApplianceComplianceFields value={form} onChange={(patch) => setForm({ ...form, ...patch })} />}
           {formTab === "Site" && <ApplianceSiteFields value={form} onChange={(patch) => setForm({ ...form, ...patch })} />}
-          <Button className="w-full justify-center" onClick={submit} disabled={getMissingRequiredFields("appliance", form).length > 0}>{bi("Save Product", "حفظ المنتج")}</Button>
+          <Button className="w-full justify-center" onClick={submit} disabled={getMissingRequiredFields("appliance", form).length > 0 || !productBranchId}>{bi("Save Product", "حفظ المنتج")}</Button>
         </div>
       </Modal>
     </div>

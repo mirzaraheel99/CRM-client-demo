@@ -67,7 +67,7 @@ export function CommandPalette() {
   const appMap = useMemo(() => new Map(appliances.map((a) => [a.id, a])), [appliances]);
   const scopedJobs = useMemo(() => filterByBranch(jobCards, selectedBranchId), [jobCards, selectedBranchId]);
   const scopedCustomers = useMemo(() => filterByBranch(customers, selectedBranchId), [customers, selectedBranchId]);
-  const scopedAppliances = useMemo(() => appliancesByBranch(appliances, jobCards, selectedBranchId), [appliances, jobCards, selectedBranchId]);
+  const scopedAppliances = useMemo(() => appliancesByBranch(appliances, selectedBranchId), [appliances, selectedBranchId]);
 
   const commands: Command[] = useMemo(() => {
     const nav: Command[] = STATIC_DESTINATIONS.filter((destination) => canAccessPath(role, destination.to)).map((d) => ({

@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import * as seed from "./seed";
-import { canAdvanceCurrentStage, canPerform, syncActionRolesFromServer, type DemoAction } from "./permissions";
+import { canAdvanceCurrentStage, canPerform, canViewOtherBranches, syncActionRolesFromServer, type DemoAction } from "./permissions";
 import { setFieldRequired as setFieldRequiredRaw, resetRequiredFields as resetRequiredFieldsRaw, type RequiredFieldEntity } from "./requiredFields";
 import { MESSAGE_TEMPLATES, renderTemplate } from "./templates";
 import { formatDate } from "./utils";
@@ -332,8 +332,25 @@ export const useStore = create<DemoState>()(
       permissionsVersion: 0,
       requiredFieldsVersion: 0,
 
-      setRole: (role) => set({ role }),
-      setBranch: (selectedBranchId) => set({ selectedBranchId }),
+      setRole: (role) => {
+        const state = get();
+        // Previewing as a branch-locked role (admin's "View as") should
+        // immediately reflect what that role would actually see, not keep
+        // whatever branch scope the real admin had selected.
+        const selectedBranchId = canViewOtherBranches(role) ? state.selectedBranchId : (state.currentUser?.branchId ?? state.selectedBranchId);
+        set({ role, selectedBranchId });
+      },
+      setBranch: (selectedBranchId) => {
+        const state = get();
+        // A non-management role can never switch away from its own branch,
+        // regardless of what the UI passes in -- this is the client-side
+        // mirror of the same rule the backend enforces on every request.
+        if (!canViewOtherBranches(state.role)) {
+          set({ selectedBranchId: state.currentUser?.branchId ?? state.selectedBranchId });
+          return;
+        }
+        set({ selectedBranchId });
+      },
       setTheme: (theme) => set({ theme }),
       setLang: (lang) => set({ lang }),
       login: async (username, password) => {

@@ -205,7 +205,7 @@ export default function JobCardDetail() {
       const brand = brands.find((candidate) => candidate.id === newProductForm.brandId)!;
       const months = (Date.now() - new Date(newProductForm.purchaseDate).getTime()) / (1000 * 60 * 60 * 24 * 30);
       const warrantyStatus = months < brand.warrantyMonths ? "In Warranty" as const : "Out of Warranty" as const;
-      const created = await addAppliance({ ...applianceFormToInput(newProductForm), warrantyStatus });
+      const created = await addAppliance({ ...applianceFormToInput(newProductForm), branchId: job.branchId, warrantyStatus });
       applianceId = created.id;
       detected = isUnderWarrantyCoverage(created, brand.warrantyMonths) ? "warranty" : "non_warranty";
     } else {
@@ -360,12 +360,14 @@ export default function JobCardDetail() {
                 placeholder={bi("Choose a registered product...", "اختر منتجاً مسجلاً...")}
                 options={[
                   { value: NEW_PRODUCT_OPTION, label: `+ ${bi("Register new product unit", "تسجيل وحدة منتج جديدة")}` },
-                  ...appliances.map((candidate) => ({
-                    value: candidate.id,
-                    label: `${candidate.documentNo} - ${candidate.model} - SN ${candidate.serialNo}`,
-                    searchText: `${candidate.documentNo} ${candidate.model} ${candidate.serialNo}`,
-                    disabled: usedApplianceIds.has(candidate.id),
-                  })),
+                  ...appliances
+                    .filter((candidate) => candidate.branchId == null || candidate.branchId === job.branchId || candidate.id === addProductForm.applianceId)
+                    .map((candidate) => ({
+                      value: candidate.id,
+                      label: `${candidate.documentNo} - ${candidate.model} - SN ${candidate.serialNo}`,
+                      searchText: `${candidate.documentNo} ${candidate.model} ${candidate.serialNo}`,
+                      disabled: usedApplianceIds.has(candidate.id),
+                    })),
                 ]}
               />
             </Field>

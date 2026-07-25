@@ -95,6 +95,7 @@ async function main() {
     data: {
       documentNo: applianceDoc,
       brandId: samsung.id,
+      branchId: riyadh.id,
       category: "AC",
       model: "AR18",
       serialNo: "SN-DEMO-0001",

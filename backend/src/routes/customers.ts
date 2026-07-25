@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { nextCustomerDocumentNo } from "../lib/documentNo.js";
+import { resolveBranchScope } from "../lib/branchScope.js";
 
 const customerBaseSchema = z.object({
   firstName: z.string().optional(),
@@ -45,14 +46,18 @@ const customerSchema = customerBaseSchema
   });
 
 export default async function customerRoutes(fastify: FastifyInstance) {
-  fastify.get("/api/customers", { preHandler: fastify.authenticate }, async () => {
-    return prisma.customer.findMany({ orderBy: { createdAt: "desc" } });
+  fastify.get("/api/customers", { preHandler: fastify.authenticate }, async (request) => {
+    const { branchId } = request.query as { branchId?: string };
+    const scope = resolveBranchScope(request, branchId);
+    return prisma.customer.findMany({ where: scope ? { branchId: scope } : undefined, orderBy: { createdAt: "desc" } });
   });
 
   fastify.get("/api/customers/:id", { preHandler: fastify.authenticate }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const customer = await prisma.customer.findUnique({ where: { id } });
     if (!customer) return reply.code(404).send({ ok: false, message: "Customer not found." });
+    const scope = resolveBranchScope(request);
+    if (scope && customer.branchId !== scope) return reply.code(404).send({ ok: false, message: "Customer not found." });
     return customer;
   });
 

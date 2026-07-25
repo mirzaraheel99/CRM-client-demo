@@ -12,7 +12,7 @@ import { Toaster } from "./Toaster";
 import { CommandPalette } from "./CommandPalette";
 import { useCommandPaletteStore } from "../lib/commandPaletteStore";
 import { cx } from "../lib/utils";
-import { canAccessPath } from "../lib/permissions";
+import { canAccessPath, canViewOtherBranches } from "../lib/permissions";
 import { bi } from "../lib/domainAr";
 import { useState, type ReactNode } from "react";
 import type { Role } from "../lib/types";
@@ -162,20 +162,29 @@ export function Shell({ children }: { children: ReactNode }) {
 
           <div className="order-2 flex min-w-0 items-center gap-2 md:order-none md:shrink-0">
             <span className="hidden text-xs text-[var(--color-ink-muted)] sm:inline">{t(lang, "branch")}</span>
-            <div className="relative">
-              <select
-                value={selectedBranchId}
-                onChange={(e) => setBranch(e.target.value)}
-                aria-label={t(lang, "branch")}
-                className="max-w-[154px] appearance-none truncate rounded-lg border bg-[var(--color-surface-2)] py-1.5 pl-3 pr-7 rtl:pl-7 rtl:pr-3 text-sm font-medium outline-none [border-color:var(--color-border)] sm:max-w-none"
+            {canViewOtherBranches(role) ? (
+              <div className="relative">
+                <select
+                  value={selectedBranchId}
+                  onChange={(e) => setBranch(e.target.value)}
+                  aria-label={t(lang, "branch")}
+                  className="max-w-[154px] appearance-none truncate rounded-lg border bg-[var(--color-surface-2)] py-1.5 pl-3 pr-7 rtl:pl-7 rtl:pr-3 text-sm font-medium outline-none [border-color:var(--color-border)] sm:max-w-none"
+                >
+                  <option value="all">{t(lang, "allBranches")}</option>
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+                <ChevronDown size={14} className="pointer-events-none absolute right-2 rtl:right-auto rtl:left-2 top-1/2 -translate-y-1/2 text-[var(--color-ink-muted)]" />
+              </div>
+            ) : (
+              <span
+                title={bi("Your account is limited to its home branch.", "حسابك مقتصر على الفرع الرئيسي الخاص به.")}
+                className="max-w-[154px] truncate rounded-lg border bg-[var(--color-surface-2)] px-3 py-1.5 text-sm font-medium [border-color:var(--color-border)]"
               >
-                <option value="all">{t(lang, "allBranches")}</option>
-                {branches.map((b) => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
-                ))}
-              </select>
-              <ChevronDown size={14} className="pointer-events-none absolute right-2 rtl:right-auto rtl:left-2 top-1/2 -translate-y-1/2 text-[var(--color-ink-muted)]" />
-            </div>
+                {branches.find((b) => b.id === currentUser?.branchId)?.name ?? currentUser?.branchId}
+              </span>
+            )}
           </div>
 
           <div className="order-3 ml-auto rtl:ml-0 rtl:mr-auto flex shrink-0 items-center gap-1.5 md:order-none md:gap-2">

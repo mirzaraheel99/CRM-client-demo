@@ -6,10 +6,12 @@ export function filterByBranch<T extends { branchId: string }>(items: T[], branc
   return items.filter((i) => i.branchId === branchId);
 }
 
-export function appliancesByBranch(appliances: Appliance[], jobs: JobCard[], branchId: string | "all") {
+// A product with no branchId is a legacy row (or one registered before this
+// field existed) -- treated as visible from every branch rather than being
+// filtered out entirely.
+export function appliancesByBranch(appliances: Appliance[], branchId: string | "all") {
   if (branchId === "all") return appliances;
-  const applianceIds = new Set(jobs.filter((job) => job.branchId === branchId).map((job) => job.applianceId));
-  return appliances.filter((appliance) => applianceIds.has(appliance.id));
+  return appliances.filter((appliance) => appliance.branchId == null || appliance.branchId === branchId);
 }
 
 export function communicationsByBranch(communications: CommunicationLog[], jobs: JobCard[], customers: Customer[], branchId: string | "all") {

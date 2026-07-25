@@ -53,6 +53,7 @@ model Branch {
   jobCards      JobCard[]
   users         User[]
   zones         Zone[]
+  appliances    Appliance[]
 }
 
 // A technician's/customer's coverage sub-area within a branch (e.g. "Riyadh
@@ -195,6 +196,13 @@ model Appliance {
   documentNo        String   @unique
   brandId           String
   brand             Brand    @relation(fields: [brandId], references: [id])
+  // Nullable and additive on purpose: a product is registered once but can
+  // legitimately be serviced across branches over its lifetime (customer
+  // moves, repair happens at a different branch than first receipt), and
+  // existing rows predate this field entirely. Null means "unassigned" --
+  // treated as visible from every branch rather than orphaned by a filter.
+  branchId          String?
+  branch            Branch?  @relation(fields: [branchId], references: [id])
   category          String
   model             String
   modelAr           String?

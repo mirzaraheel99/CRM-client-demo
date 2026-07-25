@@ -3,9 +3,11 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { nextApplianceDocumentNo } from "../lib/documentNo.js";
 import { computeWarrantyStatus } from "../lib/warranty.js";
+import { resolveBranchScope } from "../lib/branchScope.js";
 
 const applianceSchema = z.object({
   brandId: z.string().min(1),
+  branchId: z.string().min(1),
   category: z.string().min(1),
   model: z.string().min(1),
   modelAr: z.string().optional(),
@@ -34,8 +36,14 @@ export default async function applianceRoutes(fastify: FastifyInstance) {
   // recomputes on its own, so a unit registered as "In Warranty" would stay
   // labeled that way forever if nobody happened to re-save the record after
   // the manufacturer window lapsed. Every read recomputes it live instead.
-  fastify.get("/api/appliances", { preHandler: fastify.authenticate }, async () => {
-    const appliances = await prisma.appliance.findMany({ orderBy: { id: "desc" }, include: { brand: true } });
+  fastify.get("/api/appliances", { preHandler: fastify.authenticate }, async (request) => {
+    const { branchId } = request.query as { branchId?: string };
+    const scope = resolveBranchScope(request, branchId);
+    const appliances = await prisma.appliance.findMany({
+      where: scope ? { OR: [{ branchId: scope }, { branchId: null }] } : undefined,
+      orderBy: { id: "desc" },
+      include: { brand: true },
+    });
     return appliances.map((appliance) => ({ ...appliance, warrantyStatus: computeWarrantyStatus(appliance.purchaseDate, appliance.brand.warrantyMonths) }));
   });
 
@@ -43,6 +51,10 @@ export default async function applianceRoutes(fastify: FastifyInstance) {
     const { id } = request.params as { id: string };
     const appliance = await prisma.appliance.findUnique({ where: { id }, include: { brand: true, telemetry: true } });
     if (!appliance) return reply.code(404).send({ ok: false, message: "Product not found." });
+    const scope = resolveBranchScope(request);
+    if (scope && appliance.branchId && appliance.branchId !== scope) {
+      return reply.code(404).send({ ok: false, message: "Product not found." });
+    }
     return { ...appliance, warrantyStatus: computeWarrantyStatus(appliance.purchaseDate, appliance.brand.warrantyMonths) };
   });
 
@@ -57,6 +69,9 @@ export default async function applianceRoutes(fastify: FastifyInstance) {
       const brand = await prisma.brand.findUnique({ where: { id: input.brandId } });
       if (!brand) return reply.code(400).send({ ok: false, message: "Choose a valid brand." });
 
+      const branch = await prisma.branch.findUnique({ where: { id: input.branchId } });
+      if (!branch) return reply.code(400).send({ ok: false, message: "Choose a valid branch." });
+
       const documentNo = await nextApplianceDocumentNo();
       const warrantyStatus = computeWarrantyStatus(input.purchaseDate, brand.warrantyMonths);
 
@@ -64,6 +79,7 @@ export default async function applianceRoutes(fastify: FastifyInstance) {
         data: {
           documentNo,
           brandId: input.brandId,
+          branchId: input.branchId,
           category: input.category,
           model: input.model,
           modelAr: input.modelAr,
@@ -107,6 +123,11 @@ export default async function applianceRoutes(fastify: FastifyInstance) {
       let brand = input.brandId ? await prisma.brand.findUnique({ where: { id: input.brandId } }) : null;
       if (input.brandId && !brand) return reply.code(400).send({ ok: false, message: "Choose a valid brand." });
       if (!brand) brand = await prisma.brand.findUnique({ where: { id: existing.brandId } });
+
+      if (input.branchId) {
+        const branch = await prisma.branch.findUnique({ where: { id: input.branchId } });
+        if (!branch) return reply.code(400).send({ ok: false, message: "Choose a valid branch." });
+      }
 
       const purchaseDate = input.purchaseDate ?? existing.purchaseDate.toISOString();
       const warrantyStatus = brand ? computeWarrantyStatus(purchaseDate, brand.warrantyMonths) : existing.warrantyStatus;

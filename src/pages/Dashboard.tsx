@@ -21,7 +21,7 @@ export default function Dashboard() {
 
   const scopedJobs = filterByBranch(jobCards, selectedBranchId);
   const scopedTechs = filterByBranch(technicians, selectedBranchId);
-  const scopedAppliances = appliancesByBranch(appliances, jobCards, selectedBranchId);
+  const scopedAppliances = appliancesByBranch(appliances, selectedBranchId);
   const activeJobs = scopedJobs.filter((j) => j.status !== "Delivered");
   const alerts = inventoryAlerts(inventoryItems, inventoryLocations, inventoryStock, selectedBranchId);
   const maintenanceCandidates = predictiveMaintenanceCandidates(scopedAppliances, scopedJobs, brands);

@@ -165,6 +165,7 @@ export default function NewJobCard() {
       const appliance = line.applianceId === NEW_PRODUCT
         ? await addAppliance({
           ...applianceFormToInput(line.newProduct),
+          branchId,
           warrantyStatus: warrantyStatus(line.newProduct),
         })
         : applianceMap.get(line.applianceId);
@@ -326,12 +327,14 @@ export default function NewJobCard() {
                       placeholder={bi("Choose a registered product...", "اختر منتجاً مسجلاً...")}
                       options={[
                         { value: NEW_PRODUCT, label: `+ ${bi("Register new product unit", "تسجيل وحدة منتج جديدة")}` },
-                        ...appliances.map((candidate) => ({
-                          value: candidate.id,
-                          label: `${candidate.documentNo} - ${candidate.model} - SN ${candidate.serialNo}`,
-                          searchText: `${candidate.documentNo} ${candidate.model} ${candidate.serialNo}`,
-                          disabled: selectedIds.has(candidate.id) && candidate.id !== line.applianceId,
-                        })),
+                        ...appliances
+                          .filter((candidate) => candidate.branchId == null || candidate.branchId === branchId || candidate.id === line.applianceId)
+                          .map((candidate) => ({
+                            value: candidate.id,
+                            label: `${candidate.documentNo} - ${candidate.model} - SN ${candidate.serialNo}`,
+                            searchText: `${candidate.documentNo} ${candidate.model} ${candidate.serialNo}`,
+                            disabled: selectedIds.has(candidate.id) && candidate.id !== line.applianceId,
+                          })),
                       ]}
                     />
                   </Field>

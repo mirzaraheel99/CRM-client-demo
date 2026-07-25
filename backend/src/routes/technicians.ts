@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
+import { resolveBranchScope } from "../lib/branchScope.js";
 
 const technicianSchema = z.object({
   name: z.string().min(1),
@@ -15,8 +16,10 @@ const technicianSchema = z.object({
 });
 
 export default async function technicianRoutes(fastify: FastifyInstance) {
-  fastify.get("/api/technicians", { preHandler: fastify.authenticate }, async () => {
-    return prisma.technician.findMany({ orderBy: { name: "asc" } });
+  fastify.get("/api/technicians", { preHandler: fastify.authenticate }, async (request) => {
+    const { branchId } = request.query as { branchId?: string };
+    const scope = resolveBranchScope(request, branchId);
+    return prisma.technician.findMany({ where: scope ? { branchId: scope } : undefined, orderBy: { name: "asc" } });
   });
 
   fastify.post(

@@ -117,9 +117,8 @@ export default function Reports() {
 
   const scopedAppliances = useMemo(() => {
     if (selectedBranchId === "all") return appliances;
-    const applianceIds = new Set(scopedJobs.map((job) => job.applianceId));
-    return appliances.filter((appliance) => applianceIds.has(appliance.id));
-  }, [appliances, scopedJobs, selectedBranchId]);
+    return appliances.filter((appliance) => appliance.branchId == null || appliance.branchId === selectedBranchId);
+  }, [appliances, selectedBranchId]);
   const warrantyJobs = filteredJobs.filter((job) => job.jobType === "warranty");
   const warrantyByBrand = useMemo(() => {
     const claims = new Map<string, number>();

@@ -10,7 +10,7 @@ import { bi } from "../lib/domainAr";
 
 export default function PredictiveMaintenance() {
   const { appliances, jobCards, brands, customers, selectedBranchId, maintenanceRemindersSent, sendMaintenanceReminder } = useStore();
-  const scopedAppliances = useMemo(() => appliancesByBranch(appliances, jobCards, selectedBranchId), [appliances, jobCards, selectedBranchId]);
+  const scopedAppliances = useMemo(() => appliancesByBranch(appliances, selectedBranchId), [appliances, selectedBranchId]);
   const scopedJobs = useMemo(() => filterByBranch(jobCards, selectedBranchId), [jobCards, selectedBranchId]);
   const candidates = useMemo(() => predictiveMaintenanceCandidates(scopedAppliances, scopedJobs, brands), [scopedAppliances, scopedJobs, brands]);
   const customerMap = useMemo(() => new Map(customers.map((customer) => [customer.id, customer])), [customers]);

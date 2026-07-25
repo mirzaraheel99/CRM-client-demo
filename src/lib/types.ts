@@ -143,6 +143,12 @@ export interface Appliance {
   id: string;
   documentNo: string;
   brandId: string;
+  // Nullable/additive: which branch registered this unit. A product can
+  // legitimately be serviced across branches over its lifetime, so this is a
+  // soft default for scoping/filtering, not an ownership lock -- null means
+  // "unassigned" (legacy row, or registered before this field existed) and
+  // is treated as visible from every branch.
+  branchId?: string | null;
   category: ApplianceCategory;
   model: string;
   modelAr?: string;

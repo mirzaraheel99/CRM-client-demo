@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma.js";
 import { nextStageRefNo } from "../lib/stageRefNo.js";
 import { stageBlockers, nextStage, canAdvanceCurrentStage, statusForStage } from "../lib/workflow.js";
 import { recordAmendmentIfPast } from "../lib/audit.js";
+import { resolveBranchScope } from "../lib/branchScope.js";
 
 const jobCardInclude = {
   customer: true,
@@ -17,8 +18,9 @@ const jobCardInclude = {
 export default async function jobCardRoutes(fastify: FastifyInstance) {
   fastify.get("/api/job-cards", { preHandler: fastify.authenticate }, async (request) => {
     const { branchId, status } = request.query as { branchId?: string; status?: string };
+    const scope = resolveBranchScope(request, branchId);
     return prisma.jobCard.findMany({
-      where: { branchId: branchId || undefined, status: status || undefined },
+      where: { branchId: scope || undefined, status: status || undefined },
       include: jobCardInclude,
       orderBy: { createdAt: "desc" },
     });
@@ -28,6 +30,8 @@ export default async function jobCardRoutes(fastify: FastifyInstance) {
     const { id } = request.params as { id: string };
     const jobCard = await prisma.jobCard.findUnique({ where: { id }, include: jobCardInclude });
     if (!jobCard) return reply.code(404).send({ ok: false, message: "Job card not found." });
+    const scope = resolveBranchScope(request);
+    if (scope && jobCard.branchId !== scope) return reply.code(404).send({ ok: false, message: "Job card not found." });
     return jobCard;
   });
 

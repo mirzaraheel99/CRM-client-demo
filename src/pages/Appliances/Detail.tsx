@@ -8,7 +8,7 @@ import { applianceToForm, applianceFormToInput, type ApplianceFormState } from "
 import { JobStatusBadge, JobTypeBadge } from "../../components/StatusBadge";
 import { formatCurrency, formatDate, relativeTime } from "../../lib/utils";
 import { toast } from "../../lib/toast";
-import { canPerform } from "../../lib/permissions";
+import { canPerform, canViewOtherBranches } from "../../lib/permissions";
 import { categoryNameAr, WARRANTY_STATUS_AR, bi } from "../../lib/domainAr";
 
 const EDIT_TABS = ["Basic", "Purchase", "Compliance", "Site"];
@@ -22,19 +22,22 @@ const EDIT_TAB_LABELS: Record<string, string> = {
 export default function ApplianceDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { appliances, applianceTelemetry, customers, brands, categories, jobCards, selectedBranchId, role, aliasFieldsEnabled, updateAppliance, deleteAppliance } = useStore();
+  const { appliances, applianceTelemetry, customers, brands, categories, branches, jobCards, selectedBranchId, role, aliasFieldsEnabled, updateAppliance, deleteAppliance } = useStore();
   const [editOpen, setEditOpen] = useState(false);
   const [editTab, setEditTab] = useState("Basic");
   const [editForm, setEditForm] = useState<ApplianceFormState | null>(null);
+  const [editBranchId, setEditBranchId] = useState("");
   const history = jobCards.filter((job) => job.applianceId === id && (selectedBranchId === "all" || job.branchId === selectedBranchId)).sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
-  const appliance = appliances.find((candidate) => candidate.id === id && (selectedBranchId === "all" || history.length > 0));
+  const appliance = appliances.find((candidate) => candidate.id === id && (selectedBranchId === "all" || candidate.branchId == null || candidate.branchId === selectedBranchId));
   if (!appliance) return <p className="text-sm text-[var(--color-ink-muted)]">{bi("Product not found for this branch.", "لم يتم العثور على المنتج لهذا الفرع.")}</p>;
 
   const brand = brands.find((candidate) => candidate.id === appliance.brandId);
+  const registeredBranch = branches.find((candidate) => candidate.id === appliance.branchId);
   const telemetry = applianceTelemetry.find((candidate) => candidate.applianceId === appliance.id);
 
   function openEdit() {
     setEditForm(applianceToForm(appliance!));
+    setEditBranchId(appliance!.branchId ?? "");
     setEditTab("Basic");
     setEditOpen(true);
   }
@@ -45,7 +48,7 @@ export default function ApplianceDetail() {
       toast("Fill in the required Basic fields.", "error");
       return;
     }
-    const outcome = await updateAppliance(appliance.id, applianceFormToInput(editForm));
+    const outcome = await updateAppliance(appliance.id, { ...applianceFormToInput(editForm), branchId: editBranchId || undefined });
     toast(outcome.message, outcome.ok ? "success" : "error");
     if (outcome.ok) setEditOpen(false);
   }
@@ -69,6 +72,7 @@ export default function ApplianceDetail() {
           </div>
           {appliance.modelAr && <p dir="rtl" className="text-sm text-[var(--color-ink-secondary)]">{appliance.modelAr}</p>}
           <p className="text-sm text-[var(--color-ink-muted)]">Product No. {appliance.documentNo} | Customer association is recorded per service order.</p>
+          <p className="text-xs text-[var(--color-ink-muted)]">{bi("Registered branch", "الفرع المسجل")}: {registeredBranch?.name ?? bi("Unassigned", "غير محدد")}</p>
         </div>
         {canPerform(role, "create_appliance") && (
           <div className="flex gap-2">
@@ -148,6 +152,19 @@ export default function ApplianceDetail() {
       {editForm && (
         <Modal open={editOpen} onClose={() => setEditOpen(false)} title={bi("Edit Product", "تعديل المنتج")} width="lg">
           <div className="space-y-4">
+            {canViewOtherBranches(role) && (
+              <div>
+                <p className="mb-1 text-xs font-medium text-[var(--color-ink-secondary)]">{bi("Registered branch", "الفرع المسجل")}</p>
+                <select
+                  value={editBranchId}
+                  onChange={(event) => setEditBranchId(event.target.value)}
+                  className="w-full rounded-lg border bg-[var(--color-surface-2)] px-3 py-2 text-sm outline-none [border-color:var(--color-border)]"
+                >
+                  <option value="">{bi("Unassigned", "غير محدد")}</option>
+                  {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              </div>
+            )}
             <Tabs tabs={EDIT_TABS} active={editTab} onChange={setEditTab} labels={EDIT_TAB_LABELS} />
             {editTab === "Basic" && <ApplianceBasicFields value={editForm} onChange={(patch) => setEditForm({ ...editForm, ...patch })} brands={brands} categories={categories} aliasFieldsEnabled={aliasFieldsEnabled} />}
             {editTab === "Purchase" && <AppliancePurchaseFields value={editForm} onChange={(patch) => setEditForm({ ...editForm, ...patch })} />}

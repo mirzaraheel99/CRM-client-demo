@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useStore } from "../lib/store";
-import { Card, CardHeader, Button, Input, Field, Modal } from "../components/ui";
+import { Card, CardHeader, Button, Input, Select, Field, Modal } from "../components/ui";
 import { toast } from "../lib/toast";
 import { canPerform } from "../lib/permissions";
-import { bi } from "../lib/domainAr";
+import { bi, SAUDI_CITIES } from "../lib/domainAr";
 import type { Branch } from "../lib/types";
 
 const emptyForm = () => ({ name: "", city: "" });
@@ -82,7 +82,12 @@ export default function Branches() {
       <Modal open={open} onClose={() => setOpen(false)} title={editing ? bi("Edit Branch", "تعديل الفرع") : bi("Add Branch", "إضافة فرع")}>
         <div className="space-y-3">
           <Field label={bi("Branch name", "اسم الفرع")}><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
-          <Field label={bi("City", "المدينة")}><Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></Field>
+          <Field label={bi("City", "المدينة")}>
+            <Select value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })}>
+              <option value="">{bi("Choose city...", "اختر المدينة...")}</option>
+              {SAUDI_CITIES.map((c) => <option key={c.en} value={c.en}>{bi(c.en, c.ar)}</option>)}
+            </Select>
+          </Field>
           <Button className="w-full justify-center" onClick={submit}>{bi("Save Branch", "حفظ الفرع")}</Button>
         </div>
       </Modal>

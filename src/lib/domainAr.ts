@@ -128,3 +128,29 @@ export const REQUEST_SOURCE_AR: Record<RequestSource, string> = {
 export function bi(en: string, ar: string): string {
   return `${en} · ${ar}`;
 }
+
+// Major Saudi Arabia cities/regions, for the Branch city dropdown.
+export const SAUDI_CITIES: { en: string; ar: string }[] = [
+  { en: "Riyadh", ar: "الرياض" },
+  { en: "Jeddah", ar: "جدة" },
+  { en: "Mecca", ar: "مكة المكرمة" },
+  { en: "Medina", ar: "المدينة المنورة" },
+  { en: "Dammam", ar: "الدمام" },
+  { en: "Khobar", ar: "الخبر" },
+  { en: "Dhahran", ar: "الظهران" },
+  { en: "Taif", ar: "الطائف" },
+  { en: "Tabuk", ar: "تبوك" },
+  { en: "Buraidah", ar: "بريدة" },
+  { en: "Khamis Mushait", ar: "خميس مشيط" },
+  { en: "Abha", ar: "أبها" },
+  { en: "Hail", ar: "حائل" },
+  { en: "Najran", ar: "نجران" },
+  { en: "Jubail", ar: "الجبيل" },
+  { en: "Yanbu", ar: "ينبع" },
+  { en: "Al Ahsa", ar: "الأحساء" },
+  { en: "Qatif", ar: "القطيف" },
+  { en: "Arar", ar: "عرعر" },
+  { en: "Sakaka", ar: "سكاكا" },
+  { en: "Jazan", ar: "جازان" },
+  { en: "Al Bahah", ar: "الباحة" },
+];

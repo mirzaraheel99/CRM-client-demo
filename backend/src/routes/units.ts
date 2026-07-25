@@ -6,6 +6,7 @@ const unitSchema = z.object({
   name: z.string().min(1),
   nameAr: z.string().optional(),
   code: z.string().optional(),
+  category: z.enum(["Weight", "Volume", "Length", "Count", "Area", "Other"]).optional(),
   unitType: z.enum(["Base", "Alternate"]).optional(),
   roundingType: z.string().optional(),
   decimalPlaces: z.number().int().min(0).max(6).optional(),

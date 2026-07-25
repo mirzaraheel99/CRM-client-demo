@@ -1,5 +1,5 @@
-import { forwardRef, useEffect, useState, type ReactNode } from "react";
-import { Check, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { forwardRef, useEffect, useRef, useState, type ReactNode } from "react";
+import { Check, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown, MoreVertical } from "lucide-react";
 import { cx } from "../lib/utils";
 import { useCountUp } from "../lib/useCountUp";
 import { STAGE_NAME_AR } from "../lib/domainAr";
@@ -351,6 +351,50 @@ export function SortableTh({
         )}
       </button>
     </th>
+  );
+}
+
+export function ActionsMenu({ items }: { items: { label: string; onClick: () => void; danger?: boolean }[] }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDocClick(event: MouseEvent) {
+      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [open]);
+
+  return (
+    <div className="relative inline-block" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-ink-muted)] transition-colors hover:bg-black/5 hover:text-[var(--color-ink-primary)] dark:hover:bg-white/10"
+        aria-label="Actions"
+      >
+        <MoreVertical size={16} />
+      </button>
+      {open && (
+        <div className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-lg border bg-[var(--color-surface-1)] py-1 shadow-[var(--shadow-md)] [border-color:var(--color-border)]">
+          {items.map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              onClick={() => { setOpen(false); item.onClick(); }}
+              className={cx(
+                "block w-full px-3 py-1.5 text-left text-sm transition-colors hover:bg-black/5 dark:hover:bg-white/10",
+                item.danger ? "text-[var(--color-status-critical)]" : "text-[var(--color-ink-primary)]"
+              )}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

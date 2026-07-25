@@ -103,11 +103,14 @@ export interface Category {
 
 export type ApplianceCategory = string;
 
+export type UnitCategory = "Weight" | "Volume" | "Length" | "Count" | "Area" | "Other";
+
 export interface UnitOfMeasure {
   id: string;
   name: string;
   nameAr?: string;
   code?: string;
+  category?: UnitCategory;
   unitType: "Base" | "Alternate";
   roundingType?: string;
   decimalPlaces: number;

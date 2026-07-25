@@ -159,6 +159,7 @@ model UnitOfMeasure {
   name             String   @unique
   nameAr           String?
   code             String?
+  category         String?
   unitType         String   @default("Base")
   roundingType     String?
   decimalPlaces    Int      @default(0)

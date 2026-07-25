@@ -1,17 +1,30 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useStore } from "../lib/store";
-import { Card, CardHeader, Button, Input, Select, Field, Modal } from "../components/ui";
+import { Card, Button, Input, Select, Field, Modal, Badge, SortableTh, ActionsMenu, EmptyState } from "../components/ui";
 import { toast } from "../lib/toast";
 import { canPerform } from "../lib/permissions";
+import { useSort } from "../lib/useSort";
 import { bi } from "../lib/domainAr";
-import type { UnitOfMeasure } from "../lib/types";
+import type { UnitCategory, UnitOfMeasure } from "../lib/types";
 
 const ROUNDING_TYPES = ["No Rounding", "Round Up", "Round Down", "Nearest"];
+const UNIT_CATEGORIES: UnitCategory[] = ["Weight", "Volume", "Length", "Count", "Area", "Other"];
+const UNIT_CATEGORY_AR: Record<UnitCategory, string> = {
+  Weight: "الوزن",
+  Volume: "الحجم",
+  Length: "الطول",
+  Count: "العدد",
+  Area: "المساحة",
+  Other: "أخرى",
+};
+
+type SortKey = "name" | "code" | "category" | "unitType" | "decimalPlaces" | "itemsUsed";
 
 const emptyForm = () => ({
   name: "",
   nameAr: "",
   code: "",
+  category: "" as UnitCategory | "",
   unitType: "Base" as UnitOfMeasure["unitType"],
   roundingType: "No Rounding",
   decimalPlaces: "0",
@@ -25,7 +38,29 @@ export default function Units() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<UnitOfMeasure | null>(null);
   const [form, setForm] = useState(emptyForm());
+  const [categoryFilter, setCategoryFilter] = useState<UnitCategory | "all">("all");
   const baseUnits = units.filter((u) => u.unitType === "Base");
+
+  const itemCountByUnit = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const item of inventoryItems) if (item.unit) map.set(item.unit, (map.get(item.unit) ?? 0) + 1);
+    return map;
+  }, [inventoryItems]);
+
+  const filteredUnits = useMemo(
+    () => categoryFilter === "all" ? units : units.filter((u) => u.category === categoryFilter),
+    [units, categoryFilter]
+  );
+
+  const sortValue = (u: UnitOfMeasure, key: SortKey) => {
+    if (key === "name") return u.name;
+    if (key === "code") return u.code ?? "";
+    if (key === "category") return u.category ?? "";
+    if (key === "unitType") return u.unitType;
+    if (key === "decimalPlaces") return u.decimalPlaces;
+    return itemCountByUnit.get(u.name) ?? 0;
+  };
+  const { sorted, sortKey, dir, toggle } = useSort<UnitOfMeasure, SortKey>(filteredUnits, sortValue, "name");
 
   function openAdd() {
     setEditing(null);
@@ -39,6 +74,7 @@ export default function Units() {
       name: unit.name,
       nameAr: unit.nameAr ?? "",
       code: unit.code ?? "",
+      category: unit.category ?? "",
       unitType: unit.unitType,
       roundingType: unit.roundingType ?? "No Rounding",
       decimalPlaces: String(unit.decimalPlaces),
@@ -58,6 +94,7 @@ export default function Units() {
       name: form.name.trim(),
       nameAr: form.nameAr.trim() || undefined,
       code: form.code.trim() || undefined,
+      category: form.category || undefined,
       unitType: form.unitType,
       roundingType: form.roundingType,
       decimalPlaces: Number(form.decimalPlaces) || 0,
@@ -85,30 +122,66 @@ export default function Units() {
         {canManage && <Button onClick={openAdd}>+ {bi("Add Unit", "إضافة وحدة")}</Button>}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {units.map((unit) => {
-          const count = inventoryItems.filter((i) => i.unit === unit.name).length;
-          return (
-            <Card key={unit.id} interactive className="space-y-2">
-              <CardHeader title={unit.name} subtitle={unit.code ?? undefined} />
-              {unit.nameAr && <p dir="rtl" className="-mt-3 text-xs text-[var(--color-ink-muted)]">{unit.nameAr}</p>}
-              <p className="text-xs text-[var(--color-ink-muted)]">
-                {bi(unit.unitType === "Base" ? "Base unit" : "Alternate unit", unit.unitType === "Base" ? "وحدة أساسية" : "وحدة بديلة")}
-                {unit.unitType === "Alternate" && unit.baseUnitName && ` · 1 ${unit.name} = ${unit.conversionFactor ?? "?"} ${unit.baseUnitName}`}
-              </p>
-              <p className="text-xs text-[var(--color-ink-muted)]">{bi("Decimals", "الكسور العشرية")}: {unit.decimalPlaces} · {unit.roundingType ?? "No Rounding"}</p>
-              <p className="text-xs text-[var(--color-ink-muted)]">{count} item{count === 1 ? "" : "s"} using this unit</p>
-              {canManage && (
-                <div className="flex gap-2 pt-1">
-                  <Button size="sm" variant="secondary" onClick={() => openEdit(unit)}>{bi("Edit", "تعديل")}</Button>
-                  <Button size="sm" variant="danger" onClick={() => remove(unit)}>{bi("Delete", "حذف")}</Button>
-                </div>
-              )}
-            </Card>
-          );
-        })}
-        {units.length === 0 && <p className="text-sm text-[var(--color-ink-muted)]">{bi("No units yet.", "لا توجد وحدات بعد.")}</p>}
-      </div>
+      <Card padded={false}>
+        <div className="flex items-center justify-between gap-3 px-5 pt-4">
+          <Select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value as UnitCategory | "all")} className="max-w-[220px]">
+            <option value="all">{bi("All categories", "كل الفئات")}</option>
+            {UNIT_CATEGORIES.map((c) => <option key={c} value={c}>{bi(c, UNIT_CATEGORY_AR[c])}</option>)}
+          </Select>
+        </div>
+        <div className="p-5 overflow-x-auto">
+          <table className="w-full min-w-[820px] text-sm">
+            <thead>
+              <tr className="border-b text-left text-xs text-[var(--color-ink-muted)] [border-color:var(--color-border)]">
+                <SortableTh label={bi("Name", "الاسم")} active={sortKey === "name"} direction={dir} onClick={() => toggle("name")} className="py-2" />
+                <SortableTh label={bi("Code", "الرمز")} active={sortKey === "code"} direction={dir} onClick={() => toggle("code")} className="py-2" />
+                <SortableTh label={bi("Category", "الفئة")} active={sortKey === "category"} direction={dir} onClick={() => toggle("category")} className="py-2" />
+                <SortableTh label={bi("Type", "النوع")} active={sortKey === "unitType"} direction={dir} onClick={() => toggle("unitType")} className="py-2" />
+                <th className="py-2 font-medium">{bi("Base / Conversion", "الوحدة الأساسية / التحويل")}</th>
+                <SortableTh label={bi("Decimals", "الكسور")} active={sortKey === "decimalPlaces"} direction={dir} onClick={() => toggle("decimalPlaces")} className="py-2" />
+                <th className="py-2 font-medium">{bi("Rounding", "التقريب")}</th>
+                <SortableTh label={bi("Items Used", "الأصناف المستخدمة")} active={sortKey === "itemsUsed"} direction={dir} onClick={() => toggle("itemsUsed")} className="py-2" />
+                <th className="py-2 font-medium text-right">{bi("Actions", "الإجراءات")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((unit) => {
+                const count = itemCountByUnit.get(unit.name) ?? 0;
+                return (
+                  <tr key={unit.id} className="border-b last:border-0 [border-color:var(--color-border)] transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.03]">
+                    <td className="py-2.5 font-medium">
+                      {unit.name}
+                      {unit.nameAr && aliasFieldsEnabled && <span dir="rtl" className="block text-[11px] font-normal text-[var(--color-ink-muted)]">{unit.nameAr}</span>}
+                    </td>
+                    <td className="py-2.5 text-[var(--color-ink-secondary)]">{unit.code ?? "—"}</td>
+                    <td className="py-2.5">{unit.category ? <Badge tone="neutral">{bi(unit.category, UNIT_CATEGORY_AR[unit.category])}</Badge> : <span className="text-[var(--color-ink-muted)]">—</span>}</td>
+                    <td className="py-2.5">
+                      <Badge tone={unit.unitType === "Base" ? "brand" : "neutral"}>{bi(unit.unitType === "Base" ? "Base" : "Alternate", unit.unitType === "Base" ? "أساسية" : "بديلة")}</Badge>
+                    </td>
+                    <td className="py-2.5 text-[var(--color-ink-secondary)]">
+                      {unit.unitType === "Alternate" && unit.baseUnitName ? `1 ${unit.name} = ${unit.conversionFactor ?? "?"} ${unit.baseUnitName}` : "—"}
+                    </td>
+                    <td className="py-2.5 tabular-nums">{unit.decimalPlaces}</td>
+                    <td className="py-2.5 text-[var(--color-ink-secondary)]">{unit.roundingType ?? "No Rounding"}</td>
+                    <td className="py-2.5 tabular-nums">{count}</td>
+                    <td className="py-2.5 text-right">
+                      {canManage && (
+                        <ActionsMenu
+                          items={[
+                            { label: bi("Edit", "تعديل"), onClick: () => openEdit(unit) },
+                            { label: bi("Delete", "حذف"), onClick: () => remove(unit), danger: true },
+                          ]}
+                        />
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {sorted.length === 0 && <EmptyState title={bi("No units found", "لم يتم العثور على وحدات")} subtitle={categoryFilter === "all" ? "Add your first unit to get started." : "No units in this category yet."} />}
+        </div>
+      </Card>
 
       <Modal open={open} onClose={() => setOpen(false)} title={editing ? bi("Edit Unit", "تعديل الوحدة") : bi("Add Unit", "إضافة وحدة")}>
         <div className="space-y-3">
@@ -116,7 +189,15 @@ export default function Units() {
             <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder="الاسم بالعربية" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} />}
           </Field>
-          <Field label={bi("Code (optional)", "الرمز (اختياري)")}><Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} /></Field>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label={bi("Code (optional)", "الرمز (اختياري)")}><Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} /></Field>
+            <Field label={bi("Category (optional)", "الفئة (اختياري)")}>
+              <Select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value as UnitCategory | "" })}>
+                <option value="">{bi("Not set", "غير محدد")}</option>
+                {UNIT_CATEGORIES.map((c) => <option key={c} value={c}>{bi(c, UNIT_CATEGORY_AR[c])}</option>)}
+              </Select>
+            </Field>
+          </div>
           <Field label={bi("Unit type", "نوع الوحدة")}>
             <Select value={form.unitType} onChange={(e) => setForm({ ...form, unitType: e.target.value as UnitOfMeasure["unitType"] })}>
               <option value="Base">{bi("Base", "أساسية")}</option>

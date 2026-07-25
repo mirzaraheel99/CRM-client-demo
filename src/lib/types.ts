@@ -75,6 +75,7 @@ export interface Customer {
   gender?: Gender;
   notes?: string;
   branchId: string;
+  zone?: string;
   createdAt: string;
   whatsappVerified: boolean;
 }
@@ -158,6 +159,17 @@ export interface ApplianceTelemetry {
   lastErrorDescription: string | null;
   cycleCount: number;
   lastSyncAt: string;
+}
+
+// A technician's/customer's coverage sub-area within a branch (e.g. "Riyadh
+// North") -- soft reference like Category: stored as plain text on
+// Technician.zone/Customer.zone, not a FK, so admins can add zones from the
+// Zones page without a schema change.
+export interface Zone {
+  id: string;
+  name: string;
+  branchId: string;
+  createdAt: string;
 }
 
 export interface Technician {

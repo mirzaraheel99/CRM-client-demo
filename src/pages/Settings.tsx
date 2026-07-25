@@ -20,6 +20,7 @@ const ACTION_LABELS: Record<DemoAction, string> = {
   create_appliance: bi("Register product", "تسجيل منتج"),
   create_job: bi("Create job card", "إنشاء بطاقة عمل"),
   manage_branch: bi("Manage branches", "إدارة الفروع"),
+  manage_zone: bi("Manage zones", "إدارة المناطق"),
   manage_brand: bi("Manage brands", "إدارة العلامات التجارية"),
   manage_category: bi("Manage categories", "إدارة الفئات"),
   manage_unit: bi("Manage units of measure", "إدارة وحدات القياس"),

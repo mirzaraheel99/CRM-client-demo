@@ -29,6 +29,7 @@ const customerBaseSchema = z.object({
   gender: z.enum(["male", "female"]).optional(),
   notes: z.string().optional(),
   branchId: z.string().min(1),
+  zone: z.string().optional(),
 });
 
 const customerSchema = customerBaseSchema
@@ -104,6 +105,7 @@ export default async function customerRoutes(fastify: FastifyInstance) {
           gender: isCorporate ? undefined : input.gender,
           notes: input.notes,
           branchId: input.branchId,
+          zone: input.zone,
         },
       });
       return customer;

@@ -7,7 +7,7 @@ import { MESSAGE_TEMPLATES, renderTemplate } from "./templates";
 import { formatDate } from "./utils";
 import { api, ApiError, getToken, setToken } from "./api";
 import type {
-  ActionResult, Customer, Appliance, ApplianceTelemetry, Brand, Category, UnitOfMeasure, Technician, InventoryItem, InventoryLocation,
+  ActionResult, Customer, Appliance, ApplianceTelemetry, Brand, Category, UnitOfMeasure, Technician, Zone, InventoryItem, InventoryLocation,
   InventoryStock, InventoryTransaction, JobCard, JobCardStageHistory,
   JobCardAttachment, JobCardPartUsed, JobCardEstimateLine, EstimateLineKind, PurchaseBill, CommunicationLog,
   WorkflowDefinition, Role, StageName, Branch, Payment, PaymentMethod, Channel, ServiceOrder, RemovedPart, RequestSource, DemoUser,
@@ -40,6 +40,7 @@ interface DemoState {
   appliances: Appliance[];
   applianceTelemetry: ApplianceTelemetry[];
   technicians: Technician[];
+  zones: Zone[];
   inventoryItems: InventoryItem[];
   inventoryLocations: InventoryLocation[];
   inventoryStock: InventoryStock[];
@@ -111,6 +112,9 @@ interface DemoState {
   addTechnician: (technician: Omit<Technician, "id">) => Promise<Technician>;
   updateTechnician: (id: string, patch: Partial<Omit<Technician, "id">>) => Promise<ActionResult>;
   deleteTechnician: (id: string) => Promise<ActionResult>;
+  addZone: (zone: Omit<Zone, "id" | "createdAt">) => Promise<Zone>;
+  updateZone: (id: string, name: string) => Promise<ActionResult>;
+  deleteZone: (id: string) => Promise<ActionResult>;
   addInventoryItem: (item: Omit<InventoryItem, "id">) => Promise<InventoryItem>;
   updateInventoryItem: (id: string, patch: Partial<Omit<InventoryItem, "id">>) => Promise<ActionResult>;
   deleteInventoryItem: (id: string) => Promise<ActionResult>;
@@ -199,6 +203,7 @@ const initialSlice = () => ({
   appliances: [] as Appliance[],
   applianceTelemetry: clone(seed.APPLIANCE_TELEMETRY),
   technicians: [] as Technician[],
+  zones: [] as Zone[],
   inventoryItems: [] as InventoryItem[],
   inventoryLocations: [] as InventoryLocation[],
   inventoryStock: [] as InventoryStock[],
@@ -371,7 +376,7 @@ export const useStore = create<DemoState>()(
           }
         };
         const [
-          branches, customers, brands, categories, units, technicians, appliances, serviceOrders, jobCardsRaw,
+          branches, customers, brands, categories, units, technicians, zones, appliances, serviceOrders, jobCardsRaw,
           removedParts, estimateLineItems, rolePermissionRows,
           inventoryLocations, inventoryItems, inventoryStock, inventoryTransactions,
         ] = await Promise.all([
@@ -381,6 +386,7 @@ export const useStore = create<DemoState>()(
           fetchOr<Category[]>("/api/categories", state.categories),
           fetchOr<UnitOfMeasure[]>("/api/units", state.units),
           fetchOr<Technician[]>("/api/technicians", state.technicians),
+          fetchOr<Zone[]>("/api/zones", state.zones),
           fetchOr<Appliance[]>("/api/appliances", state.appliances),
           fetchOr<ServiceOrder[]>("/api/service-orders", state.serviceOrders),
           fetchOr<(JobCard & { stageHistory?: JobCardStageHistory[] })[]>("/api/job-cards", state.jobCards),
@@ -397,7 +403,7 @@ export const useStore = create<DemoState>()(
           : state.stageHistory;
         syncActionRolesFromServer(rolePermissionRows);
         set({
-          branches, customers, brands, categories, units, technicians, appliances, serviceOrders,
+          branches, customers, brands, categories, units, technicians, zones, appliances, serviceOrders,
           jobCards: jobCardsRaw, stageHistory, removedParts, estimateLineItems,
           inventoryLocations, inventoryItems, inventoryStock, inventoryTransactions,
           permissionsVersion: state.permissionsVersion + 1,
@@ -619,6 +625,29 @@ export const useStore = create<DemoState>()(
           return result(true, "Technician deleted.");
         } catch (err) {
           return result(false, err instanceof ApiError ? err.message : "Failed to delete technician.");
+        }
+      },
+      addZone: async (input) => {
+        const zone = await api.post<Zone>("/api/zones", input);
+        await get().hydrate();
+        return zone;
+      },
+      updateZone: async (id, name) => {
+        try {
+          await api.patch(`/api/zones/${id}`, { name });
+          await get().hydrate();
+          return result(true, "Zone updated.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to update zone.");
+        }
+      },
+      deleteZone: async (id) => {
+        try {
+          await api.delete(`/api/zones/${id}`);
+          await get().hydrate();
+          return result(true, "Zone deleted.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to delete zone.");
         }
       },
       addInventoryItem: async (input) => {

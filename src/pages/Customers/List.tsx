@@ -43,6 +43,7 @@ function emptyCustomerForm(branchId: string) {
     email: "",
     address: "",
     branchId,
+    zone: "",
     nationalId: "",
     nationality: "",
     preferredLanguage: "" as PreferredLanguage | "",
@@ -53,7 +54,7 @@ function emptyCustomerForm(branchId: string) {
 }
 
 export default function CustomerList() {
-  const { customers, jobCards, serviceOrders, branches, selectedBranchId, role, addCustomer, updateCustomer, deleteCustomer, aliasFieldsEnabled, requiredFieldsVersion } = useStore();
+  const { customers, jobCards, serviceOrders, branches, zones, selectedBranchId, role, addCustomer, updateCustomer, deleteCustomer, aliasFieldsEnabled, requiredFieldsVersion } = useStore();
   // requiredFieldsVersion (destructured above) forces a re-render whenever the module-level table in requiredFields.ts changes.
   void requiredFieldsVersion;
   const canManage = canPerform(role, "create_customer");
@@ -139,6 +140,7 @@ export default function CustomerList() {
       email: customer.email ?? "",
       address: customer.address ?? "",
       branchId: customer.branchId,
+      zone: customer.zone ?? "",
       nationalId: customer.nationalId ?? "",
       nationality: customer.nationality ?? "",
       preferredLanguage: customer.preferredLanguage ?? "",
@@ -163,6 +165,7 @@ export default function CustomerList() {
       grandfatherNameAr: isCorporate ? undefined : (form.grandfatherNameAr.trim() || undefined),
       familyNameAr: isCorporate ? undefined : (form.familyNameAr.trim() || undefined),
       homePhone: form.homePhone || undefined,
+      zone: form.zone || undefined,
       whatsapp: form.whatsapp.trim() || form.phone,
       nationalId: isCorporate ? undefined : (form.nationalId || undefined),
       nationality: isCorporate ? undefined : (form.nationality || undefined),
@@ -300,11 +303,19 @@ export default function CustomerList() {
                 <Field label={bi("Email", "البريد الإلكتروني")} required={isFieldRequired("customer", "email")}><Input value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></Field>
               </div>
               <Field label={bi("Address", "العنوان")} required={isFieldRequired("customer", "address")}><Input value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} /></Field>
-              <Field label={bi("Branch", "الفرع")}>
-                <Select value={form.branchId} onChange={(event) => setForm({ ...form, branchId: event.target.value })}>
-                  {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-                </Select>
-              </Field>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label={bi("Branch", "الفرع")}>
+                  <Select value={form.branchId} onChange={(event) => setForm({ ...form, branchId: event.target.value, zone: "" })}>
+                    {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+                  </Select>
+                </Field>
+                <Field label={bi("Zone (optional)", "المنطقة (اختياري)")}>
+                  <Select value={form.zone} onChange={(event) => setForm({ ...form, zone: event.target.value })}>
+                    <option value="">{bi("Not set", "غير محدد")}</option>
+                    {zones.filter((z) => z.branchId === form.branchId).map((z) => <option key={z.id} value={z.name}>{z.name}</option>)}
+                  </Select>
+                </Field>
+              </div>
             </div>
           )}
 

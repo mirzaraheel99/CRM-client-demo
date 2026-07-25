@@ -52,6 +52,21 @@ model Branch {
   serviceOrders ServiceOrder[]
   jobCards      JobCard[]
   users         User[]
+  zones         Zone[]
+}
+
+// A technician's/customer's coverage sub-area within a branch (e.g. "Riyadh
+// North"). Soft reference like Category: Technician.zone and Customer.zone
+// store this zone's name as plain text, not a FK, so admins can rename/add
+// zones without a schema migration.
+model Zone {
+  id        String   @id @default(cuid())
+  name      String
+  branchId  String
+  branch    Branch   @relation(fields: [branchId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([branchId, name])
 }
 
 model User {
@@ -105,6 +120,7 @@ model Customer {
   notes              String?
   branchId           String
   branch             Branch    @relation(fields: [branchId], references: [id])
+  zone               String?
   createdAt          DateTime  @default(now())
   whatsappVerified   Boolean   @default(false)
 

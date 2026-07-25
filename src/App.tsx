@@ -22,6 +22,7 @@ const Categories = lazy(() => import("./pages/Categories"));
 const Units = lazy(() => import("./pages/Units"));
 const Inventory = lazy(() => import("./pages/Inventory"));
 const AssetCustody = lazy(() => import("./pages/AssetCustody"));
+const Zones = lazy(() => import("./pages/Zones"));
 const Technicians = lazy(() => import("./pages/Technicians"));
 const Workflow = lazy(() => import("./pages/Workflow"));
 const Communications = lazy(() => import("./pages/Communications"));
@@ -69,6 +70,7 @@ function ShellRoutes() {
           <Route path="/units" element={<Units />} />
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/asset-custody" element={<AssetCustody />} />
+          <Route path="/zones" element={<Zones />} />
           <Route path="/technicians" element={<Technicians />} />
           <Route path="/workflow" element={<Workflow />} />
           <Route path="/communications" element={<Communications />} />

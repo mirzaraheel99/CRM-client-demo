@@ -15,16 +15,17 @@ const TAB_LABELS: Record<string, string> = {
 };
 
 export default function Technicians() {
-  const { technicians, jobCards, customers, branches, categories, role, selectedBranchId, addTechnician, updateTechnician, deleteTechnician, aliasFieldsEnabled } = useStore();
+  const { technicians, jobCards, customers, branches, zones, categories, role, selectedBranchId, addTechnician, updateTechnician, deleteTechnician, aliasFieldsEnabled } = useStore();
   const canManage = canPerform(role, "assign_technician");
   const [tab, setTab] = useState(TABS[0]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Technician | null>(null);
   const defaultBranchId = selectedBranchId === "all" ? branches[0]?.id ?? "" : selectedBranchId;
-  const emptyForm = () => ({ name: "", nameAr: "", phone: "", zone: "Zone A", skills: [] as ApplianceCategory[], branchId: defaultBranchId, status: "Available" as const, avatarColor: "#2a78d6", notes: "" });
+  const emptyForm = () => ({ name: "", nameAr: "", phone: "", zone: "", skills: [] as ApplianceCategory[], branchId: defaultBranchId, status: "Available" as const, avatarColor: "#2a78d6", notes: "" });
   const [form, setForm] = useState(emptyForm());
   const scopedTechnicians = filterByBranch(technicians, selectedBranchId);
   const scopedJobs = filterByBranch(jobCards, selectedBranchId);
+  const zonesForBranch = zones.filter((z) => z.branchId === form.branchId);
 
   function toggleSkill(s: ApplianceCategory) {
     setForm((f) => ({ ...f, skills: f.skills.includes(s) ? f.skills.filter((x) => x !== s) : [...f.skills, s] }));
@@ -47,7 +48,7 @@ export default function Technicians() {
   }
 
   async function submit() {
-    if (!form.name.trim() || !form.phone.trim() || !form.branchId || form.skills.length === 0) return;
+    if (!form.name.trim() || !form.phone.trim() || !form.branchId || !form.zone || form.skills.length === 0) return;
     const payload = { ...form, nameAr: form.nameAr.trim() || undefined, notes: form.notes.trim() || undefined };
     if (editing) {
       const outcome = await updateTechnician(editing.id, payload);
@@ -169,15 +170,21 @@ export default function Technicians() {
             {aliasFieldsEnabled && <Input dir="rtl" className="mt-2" placeholder="الاسم بالعربية" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} />}
           </Field>
           <Field label={bi("Phone", "الهاتف")}><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>
-          <Field label={bi("Zone", "المنطقة")}>
-            <Select value={form.zone} onChange={(e) => setForm({ ...form, zone: e.target.value })}>
-              <option>Zone A</option><option>Zone B</option><option>Zone C</option>
-            </Select>
-          </Field>
           <Field label={bi("Branch", "الفرع")}>
-            <Select value={form.branchId} onChange={(e) => setForm({ ...form, branchId: e.target.value })}>
+            <Select value={form.branchId} onChange={(e) => setForm({ ...form, branchId: e.target.value, zone: "" })}>
               {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
             </Select>
+          </Field>
+          <Field label={bi("Zone", "المنطقة")}>
+            <Select value={form.zone} onChange={(e) => setForm({ ...form, zone: e.target.value })}>
+              <option value="">{bi("Choose zone...", "اختر المنطقة...")}</option>
+              {zonesForBranch.map((z) => <option key={z.id} value={z.name}>{z.name}</option>)}
+            </Select>
+            {zonesForBranch.length === 0 && (
+              <p className="mt-1 text-[11px] text-[var(--color-ink-muted)]">
+                {bi("No zones set up for this branch yet -- add one from the Zones page.", "لا توجد مناطق لهذا الفرع بعد -- أضف واحدة من صفحة المناطق.")}
+              </p>
+            )}
           </Field>
           <Field label={bi("Skills", "المهارات")}>
             <div className="flex flex-wrap gap-2">

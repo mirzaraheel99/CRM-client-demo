@@ -16,6 +16,7 @@ import removedPartRoutes from "./routes/removedParts.js";
 import estimateLineRoutes from "./routes/estimateLines.js";
 import rolePermissionRoutes from "./routes/rolePermissions.js";
 import inventoryRoutes from "./routes/inventory.js";
+import zoneRoutes from "./routes/zones.js";
 import licenseRoutes from "./routes/license.js";
 import { checkLicense } from "./lib/license.js";
 
@@ -56,6 +57,7 @@ await fastify.register(removedPartRoutes);
 await fastify.register(estimateLineRoutes);
 await fastify.register(rolePermissionRoutes);
 await fastify.register(inventoryRoutes);
+await fastify.register(zoneRoutes);
 
 fastify.get("/api/health", async () => ({ ok: true }));
 

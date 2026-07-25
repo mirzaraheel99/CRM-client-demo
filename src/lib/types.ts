@@ -209,6 +209,7 @@ export interface InventoryTransaction {
   timestamp: string;
   createdBy: string;
   destLocationId?: string;
+  photoUrl?: string;
 }
 
 export interface JobCardStageHistory {

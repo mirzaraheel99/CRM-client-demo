@@ -37,7 +37,7 @@ export default function Inventory() {
   const [search, setSearch] = useState("");
   const [breakdownItem, setBreakdownItem] = useState<InventoryItem | null>(null);
 
-  const [txnForm, setTxnForm] = useState({ itemId: "", locationId: "", destLocationId: "", qty: 1 });
+  const [txnForm, setTxnForm] = useState({ itemId: "", locationId: "", destLocationId: "", qty: 1, photoUrl: "" });
   const [itemForm, setItemForm] = useState(emptyItemForm());
   const scopedLocations = useMemo(() => inventoryLocationsByBranch(inventoryLocations, selectedBranchId), [inventoryLocations, selectedBranchId]);
   const scopedStock = useMemo(() => inventoryStockByBranch(inventoryStock, inventoryLocations, selectedBranchId), [inventoryStock, inventoryLocations, selectedBranchId]);
@@ -100,10 +100,11 @@ export default function Inventory() {
       qty: txnForm.qty,
       createdBy: "You",
       destLocationId: txnModal === "transfer" ? txnForm.destLocationId : undefined,
+      photoUrl: txnModal === "receive" ? (txnForm.photoUrl || undefined) : undefined,
     });
     toast(result.message, result.ok ? "success" : "error");
     if (result.ok) {
-      setTxnForm({ itemId: "", locationId: "", destLocationId: "", qty: 1 });
+      setTxnForm({ itemId: "", locationId: "", destLocationId: "", qty: 1, photoUrl: "" });
       setTxnModal(null);
     }
   }
@@ -235,6 +236,7 @@ export default function Inventory() {
                   <th className="py-2 font-medium">{bi("Qty", "الكمية")}</th>
                   <th className="py-2 font-medium">{bi("By", "بواسطة")}</th>
                   <th className="py-2 font-medium">{bi("When", "الوقت")}</th>
+                  <th className="py-2 font-medium">{bi("Photo", "الصورة")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -249,6 +251,13 @@ export default function Inventory() {
                       <td className="py-2.5 tabular-nums">{txn.qty}</td>
                       <td className="py-2.5 text-[var(--color-ink-secondary)]">{txn.createdBy}</td>
                       <td className="py-2.5 text-[var(--color-ink-muted)]">{formatDateTime(txn.timestamp)}</td>
+                      <td className="py-2.5">
+                        {txn.photoUrl && (
+                          <a href={txn.photoUrl} target="_blank" rel="noreferrer">
+                            <img src={txn.photoUrl} alt="Receipt reference" className="h-8 w-8 rounded object-cover border [border-color:var(--color-border)]" />
+                          </a>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
@@ -385,6 +394,25 @@ export default function Inventory() {
           <Field label={bi("Quantity", "الكمية")}>
             <Input type="number" min={1} value={txnForm.qty} onChange={(e) => setTxnForm({ ...txnForm, qty: Number(e.target.value) })} />
           </Field>
+          {txnModal === "receive" && (
+            <Field label={bi("Photo reference (camera)", "صورة مرجعية (كاميرا)")}>
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = () => setTxnForm((prev) => ({ ...prev, photoUrl: String(reader.result) }));
+                  reader.readAsDataURL(file);
+                  event.target.value = "";
+                }}
+                className="block w-full text-sm text-[var(--color-ink-secondary)] file:mr-3 file:rounded-md file:border-0 file:bg-[var(--color-brand-1)]/10 file:px-3 file:py-2 file:text-sm file:font-medium file:text-[var(--color-brand-1)]"
+              />
+              {txnForm.photoUrl && <img src={txnForm.photoUrl} alt="Stock receipt reference" className="mt-2 h-20 w-20 rounded-md border object-cover [border-color:var(--color-border)]" />}
+            </Field>
+          )}
           <Button className="w-full justify-center" onClick={submitTxn}>{bi("Confirm", "تأكيد")}</Button>
         </div>
       </Modal>

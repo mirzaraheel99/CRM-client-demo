@@ -16,6 +16,7 @@ const CustomerList = lazy(() => import("./pages/Customers/List"));
 const CustomerDetail = lazy(() => import("./pages/Customers/Detail"));
 const ApplianceList = lazy(() => import("./pages/Appliances/List"));
 const ApplianceDetail = lazy(() => import("./pages/Appliances/Detail"));
+const Branches = lazy(() => import("./pages/Branches"));
 const Brands = lazy(() => import("./pages/Brands"));
 const Categories = lazy(() => import("./pages/Categories"));
 const Units = lazy(() => import("./pages/Units"));
@@ -62,6 +63,7 @@ function ShellRoutes() {
           <Route path="/customers/:id" element={<CustomerDetail />} />
           <Route path="/appliances" element={<ApplianceList />} />
           <Route path="/appliances/:id" element={<ApplianceDetail />} />
+          <Route path="/branches" element={<Branches />} />
           <Route path="/brands" element={<Brands />} />
           <Route path="/categories" element={<Categories />} />
           <Route path="/units" element={<Units />} />

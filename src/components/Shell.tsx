@@ -1,7 +1,7 @@
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, ClipboardList, Users, PackageSearch, Tag, Layers, Ruler, Boxes, PackageCheck,
-  UserCog, GitBranch, MessageSquare, BarChart3, Smartphone, Sun, Moon,
+  UserCog, GitBranch, Building2, MessageSquare, BarChart3, Smartphone, Sun, Moon,
   Languages, ChevronDown, Menu, Radar, X, Search, Settings as SettingsIcon, LogOut,
 } from "lucide-react";
 import { useStore } from "../lib/store";
@@ -23,6 +23,7 @@ const NAV: { to: string; labelKey: Parameters<typeof t>[1]; icon: ReactNode; rol
   { to: "/jobcards", labelKey: "jobCards", icon: <ClipboardList size={18} /> },
   { to: "/customers", labelKey: "customers", icon: <Users size={18} /> },
   { to: "/appliances", labelKey: "appliances", icon: <PackageSearch size={18} /> },
+  { to: "/branches", labelKey: "branches", icon: <Building2 size={18} />, roles: ["admin"] },
   { to: "/brands", labelKey: "brands", icon: <Tag size={18} />, roles: ["admin", "manager"] },
   { to: "/categories", labelKey: "categories", icon: <Layers size={18} />, roles: ["admin", "manager"] },
   { to: "/units", labelKey: "units", icon: <Ruler size={18} />, roles: ["admin", "manager"] },

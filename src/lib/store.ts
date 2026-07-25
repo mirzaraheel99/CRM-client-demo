@@ -96,6 +96,9 @@ interface DemoState {
   addAppliance: (appliance: Omit<Appliance, "id" | "documentNo">) => Promise<Appliance>;
   updateAppliance: (id: string, patch: Partial<Omit<Appliance, "id" | "documentNo">>) => Promise<ActionResult>;
   deleteAppliance: (id: string) => Promise<ActionResult>;
+  addBranch: (branch: Omit<Branch, "id">) => Promise<Branch>;
+  updateBranch: (id: string, patch: Partial<Omit<Branch, "id">>) => Promise<ActionResult>;
+  deleteBranch: (id: string) => Promise<ActionResult>;
   addBrand: (brand: Omit<Brand, "id">) => Promise<Brand>;
   updateBrand: (id: string, patch: Partial<Omit<Brand, "id">>) => Promise<ActionResult>;
   deleteBrand: (id: string) => Promise<ActionResult>;
@@ -493,6 +496,29 @@ export const useStore = create<DemoState>()(
           return result(true, "Product deleted.");
         } catch (err) {
           return result(false, err instanceof ApiError ? err.message : "Failed to delete product.");
+        }
+      },
+      addBranch: async (input) => {
+        const branch = await api.post<Branch>("/api/branches", input);
+        await get().hydrate();
+        return branch;
+      },
+      updateBranch: async (id, patch) => {
+        try {
+          await api.patch(`/api/branches/${id}`, patch);
+          await get().hydrate();
+          return result(true, "Branch updated.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to update branch.");
+        }
+      },
+      deleteBranch: async (id) => {
+        try {
+          await api.delete(`/api/branches/${id}`);
+          await get().hydrate();
+          return result(true, "Branch deleted.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to delete branch.");
         }
       },
       addBrand: async (input) => {

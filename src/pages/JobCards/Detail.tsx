@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, MessageCircle, Smartphone, Mail, CheckCircle2, Circle, XCircle, ImagePlus, Printer, Sparkles, Trash2, AlertTriangle, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { useStore } from "../../lib/store";
@@ -152,6 +152,24 @@ export default function JobCardDetail() {
       vendorName: bill?.vendorName ?? "",
     });
   }, [job?.id, job?.diagnosisNotes, job?.repairNotes, job?.finalAmount, job?.customerSignature, job?.oemClaimNo, bill?.id, bill?.billNo, bill?.billDate, bill?.vendorName]);
+
+  const stagePanelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const container = stagePanelRef.current;
+    if (!container) return;
+    const focusTarget = window.setTimeout(() => {
+      const field = container.querySelector<HTMLElement>(
+        "input:not([disabled]):not([type=hidden]):not([type=file]):not([type=checkbox]):not([type=radio]), textarea:not([disabled]), select:not([disabled])"
+      );
+      const target = field ?? container.querySelector<HTMLElement>("button:not([disabled])");
+      if (!target) return;
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      target.focus({ preventScroll: true });
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) target.select();
+    }, 50);
+    return () => window.clearTimeout(focusTarget);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [job?.id, viewedStage ?? job?.currentStage]);
 
   const timelineEntries = useMemo(() => {
     const stageEntries = jobHistory.map((h) => ({ kind: "stage" as const, id: h.id, timestamp: h.timestamp, data: h }));
@@ -812,7 +830,7 @@ export default function JobCardDetail() {
           </Card>
 
           {activeStage !== "Delivered" && (
-            <Card className="space-y-3">
+            <Card className="space-y-3" ref={stagePanelRef}>
               <CardHeader title={bi(activeStage, STAGE_NAME_AR[activeStage])} subtitle={isViewingPastStage ? bi("Amending a completed stage", "تعديل مرحلة مكتملة") : bi("Complete the stage requirements below", "أكمل متطلبات المرحلة أدناه")} />
 
               {isViewingPastStage && (

@@ -5,13 +5,12 @@ import { useCountUp } from "../lib/useCountUp";
 import { STAGE_NAME_AR } from "../lib/domainAr";
 import type { StageName } from "../lib/types";
 
-export function Card({
-  children, className, padded = true, interactive = false,
-}: {
+export const Card = forwardRef<HTMLDivElement, {
   children: ReactNode; className?: string; padded?: boolean; interactive?: boolean;
-}) {
+}>(function Card({ children, className, padded = true, interactive = false }, ref) {
   return (
     <div
+      ref={ref}
       className={cx(
         "rounded-lg border bg-[var(--color-surface-1)] shadow-[var(--shadow-xs)] transition-[border-color,box-shadow] duration-200 [border-color:var(--color-border)]",
         padded && "p-4",
@@ -22,7 +21,7 @@ export function Card({
       {children}
     </div>
   );
-}
+});
 
 export function CardHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {
   return (

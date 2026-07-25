@@ -22,7 +22,7 @@ const EDIT_TAB_LABELS: Record<string, string> = {
 export default function ApplianceDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { appliances, applianceTelemetry, customers, brands, categories, jobCards, selectedBranchId, role, aliasFieldsEnabled, updateAppliance } = useStore();
+  const { appliances, applianceTelemetry, customers, brands, categories, jobCards, selectedBranchId, role, aliasFieldsEnabled, updateAppliance, deleteAppliance } = useStore();
   const [editOpen, setEditOpen] = useState(false);
   const [editTab, setEditTab] = useState("Basic");
   const [editForm, setEditForm] = useState<ApplianceFormState | null>(null);
@@ -50,6 +50,14 @@ export default function ApplianceDetail() {
     if (outcome.ok) setEditOpen(false);
   }
 
+  async function remove() {
+    if (!appliance) return;
+    if (!confirm(`Delete product "${appliance.model}" (${appliance.serialNo})?`)) return;
+    const outcome = await deleteAppliance(appliance.id);
+    toast(outcome.message, outcome.ok ? "success" : "error");
+    if (outcome.ok) navigate("/appliances");
+  }
+
   return (
     <div className="space-y-5">
       <button onClick={() => navigate(-1)} className="flex items-center gap-1.5 text-sm text-[var(--color-ink-muted)] hover:text-[var(--color-ink-primary)]"><ArrowLeft size={15} /> {bi("Back", "رجوع")}</button>
@@ -62,7 +70,12 @@ export default function ApplianceDetail() {
           {appliance.modelAr && <p dir="rtl" className="text-sm text-[var(--color-ink-secondary)]">{appliance.modelAr}</p>}
           <p className="text-sm text-[var(--color-ink-muted)]">Product No. {appliance.documentNo} | Customer association is recorded per service order.</p>
         </div>
-        {canPerform(role, "create_appliance") && <Button variant="secondary" size="sm" onClick={openEdit}><Pencil size={14} /> {bi("Edit", "تعديل")}</Button>}
+        {canPerform(role, "create_appliance") && (
+          <div className="flex gap-2">
+            <Button variant="secondary" size="sm" onClick={openEdit}><Pencil size={14} /> {bi("Edit", "تعديل")}</Button>
+            <Button variant="danger" size="sm" onClick={remove}>{bi("Delete", "حذف")}</Button>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

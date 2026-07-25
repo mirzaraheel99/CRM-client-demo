@@ -123,4 +123,21 @@ export default async function applianceRoutes(fastify: FastifyInstance) {
       return appliance;
     }
   );
+
+  fastify.delete(
+    "/api/appliances/:id",
+    { preHandler: [fastify.authenticate, fastify.requirePermission("create_appliance")] },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const appliance = await prisma.appliance.findUnique({ where: { id } });
+      if (!appliance) return reply.code(404).send({ ok: false, message: "Product not found." });
+
+      const jobCount = await prisma.jobCard.count({ where: { applianceId: id } });
+      if (jobCount > 0) return reply.code(400).send({ ok: false, message: `Cannot delete: ${jobCount} job card${jobCount === 1 ? "" : "s"} reference this product.` });
+
+      await prisma.applianceTelemetry.deleteMany({ where: { applianceId: id } });
+      await prisma.appliance.delete({ where: { id } });
+      return { ok: true };
+    }
+  );
 }

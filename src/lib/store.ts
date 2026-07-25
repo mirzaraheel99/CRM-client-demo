@@ -90,9 +90,12 @@ interface DemoState {
   resetRequiredFields: () => ActionResult;
 
   addCustomer: (customer: Omit<Customer, "id" | "documentNo" | "createdAt" | "whatsappVerified" | "name">) => Promise<Customer>;
+  updateCustomer: (id: string, patch: Partial<Omit<Customer, "id" | "documentNo" | "createdAt" | "whatsappVerified" | "name">>) => Promise<ActionResult>;
+  deleteCustomer: (id: string) => Promise<ActionResult>;
   verifyWhatsapp: (customerId: string) => void;
   addAppliance: (appliance: Omit<Appliance, "id" | "documentNo">) => Promise<Appliance>;
   updateAppliance: (id: string, patch: Partial<Omit<Appliance, "id" | "documentNo">>) => Promise<ActionResult>;
+  deleteAppliance: (id: string) => Promise<ActionResult>;
   addBrand: (brand: Omit<Brand, "id">) => Promise<Brand>;
   updateBrand: (id: string, patch: Partial<Omit<Brand, "id">>) => Promise<ActionResult>;
   deleteBrand: (id: string) => Promise<ActionResult>;
@@ -427,6 +430,24 @@ export const useStore = create<DemoState>()(
         await get().hydrate();
         return customer;
       },
+      updateCustomer: async (id, patch) => {
+        try {
+          await api.patch(`/api/customers/${id}`, patch);
+          await get().hydrate();
+          return result(true, "Customer updated.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to update customer.");
+        }
+      },
+      deleteCustomer: async (id) => {
+        try {
+          await api.delete(`/api/customers/${id}`);
+          await get().hydrate();
+          return result(true, "Customer deleted.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to delete customer.");
+        }
+      },
       verifyWhatsapp: (customerId) => {
         set((state) => ({ customers: state.customers.map((customer) => customer.id === customerId ? { ...customer, whatsappVerified: true } : customer) }));
       },
@@ -442,6 +463,15 @@ export const useStore = create<DemoState>()(
           return result(true, "Product updated.");
         } catch (err) {
           return result(false, err instanceof ApiError ? err.message : "Failed to update product.");
+        }
+      },
+      deleteAppliance: async (id) => {
+        try {
+          await api.delete(`/api/appliances/${id}`);
+          await get().hydrate();
+          return result(true, "Product deleted.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to delete product.");
         }
       },
       addBrand: async (input) => {

@@ -53,11 +53,13 @@ function emptyCustomerForm(branchId: string) {
 }
 
 export default function CustomerList() {
-  const { customers, jobCards, serviceOrders, branches, selectedBranchId, role, addCustomer, aliasFieldsEnabled, requiredFieldsVersion } = useStore();
+  const { customers, jobCards, serviceOrders, branches, selectedBranchId, role, addCustomer, updateCustomer, deleteCustomer, aliasFieldsEnabled, requiredFieldsVersion } = useStore();
   // requiredFieldsVersion (destructured above) forces a re-render whenever the module-level table in requiredFields.ts changes.
   void requiredFieldsVersion;
+  const canManage = canPerform(role, "create_customer");
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<Customer | null>(null);
   const defaultBranchId = selectedBranchId === "all" ? branches[0]?.id ?? "" : selectedBranchId;
   const [form, setForm] = useState(emptyCustomerForm(defaultBranchId));
   const [formTab, setFormTab] = useState("Name");
@@ -108,11 +110,49 @@ export default function CustomerList() {
   const currentPage = Math.min(page, Math.max(1, Math.ceil(rows.length / PAGE_SIZE)));
   const pagedRows = rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  async function submit() {
-    if (getMissingCustomerFields(form.customerType, form).length > 0) return;
+  function openAdd() {
+    setEditing(null);
+    setForm(emptyCustomerForm(defaultBranchId));
+    setFormTab("Name");
+    setOpen(true);
+  }
+
+  function openEdit(customer: Customer) {
+    setEditing(customer);
+    setForm({
+      firstName: customer.firstName ?? "",
+      fatherName: customer.fatherName ?? "",
+      grandfatherName: customer.grandfatherName ?? "",
+      familyName: customer.familyName ?? "",
+      firstNameAr: customer.firstNameAr ?? "",
+      fatherNameAr: customer.fatherNameAr ?? "",
+      grandfatherNameAr: customer.grandfatherNameAr ?? "",
+      familyNameAr: customer.familyNameAr ?? "",
+      customerType: customer.customerType,
+      companyName: customer.companyName ?? "",
+      crNumber: customer.crNumber ?? "",
+      vatNumber: customer.vatNumber ?? "",
+      contactPersonName: customer.contactPersonName ?? "",
+      phone: customer.phone,
+      homePhone: customer.homePhone ?? "",
+      whatsapp: customer.whatsapp,
+      email: customer.email ?? "",
+      address: customer.address ?? "",
+      branchId: customer.branchId,
+      nationalId: customer.nationalId ?? "",
+      nationality: customer.nationality ?? "",
+      preferredLanguage: customer.preferredLanguage ?? "",
+      dateOfBirth: customer.dateOfBirth ? customer.dateOfBirth.slice(0, 10) : "",
+      gender: customer.gender ?? "",
+      notes: customer.notes ?? "",
+    });
+    setFormTab("Name");
+    setOpen(true);
+  }
+
+  function buildPayload() {
     const isCorporate = form.customerType === "corporate";
-    const existing = customers.find((customer) => customer.phone.replace(/\D/g, "") === form.phone.replace(/\D/g, ""));
-    const saved = await addCustomer({
+    return {
       ...form,
       firstName: isCorporate ? undefined : form.firstName,
       fatherName: isCorporate ? undefined : form.fatherName,
@@ -134,18 +174,36 @@ export default function CustomerList() {
       crNumber: isCorporate ? form.crNumber : undefined,
       vatNumber: isCorporate ? form.vatNumber : undefined,
       contactPersonName: isCorporate ? (form.contactPersonName || undefined) : undefined,
-    });
+    };
+  }
+
+  async function submit() {
+    if (getMissingCustomerFields(form.customerType, form).length > 0) return;
+    if (editing) {
+      const outcome = await updateCustomer(editing.id, buildPayload());
+      toast(outcome.message, outcome.ok ? "success" : "error");
+      if (outcome.ok) { setOpen(false); setEditing(null); }
+      return;
+    }
+    const existing = customers.find((customer) => customer.phone.replace(/\D/g, "") === form.phone.replace(/\D/g, ""));
+    const saved = await addCustomer(buildPayload());
     setForm(emptyCustomerForm(defaultBranchId));
     setFormTab("Name");
     setOpen(false);
     toast(existing ? `${saved.documentNo} already uses this phone number; the existing customer was kept.` : `${saved.documentNo} added to customers.`, existing ? "info" : "success");
   }
 
+  async function remove(customer: Customer) {
+    if (!confirm(`Delete customer "${customer.name}"?`)) return;
+    const outcome = await deleteCustomer(customer.id);
+    toast(outcome.message, outcome.ok ? "success" : "error");
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 animate-rise-in">
         <div><h1 className="text-xl font-semibold tracking-tight">{bi("Customers", "العملاء")}</h1><p className="mt-0.5 text-sm text-[var(--color-ink-muted)]">{rows.length} customer records</p></div>
-        {canPerform(role, "create_customer") && <Button onClick={() => { setForm(emptyCustomerForm(defaultBranchId)); setFormTab("Name"); setOpen(true); }}>+ {bi("Add Customer", "إضافة عميل")}</Button>}
+        {canManage && <Button onClick={openAdd}>+ {bi("Add Customer", "إضافة عميل")}</Button>}
       </div>
 
       <Card><div className="relative max-w-md"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-ink-muted)]" /><Input placeholder={bi("Search customer no., name, phone, email...", "بحث برقم العميل أو الاسم أو الهاتف أو البريد الإلكتروني...")} value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} className="pl-8" /></div></Card>
@@ -156,14 +214,20 @@ export default function CustomerList() {
             <Link key={customer.id} to={`/customers/${customer.id}`} className="block p-4 hover:bg-black/[0.02] dark:hover:bg-white/[0.03]">
               <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs font-medium text-[var(--color-ink-muted)]">{customer.documentNo}</p><p className="truncate text-sm font-semibold text-[var(--color-brand-1)]">{customer.name}</p>{customer.nameAr && <p dir="rtl" className="truncate text-xs text-[var(--color-ink-muted)]">{customer.nameAr}</p>}<p className="mt-1 text-xs text-[var(--color-ink-secondary)]">{customer.phone}</p></div><Badge tone={customer.whatsappVerified ? "good" : "warning"}>{customer.whatsappVerified ? bi("Verified", "موثّق") : bi("Unverified", "غير موثّق")}</Badge></div>
               <div className="mt-3 flex items-center justify-between text-xs text-[var(--color-ink-muted)]"><span>{orderCounts.get(customer.id) ?? 0} orders | {productCounts.get(customer.id) ?? 0} products | {jobCounts.get(customer.id) ?? 0} lines</span><span>Since {formatDate(customer.createdAt)}</span></div>
+              {canManage && (
+                <div className="mt-3 flex gap-2" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                  <Button size="sm" variant="secondary" onClick={() => openEdit(customer)}>{bi("Edit", "تعديل")}</Button>
+                  <Button size="sm" variant="danger" onClick={() => remove(customer)}>{bi("Delete", "حذف")}</Button>
+                </div>
+              )}
             </Link>
           ))}
         </div>
         <div className="hidden overflow-x-auto sm:block">
           <table className="w-full min-w-[980px] text-sm">
-            <thead><tr className="sticky top-0 z-10 border-b bg-[var(--color-surface-1)] text-left text-xs text-[var(--color-ink-muted)] [border-color:var(--color-border)]"><SortableTh label={bi("Customer No.", "رقم العميل")} active={sortKey === "document"} direction={dir} onClick={() => toggle("document")} className="px-5 py-3" /><SortableTh label={bi("Name", "الاسم")} active={sortKey === "name"} direction={dir} onClick={() => toggle("name")} className="px-3 py-3" /><SortableTh label={bi("Mobile Phone", "الجوال")} active={sortKey === "phone"} direction={dir} onClick={() => toggle("phone")} className="px-3 py-3" /><th className="px-3 py-3 font-medium">{bi("WhatsApp", "واتساب")}</th><th className="px-3 py-3 font-medium">{bi("Email", "البريد الإلكتروني")}</th><SortableTh label={bi("Orders", "الطلبات")} active={sortKey === "orders"} direction={dir} onClick={() => toggle("orders")} className="px-3 py-3" /><th className="px-3 py-3 font-medium">{bi("Products", "المنتجات")}</th><SortableTh label={bi("Job lines", "بنود المهام")} active={sortKey === "jobs"} direction={dir} onClick={() => toggle("jobs")} className="px-3 py-3" /><SortableTh label={bi("Since", "منذ")} active={sortKey === "since"} direction={dir} onClick={() => toggle("since")} className="px-5 py-3" /></tr></thead>
+            <thead><tr className="sticky top-0 z-10 border-b bg-[var(--color-surface-1)] text-left text-xs text-[var(--color-ink-muted)] [border-color:var(--color-border)]"><SortableTh label={bi("Customer No.", "رقم العميل")} active={sortKey === "document"} direction={dir} onClick={() => toggle("document")} className="px-5 py-3" /><SortableTh label={bi("Name", "الاسم")} active={sortKey === "name"} direction={dir} onClick={() => toggle("name")} className="px-3 py-3" /><SortableTh label={bi("Mobile Phone", "الجوال")} active={sortKey === "phone"} direction={dir} onClick={() => toggle("phone")} className="px-3 py-3" /><th className="px-3 py-3 font-medium">{bi("WhatsApp", "واتساب")}</th><th className="px-3 py-3 font-medium">{bi("Email", "البريد الإلكتروني")}</th><SortableTh label={bi("Orders", "الطلبات")} active={sortKey === "orders"} direction={dir} onClick={() => toggle("orders")} className="px-3 py-3" /><th className="px-3 py-3 font-medium">{bi("Products", "المنتجات")}</th><SortableTh label={bi("Job lines", "بنود المهام")} active={sortKey === "jobs"} direction={dir} onClick={() => toggle("jobs")} className="px-3 py-3" /><SortableTh label={bi("Since", "منذ")} active={sortKey === "since"} direction={dir} onClick={() => toggle("since")} className="px-5 py-3" />{canManage && <th className="px-3 py-3 font-medium">{bi("Actions", "الإجراءات")}</th>}</tr></thead>
             <tbody>
-              {pagedRows.map((customer) => <tr key={customer.id} className="border-b last:border-0 hover:bg-black/[0.02] dark:hover:bg-white/[0.03] [border-color:var(--color-border)]"><td className="px-5 py-3 text-[var(--color-ink-secondary)]">{customer.documentNo}</td><td className="px-3 py-3"><Link to={`/customers/${customer.id}`} className="font-medium text-[var(--color-brand-1)]">{customer.name}</Link>{customer.nameAr && <p dir="rtl" className="text-xs text-[var(--color-ink-muted)]">{customer.nameAr}</p>}</td><td className="px-3 py-3 text-[var(--color-ink-secondary)]">{customer.phone}</td><td className="px-3 py-3"><Badge tone={customer.whatsappVerified ? "good" : "warning"}>{customer.whatsappVerified ? bi("Verified", "موثّق") : bi("Unverified", "غير موثّق")}</Badge></td><td className="px-3 py-3 text-[var(--color-ink-secondary)]">{customer.email}</td><td className="px-3 py-3 tabular-nums">{orderCounts.get(customer.id) ?? 0}</td><td className="px-3 py-3 tabular-nums">{productCounts.get(customer.id) ?? 0}</td><td className="px-3 py-3 tabular-nums">{jobCounts.get(customer.id) ?? 0}</td><td className="px-5 py-3 text-[var(--color-ink-muted)]">{formatDate(customer.createdAt)}</td></tr>)}
+              {pagedRows.map((customer) => <tr key={customer.id} className="border-b last:border-0 hover:bg-black/[0.02] dark:hover:bg-white/[0.03] [border-color:var(--color-border)]"><td className="px-5 py-3 text-[var(--color-ink-secondary)]">{customer.documentNo}</td><td className="px-3 py-3"><Link to={`/customers/${customer.id}`} className="font-medium text-[var(--color-brand-1)]">{customer.name}</Link>{customer.nameAr && <p dir="rtl" className="text-xs text-[var(--color-ink-muted)]">{customer.nameAr}</p>}</td><td className="px-3 py-3 text-[var(--color-ink-secondary)]">{customer.phone}</td><td className="px-3 py-3"><Badge tone={customer.whatsappVerified ? "good" : "warning"}>{customer.whatsappVerified ? bi("Verified", "موثّق") : bi("Unverified", "غير موثّق")}</Badge></td><td className="px-3 py-3 text-[var(--color-ink-secondary)]">{customer.email}</td><td className="px-3 py-3 tabular-nums">{orderCounts.get(customer.id) ?? 0}</td><td className="px-3 py-3 tabular-nums">{productCounts.get(customer.id) ?? 0}</td><td className="px-3 py-3 tabular-nums">{jobCounts.get(customer.id) ?? 0}</td><td className="px-5 py-3 text-[var(--color-ink-muted)]">{formatDate(customer.createdAt)}</td>{canManage && <td className="px-3 py-3"><div className="flex gap-1.5"><Button size="sm" variant="secondary" onClick={() => openEdit(customer)}>{bi("Edit", "تعديل")}</Button><Button size="sm" variant="danger" onClick={() => remove(customer)}>{bi("Delete", "حذف")}</Button></div></td>}</tr>)}
             </tbody>
           </table>
         </div>
@@ -171,7 +235,7 @@ export default function CustomerList() {
         <Pagination page={currentPage} pageSize={PAGE_SIZE} total={rows.length} onPageChange={setPage} />
       </Card>
 
-      <Modal open={open} onClose={() => setOpen(false)} title={bi("Add Customer", "إضافة عميل")} width="lg">
+      <Modal open={open} onClose={() => { setOpen(false); setEditing(null); }} title={editing ? bi("Edit Customer", "تعديل العميل") : bi("Add Customer", "إضافة عميل")} width="lg">
         <div className="space-y-4">
           <Tabs tabs={FORM_TABS} active={formTab} onChange={setFormTab} labels={FORM_TAB_LABELS} />
 

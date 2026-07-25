@@ -119,6 +119,23 @@ export interface UnitOfMeasure {
   createdAt: string;
 }
 
+export type PackagingType = "Box" | "Container" | "Crate" | "Carton" | "Pallet" | "Bag" | "Other";
+
+// A unit can pack out in more than one way (e.g. the "Box" unit might have a
+// "Small Box" code and a "Large Crate" code), so these live as a repeatable
+// list under their unit rather than fields on UnitOfMeasure itself.
+export interface UnitPackagingCode {
+  id: string;
+  unitId: string;
+  code: string;
+  type: PackagingType;
+  weight?: number;
+  count?: number;
+  width?: number;
+  height?: number;
+  createdAt: string;
+}
+
 // Saudi Energy Efficiency Program (SEEP) star rating shown on the appliance label.
 export type EnergyRating = 1 | 2 | 3 | 4 | 5;
 

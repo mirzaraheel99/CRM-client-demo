@@ -166,6 +166,28 @@ model UnitOfMeasure {
   baseUnitName     String?
   conversionFactor Float?
   createdAt        DateTime @default(now())
+
+  packagingCodes UnitPackagingCode[]
+}
+
+// A unit can pack out in more than one way (e.g. the "Box" unit might have a
+// "Small Box" code and a "Large Crate" code), so these are a repeatable list
+// hanging off their unit rather than fields on UnitOfMeasure itself. Deleted
+// automatically when their parent unit is deleted -- they have no meaning
+// without it.
+model UnitPackagingCode {
+  id        String        @id @default(cuid())
+  unitId    String
+  unit      UnitOfMeasure @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  code      String
+  type      String
+  weight    Float?
+  count     Int?
+  width     Float?
+  height    Float?
+  createdAt DateTime      @default(now())
+
+  @@index([unitId])
 }
 
 model Appliance {

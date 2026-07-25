@@ -5,7 +5,7 @@ import { toast } from "../lib/toast";
 import { canPerform } from "../lib/permissions";
 import { useSort } from "../lib/useSort";
 import { bi } from "../lib/domainAr";
-import type { UnitCategory, UnitOfMeasure } from "../lib/types";
+import type { PackagingType, UnitCategory, UnitOfMeasure, UnitPackagingCode } from "../lib/types";
 
 const ROUNDING_TYPES = ["No Rounding", "Round Up", "Round Down", "Nearest"];
 const UNIT_CATEGORIES: UnitCategory[] = ["Weight", "Volume", "Length", "Count", "Area", "Other"];
@@ -17,6 +17,26 @@ const UNIT_CATEGORY_AR: Record<UnitCategory, string> = {
   Area: "المساحة",
   Other: "أخرى",
 };
+
+const PACKAGING_TYPES: PackagingType[] = ["Box", "Container", "Crate", "Carton", "Pallet", "Bag", "Other"];
+const PACKAGING_TYPE_AR: Record<PackagingType, string> = {
+  Box: "صندوق",
+  Container: "حاوية",
+  Crate: "قفص",
+  Carton: "كرتون",
+  Pallet: "منصة نقالة",
+  Bag: "كيس",
+  Other: "أخرى",
+};
+
+const emptyPackagingForm = () => ({
+  code: "",
+  type: "Box" as PackagingType,
+  weight: "",
+  count: "",
+  width: "",
+  height: "",
+});
 
 type SortKey = "name" | "code" | "category" | "unitType" | "decimalPlaces" | "itemsUsed";
 
@@ -33,12 +53,15 @@ const emptyForm = () => ({
 });
 
 export default function Units() {
-  const { units, inventoryItems, role, addUnit, updateUnit, deleteUnit, aliasFieldsEnabled } = useStore();
+  const { units, unitPackagingCodes, inventoryItems, role, addUnit, updateUnit, deleteUnit, addUnitPackagingCode, updateUnitPackagingCode, deleteUnitPackagingCode, aliasFieldsEnabled } = useStore();
   const canManage = canPerform(role, "manage_unit");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<UnitOfMeasure | null>(null);
   const [form, setForm] = useState(emptyForm());
   const [categoryFilter, setCategoryFilter] = useState<UnitCategory | "all">("all");
+  const [packagingUnit, setPackagingUnit] = useState<UnitOfMeasure | null>(null);
+  const [editingPackagingCode, setEditingPackagingCode] = useState<UnitPackagingCode | null>(null);
+  const [packagingForm, setPackagingForm] = useState(emptyPackagingForm());
   const baseUnits = units.filter((u) => u.unitType === "Base");
 
   const itemCountByUnit = useMemo(() => {
@@ -112,6 +135,50 @@ export default function Units() {
     toast(outcome.message, outcome.ok ? "success" : "error");
   }
 
+  function openPackaging(unit: UnitOfMeasure) {
+    setPackagingUnit(unit);
+    setEditingPackagingCode(null);
+    setPackagingForm(emptyPackagingForm());
+  }
+
+  function editPackagingCode(packagingCode: UnitPackagingCode) {
+    setEditingPackagingCode(packagingCode);
+    setPackagingForm({
+      code: packagingCode.code,
+      type: packagingCode.type,
+      weight: packagingCode.weight != null ? String(packagingCode.weight) : "",
+      count: packagingCode.count != null ? String(packagingCode.count) : "",
+      width: packagingCode.width != null ? String(packagingCode.width) : "",
+      height: packagingCode.height != null ? String(packagingCode.height) : "",
+    });
+  }
+
+  async function submitPackagingCode() {
+    if (!packagingUnit || !packagingForm.code.trim()) return;
+    const payload = {
+      code: packagingForm.code.trim(),
+      type: packagingForm.type,
+      weight: packagingForm.weight ? Number(packagingForm.weight) : undefined,
+      count: packagingForm.count ? Number(packagingForm.count) : undefined,
+      width: packagingForm.width ? Number(packagingForm.width) : undefined,
+      height: packagingForm.height ? Number(packagingForm.height) : undefined,
+    };
+    const outcome = editingPackagingCode
+      ? await updateUnitPackagingCode(editingPackagingCode.id, payload)
+      : await addUnitPackagingCode({ unitId: packagingUnit.id, ...payload });
+    toast(outcome.message, outcome.ok ? "success" : "error");
+    if (outcome.ok) {
+      setEditingPackagingCode(null);
+      setPackagingForm(emptyPackagingForm());
+    }
+  }
+
+  async function removePackagingCode(packagingCode: UnitPackagingCode) {
+    if (!confirm(`Delete packaging code "${packagingCode.code}"?`)) return;
+    const outcome = await deleteUnitPackagingCode(packagingCode.id);
+    toast(outcome.message, outcome.ok ? "success" : "error");
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3 animate-rise-in">
@@ -141,12 +208,14 @@ export default function Units() {
                 <SortableTh label={bi("Decimals", "الكسور")} active={sortKey === "decimalPlaces"} direction={dir} onClick={() => toggle("decimalPlaces")} className="py-2" />
                 <th className="py-2 font-medium">{bi("Rounding", "التقريب")}</th>
                 <SortableTh label={bi("Items Used", "الأصناف المستخدمة")} active={sortKey === "itemsUsed"} direction={dir} onClick={() => toggle("itemsUsed")} className="py-2" />
+                <th className="py-2 font-medium">{bi("Packaging", "التغليف")}</th>
                 <th className="py-2 font-medium text-right">{bi("Actions", "الإجراءات")}</th>
               </tr>
             </thead>
             <tbody>
               {sorted.map((unit) => {
                 const count = itemCountByUnit.get(unit.name) ?? 0;
+                const packagingCount = unitPackagingCodes.filter((p) => p.unitId === unit.id).length;
                 return (
                   <tr key={unit.id} className="border-b last:border-0 [border-color:var(--color-border)] transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.03]">
                     <td className="py-2.5 font-medium">
@@ -164,15 +233,21 @@ export default function Units() {
                     <td className="py-2.5 tabular-nums">{unit.decimalPlaces}</td>
                     <td className="py-2.5 text-[var(--color-ink-secondary)]">{unit.roundingType ?? "No Rounding"}</td>
                     <td className="py-2.5 tabular-nums">{count}</td>
+                    <td className="py-2.5">
+                      <button type="button" onClick={() => openPackaging(unit)} className="text-[var(--color-brand-1)] hover:underline">
+                        {packagingCount} {bi(packagingCount === 1 ? "code" : "codes", "رمز")}
+                      </button>
+                    </td>
                     <td className="py-2.5 text-right">
-                      {canManage && (
-                        <ActionsMenu
-                          items={[
+                      <ActionsMenu
+                        items={[
+                          { label: bi("Packaging Codes", "رموز التغليف"), onClick: () => openPackaging(unit) },
+                          ...(canManage ? [
                             { label: bi("Edit", "تعديل"), onClick: () => openEdit(unit) },
                             { label: bi("Delete", "حذف"), onClick: () => remove(unit), danger: true },
-                          ]}
-                        />
-                      )}
+                          ] : []),
+                        ]}
+                      />
                     </td>
                   </tr>
                 );
@@ -228,6 +303,90 @@ export default function Units() {
 
           <Button className="w-full justify-center" onClick={submit}>{bi("Save Unit", "حفظ الوحدة")}</Button>
         </div>
+      </Modal>
+
+      <Modal
+        open={!!packagingUnit}
+        onClose={() => setPackagingUnit(null)}
+        title={packagingUnit ? bi(`Packaging Codes — ${packagingUnit.name}`, `رموز التغليف — ${packagingUnit.name}`) : ""}
+        width="lg"
+      >
+        {packagingUnit && (
+          <div className="space-y-4">
+            <div className="overflow-x-auto rounded-lg border [border-color:var(--color-border)]">
+              <table className="w-full min-w-[560px] text-sm">
+                <thead>
+                  <tr className="border-b text-left text-xs text-[var(--color-ink-muted)] [border-color:var(--color-border)]">
+                    <th className="px-3 py-2 font-medium">{bi("Code", "الرمز")}</th>
+                    <th className="px-3 py-2 font-medium">{bi("Type", "النوع")}</th>
+                    <th className="px-3 py-2 font-medium">{bi("Weight", "الوزن")}</th>
+                    <th className="px-3 py-2 font-medium">{bi("Count", "العدد")}</th>
+                    <th className="px-3 py-2 font-medium">{bi("Width", "العرض")}</th>
+                    <th className="px-3 py-2 font-medium">{bi("Height", "الارتفاع")}</th>
+                    {canManage && <th className="px-3 py-2 font-medium text-right">{bi("Actions", "الإجراءات")}</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {unitPackagingCodes.filter((p) => p.unitId === packagingUnit.id).map((p) => (
+                    <tr key={p.id} className="border-b last:border-0 [border-color:var(--color-border)]">
+                      <td className="px-3 py-2 font-medium">{p.code}</td>
+                      <td className="px-3 py-2"><Badge tone="neutral">{bi(p.type, PACKAGING_TYPE_AR[p.type])}</Badge></td>
+                      <td className="px-3 py-2 tabular-nums">{p.weight ?? "—"}</td>
+                      <td className="px-3 py-2 tabular-nums">{p.count ?? "—"}</td>
+                      <td className="px-3 py-2 tabular-nums">{p.width ?? "—"}</td>
+                      <td className="px-3 py-2 tabular-nums">{p.height ?? "—"}</td>
+                      {canManage && (
+                        <td className="px-3 py-2 text-right">
+                          <div className="flex justify-end gap-1.5">
+                            <Button size="sm" variant="secondary" onClick={() => editPackagingCode(p)}>{bi("Edit", "تعديل")}</Button>
+                            <Button size="sm" variant="danger" onClick={() => removePackagingCode(p)}>{bi("Delete", "حذف")}</Button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                  {unitPackagingCodes.filter((p) => p.unitId === packagingUnit.id).length === 0 && (
+                    <tr><td colSpan={canManage ? 7 : 6} className="px-3 py-6 text-center text-[var(--color-ink-muted)]">{bi("No packaging codes yet.", "لا توجد رموز تغليف بعد.")}</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {canManage && (
+              <div className="space-y-3 border-t pt-4 [border-color:var(--color-border)]">
+                <p className="text-xs font-semibold text-[var(--color-ink-secondary)]">
+                  {editingPackagingCode ? bi("Edit packaging code", "تعديل رمز التغليف") : bi("Add packaging code", "إضافة رمز تغليف")}
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label={bi("Code name", "اسم الرمز")}><Input value={packagingForm.code} onChange={(e) => setPackagingForm({ ...packagingForm, code: e.target.value })} placeholder="e.g. Small Box" /></Field>
+                  <Field label={bi("Type", "النوع")}>
+                    <Select value={packagingForm.type} onChange={(e) => setPackagingForm({ ...packagingForm, type: e.target.value as PackagingType })}>
+                      {PACKAGING_TYPES.map((t) => <option key={t} value={t}>{bi(t, PACKAGING_TYPE_AR[t])}</option>)}
+                    </Select>
+                  </Field>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label={bi("Weight (optional)", "الوزن (اختياري)")}><Input type="number" min={0} value={packagingForm.weight} onChange={(e) => setPackagingForm({ ...packagingForm, weight: e.target.value })} /></Field>
+                  <Field label={bi("Count (units per package, optional)", "العدد (وحدات لكل تغليف، اختياري)")}><Input type="number" min={0} value={packagingForm.count} onChange={(e) => setPackagingForm({ ...packagingForm, count: e.target.value })} /></Field>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label={bi("Width (optional)", "العرض (اختياري)")}><Input type="number" min={0} value={packagingForm.width} onChange={(e) => setPackagingForm({ ...packagingForm, width: e.target.value })} /></Field>
+                  <Field label={bi("Height (optional)", "الارتفاع (اختياري)")}><Input type="number" min={0} value={packagingForm.height} onChange={(e) => setPackagingForm({ ...packagingForm, height: e.target.value })} /></Field>
+                </div>
+                <div className="flex gap-2">
+                  <Button className="flex-1 justify-center" onClick={submitPackagingCode}>
+                    {editingPackagingCode ? bi("Save Changes", "حفظ التغييرات") : bi("Add Packaging Code", "إضافة رمز التغليف")}
+                  </Button>
+                  {editingPackagingCode && (
+                    <Button variant="secondary" onClick={() => { setEditingPackagingCode(null); setPackagingForm(emptyPackagingForm()); }}>
+                      {bi("Cancel", "إلغاء")}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </Modal>
     </div>
   );

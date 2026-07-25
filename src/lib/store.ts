@@ -7,7 +7,7 @@ import { MESSAGE_TEMPLATES, renderTemplate } from "./templates";
 import { formatDate } from "./utils";
 import { api, ApiError, getToken, setToken } from "./api";
 import type {
-  ActionResult, Customer, Appliance, ApplianceTelemetry, Brand, Category, UnitOfMeasure, Technician, Zone, InventoryItem, InventoryLocation,
+  ActionResult, Customer, Appliance, ApplianceTelemetry, Brand, Category, UnitOfMeasure, UnitPackagingCode, Technician, Zone, InventoryItem, InventoryLocation,
   InventoryStock, InventoryTransaction, JobCard, JobCardStageHistory,
   JobCardAttachment, JobCardPartUsed, JobCardEstimateLine, EstimateLineKind, PurchaseBill, CommunicationLog,
   WorkflowDefinition, Role, StageName, Branch, Payment, PaymentMethod, Channel, ServiceOrder, RemovedPart, RequestSource, DemoUser,
@@ -37,6 +37,7 @@ interface DemoState {
   brands: Brand[];
   categories: Category[];
   units: UnitOfMeasure[];
+  unitPackagingCodes: UnitPackagingCode[];
   appliances: Appliance[];
   applianceTelemetry: ApplianceTelemetry[];
   technicians: Technician[];
@@ -109,6 +110,9 @@ interface DemoState {
   addUnit: (unit: Omit<UnitOfMeasure, "id" | "createdAt">) => Promise<ActionResult>;
   updateUnit: (id: string, patch: Partial<Omit<UnitOfMeasure, "id" | "createdAt">>) => Promise<ActionResult>;
   deleteUnit: (id: string) => Promise<ActionResult>;
+  addUnitPackagingCode: (code: Omit<UnitPackagingCode, "id" | "createdAt">) => Promise<ActionResult>;
+  updateUnitPackagingCode: (id: string, patch: Partial<Omit<UnitPackagingCode, "id" | "unitId" | "createdAt">>) => Promise<ActionResult>;
+  deleteUnitPackagingCode: (id: string) => Promise<ActionResult>;
   addTechnician: (technician: Omit<Technician, "id">) => Promise<Technician>;
   updateTechnician: (id: string, patch: Partial<Omit<Technician, "id">>) => Promise<ActionResult>;
   deleteTechnician: (id: string) => Promise<ActionResult>;
@@ -200,6 +204,7 @@ const initialSlice = () => ({
   brands: [] as Brand[],
   categories: [] as Category[],
   units: [] as UnitOfMeasure[],
+  unitPackagingCodes: [] as UnitPackagingCode[],
   appliances: [] as Appliance[],
   applianceTelemetry: clone(seed.APPLIANCE_TELEMETRY),
   technicians: [] as Technician[],
@@ -376,7 +381,7 @@ export const useStore = create<DemoState>()(
           }
         };
         const [
-          branches, customers, brands, categories, units, technicians, zones, appliances, serviceOrders, jobCardsRaw,
+          branches, customers, brands, categories, units, unitPackagingCodes, technicians, zones, appliances, serviceOrders, jobCardsRaw,
           removedParts, estimateLineItems, rolePermissionRows,
           inventoryLocations, inventoryItems, inventoryStock, inventoryTransactions,
         ] = await Promise.all([
@@ -385,6 +390,7 @@ export const useStore = create<DemoState>()(
           fetchOr<Brand[]>("/api/brands", state.brands),
           fetchOr<Category[]>("/api/categories", state.categories),
           fetchOr<UnitOfMeasure[]>("/api/units", state.units),
+          fetchOr<UnitPackagingCode[]>("/api/unit-packaging-codes", state.unitPackagingCodes),
           fetchOr<Technician[]>("/api/technicians", state.technicians),
           fetchOr<Zone[]>("/api/zones", state.zones),
           fetchOr<Appliance[]>("/api/appliances", state.appliances),
@@ -403,7 +409,7 @@ export const useStore = create<DemoState>()(
           : state.stageHistory;
         syncActionRolesFromServer(rolePermissionRows);
         set({
-          branches, customers, brands, categories, units, technicians, zones, appliances, serviceOrders,
+          branches, customers, brands, categories, units, unitPackagingCodes, technicians, zones, appliances, serviceOrders,
           jobCards: jobCardsRaw, stageHistory, removedParts, estimateLineItems,
           inventoryLocations, inventoryItems, inventoryStock, inventoryTransactions,
           permissionsVersion: state.permissionsVersion + 1,
@@ -602,6 +608,33 @@ export const useStore = create<DemoState>()(
           return result(true, "Unit deleted.");
         } catch (err) {
           return result(false, err instanceof ApiError ? err.message : "Failed to delete unit.");
+        }
+      },
+      addUnitPackagingCode: async (input) => {
+        try {
+          await api.post("/api/unit-packaging-codes", input);
+          await get().hydrate();
+          return result(true, "Packaging code added.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to add packaging code.");
+        }
+      },
+      updateUnitPackagingCode: async (id, patch) => {
+        try {
+          await api.patch(`/api/unit-packaging-codes/${id}`, patch);
+          await get().hydrate();
+          return result(true, "Packaging code updated.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to update packaging code.");
+        }
+      },
+      deleteUnitPackagingCode: async (id) => {
+        try {
+          await api.delete(`/api/unit-packaging-codes/${id}`);
+          await get().hydrate();
+          return result(true, "Packaging code deleted.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to delete packaging code.");
         }
       },
       addTechnician: async (input) => {

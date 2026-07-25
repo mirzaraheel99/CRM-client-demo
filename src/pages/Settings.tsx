@@ -140,7 +140,7 @@ export default function Settings() {
         <CardHeader
           title={bi("Role permissions", "صلاحيات الأدوار")}
           subtitle={bi("Control which roles can perform each action across the CRM", "التحكم في الأدوار المسموح لها بتنفيذ كل إجراء في النظام")}
-          action={canManage ? <Button size="sm" variant="secondary" onClick={() => { const outcome = resetRolePermissions(); toast(outcome.message, outcome.ok ? "success" : "error"); }}>{bi("Reset to defaults", "إعادة للوضع الافتراضي")}</Button> : undefined}
+          action={canManage ? <Button size="sm" variant="secondary" onClick={async () => { const outcome = await resetRolePermissions(); toast(outcome.message, outcome.ok ? "success" : "error"); }}>{bi("Reset to defaults", "إعادة للوضع الافتراضي")}</Button> : undefined}
         />
         <div className="overflow-x-auto rounded-lg border [border-color:var(--color-border)]">
           <table className="w-full min-w-[720px] text-sm">
@@ -163,8 +163,8 @@ export default function Settings() {
                           type="checkbox"
                           checked={allowed}
                           disabled={!canManage || isAdminColumn}
-                          onChange={(event) => {
-                            const outcome = updateRolePermission(action, r, event.target.checked);
+                          onChange={async (event) => {
+                            const outcome = await updateRolePermission(action, r, event.target.checked);
                             if (!outcome.ok) toast(outcome.message, "error");
                           }}
                           className="h-4 w-4 rounded [border-color:var(--color-border)] disabled:opacity-50"

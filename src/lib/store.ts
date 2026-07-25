@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import * as seed from "./seed";
-import { canAdvanceCurrentStage, canPerform, setActionRole, resetActionRoles, type DemoAction } from "./permissions";
+import { canAdvanceCurrentStage, canPerform, syncActionRolesFromServer, type DemoAction } from "./permissions";
 import { setFieldRequired as setFieldRequiredRaw, resetRequiredFields as resetRequiredFieldsRaw, type RequiredFieldEntity } from "./requiredFields";
 import { MESSAGE_TEMPLATES, renderTemplate } from "./templates";
 import { formatDate } from "./utils";
@@ -84,8 +84,8 @@ interface DemoState {
   logout: () => void;
   bootstrap: () => Promise<void>;
   hydrate: () => Promise<void>;
-  updateRolePermission: (action: DemoAction, targetRole: Role, allowed: boolean) => ActionResult;
-  resetRolePermissions: () => ActionResult;
+  updateRolePermission: (action: DemoAction, targetRole: Role, allowed: boolean) => Promise<ActionResult>;
+  resetRolePermissions: () => Promise<ActionResult>;
   setFieldRequired: (entity: RequiredFieldEntity, key: string, required: boolean) => ActionResult;
   resetRequiredFields: () => ActionResult;
 
@@ -366,7 +366,7 @@ export const useStore = create<DemoState>()(
             return fallback;
           }
         };
-        const [branches, customers, brands, categories, units, technicians, appliances, serviceOrders, jobCardsRaw, removedParts, estimateLineItems] = await Promise.all([
+        const [branches, customers, brands, categories, units, technicians, appliances, serviceOrders, jobCardsRaw, removedParts, estimateLineItems, rolePermissionRows] = await Promise.all([
           fetchOr<Branch[]>("/api/branches", state.branches),
           fetchOr<Customer[]>("/api/customers", state.customers),
           fetchOr<Brand[]>("/api/brands", state.brands),
@@ -378,13 +378,16 @@ export const useStore = create<DemoState>()(
           fetchOr<(JobCard & { stageHistory?: JobCardStageHistory[] })[]>("/api/job-cards", state.jobCards),
           fetchOr<RemovedPart[]>("/api/removed-parts", state.removedParts),
           fetchOr<JobCardEstimateLine[]>("/api/estimate-lines", state.estimateLineItems),
+          fetchOr<{ action: string; roles: Role[] }[]>("/api/role-permissions", []),
         ]);
         const stageHistory = jobCardsRaw.some((job) => "stageHistory" in job)
           ? jobCardsRaw.flatMap((job) => job.stageHistory ?? [])
           : state.stageHistory;
+        syncActionRolesFromServer(rolePermissionRows);
         set({
           branches, customers, brands, categories, units, technicians, appliances, serviceOrders,
           jobCards: jobCardsRaw, stageHistory, removedParts, estimateLineItems,
+          permissionsVersion: state.permissionsVersion + 1,
           hydrated: true, hydrating: false,
         });
       },
@@ -395,20 +398,28 @@ export const useStore = create<DemoState>()(
         set({ aliasFieldsEnabled: enabled });
         return result(true, enabled ? "Arabic alias fields enabled." : "Arabic alias fields disabled.");
       },
-      updateRolePermission: (action, targetRole, allowed) => {
+      updateRolePermission: async (action, targetRole, allowed) => {
         const state = get();
         if (!canPerform(state.role, "manage_settings")) return result(false, "Your role cannot change role permissions.");
         if (targetRole === "admin" && !allowed) return result(false, "Admin must always retain access — remove other roles instead.");
-        setActionRole(action, targetRole, allowed);
-        set({ permissionsVersion: state.permissionsVersion + 1 });
-        return result(true, "Role permissions updated.");
+        try {
+          await api.patch("/api/role-permissions", { action, role: targetRole, allowed });
+          await get().hydrate();
+          return result(true, "Role permissions updated.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to update role permissions.");
+        }
       },
-      resetRolePermissions: () => {
+      resetRolePermissions: async () => {
         const state = get();
         if (!canPerform(state.role, "manage_settings")) return result(false, "Your role cannot change role permissions.");
-        resetActionRoles();
-        set({ permissionsVersion: state.permissionsVersion + 1 });
-        return result(true, "Role permissions reset to defaults.");
+        try {
+          await api.post("/api/role-permissions/reset", {});
+          await get().hydrate();
+          return result(true, "Role permissions reset to defaults.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to reset role permissions.");
+        }
       },
       setFieldRequired: (entity, key, required) => {
         const state = get();

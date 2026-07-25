@@ -51,27 +51,17 @@ const DEFAULT_ACTION_ROLES: Record<DemoAction, Role[]> = {
 };
 
 // The permission matrix is admin-editable at runtime (see Settings > Role
-// Permissions), so it lives in mutable module state instead of a frozen
-// const, persisted under its own localStorage key rather than piggy-backing
-// on the main Zustand store (keeps this module dependency-free of store.ts).
-const ROLE_PERMISSIONS_STORAGE_KEY = "crm-demo-role-permissions-v1";
-
+// Permissions) and enforced server-side by the backend's own RolePermission
+// table -- this module-level cache is populated from that table (via
+// store.ts's hydrate(), see syncActionRolesFromServer below) so canPerform()
+// can stay a plain synchronous function usable from anywhere without every
+// call site needing store access. It starts out as the shared defaults so
+// there's a sane fallback before the first hydrate() completes.
 function cloneActionRoles(table: Record<DemoAction, Role[]>): Record<DemoAction, Role[]> {
   return Object.fromEntries(Object.entries(table).map(([action, roles]) => [action, [...roles]])) as Record<DemoAction, Role[]>;
 }
 
-function loadStoredActionRoles(): Record<DemoAction, Role[]> {
-  try {
-    const raw = localStorage.getItem(ROLE_PERMISSIONS_STORAGE_KEY);
-    if (!raw) return cloneActionRoles(DEFAULT_ACTION_ROLES);
-    const saved = JSON.parse(raw) as Partial<Record<DemoAction, Role[]>>;
-    return { ...cloneActionRoles(DEFAULT_ACTION_ROLES), ...saved };
-  } catch {
-    return cloneActionRoles(DEFAULT_ACTION_ROLES);
-  }
-}
-
-let ACTION_ROLES: Record<DemoAction, Role[]> = loadStoredActionRoles();
+let ACTION_ROLES: Record<DemoAction, Role[]> = cloneActionRoles(DEFAULT_ACTION_ROLES);
 
 export function canPerform(role: Role, action: DemoAction) {
   return ACTION_ROLES[action].includes(role);
@@ -85,16 +75,15 @@ export function getDefaultActionRoles(): Record<DemoAction, Role[]> {
   return cloneActionRoles(DEFAULT_ACTION_ROLES);
 }
 
-export function setActionRole(action: DemoAction, role: Role, allowed: boolean) {
-  const current = ACTION_ROLES[action];
-  const next = allowed ? Array.from(new Set([...current, role])) : current.filter((candidate) => candidate !== role);
-  ACTION_ROLES = { ...ACTION_ROLES, [action]: next };
-  try { localStorage.setItem(ROLE_PERMISSIONS_STORAGE_KEY, JSON.stringify(ACTION_ROLES)); } catch { /* demo-only persistence, ignore quota errors */ }
-}
-
-export function resetActionRoles() {
-  ACTION_ROLES = cloneActionRoles(DEFAULT_ACTION_ROLES);
-  try { localStorage.removeItem(ROLE_PERMISSIONS_STORAGE_KEY); } catch { /* demo-only persistence, ignore quota errors */ }
+// Called from store.ts's hydrate() with the backend's effective permission
+// table (GET /api/role-permissions). Any action the server doesn't mention
+// keeps its built-in default, so a partial/failed fetch never locks anyone out.
+export function syncActionRolesFromServer(rows: { action: string; roles: Role[] }[]) {
+  const next = cloneActionRoles(DEFAULT_ACTION_ROLES);
+  for (const row of rows) {
+    if (row.action in next) next[row.action as DemoAction] = [...row.roles];
+  }
+  ACTION_ROLES = next;
 }
 
 export function canAccessPath(role: Role, path: string) {

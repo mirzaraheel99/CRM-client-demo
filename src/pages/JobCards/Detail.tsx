@@ -607,8 +607,8 @@ export default function JobCardDetail() {
                 {canEditParts && <PartsGrid
                   items={inventoryItems}
                   stockByItem={stockByItem}
-                  onAdd={(selections) => {
-                    const results = selections.map((selection) => addPartUsed(job.id, selection.itemId, selection.qty));
+                  onAdd={async (selections) => {
+                    const results = await Promise.all(selections.map((selection) => addPartUsed(job.id, selection.itemId, selection.qty)));
                     const failed = results.find((result) => !result.ok);
                     if (failed) toast(failed.message, "error");
                     else if (results.length > 0) toast(`${results.length} part${results.length > 1 ? "s" : ""} issued to this job.`);

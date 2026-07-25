@@ -90,10 +90,10 @@ export default function Inventory() {
     [inventoryItems, scopedTransactions, scopedStock]
   );
 
-  function submitTxn() {
+  async function submitTxn() {
     if (!txnForm.itemId || !txnForm.locationId || txnForm.qty <= 0) return;
     if (!txnModal) return;
-    const result = addInventoryTransaction({
+    const result = await addInventoryTransaction({
       itemId: txnForm.itemId,
       locationId: txnForm.locationId,
       type: txnModal,
@@ -124,24 +124,24 @@ export default function Inventory() {
     setItemModal(true);
   }
 
-  function submitItem() {
+  async function submitItem() {
     if (getMissingRequiredFields("inventoryItem", itemForm).length > 0) return;
     const payload = { ...itemForm, nameAr: itemForm.nameAr.trim() || undefined, notes: itemForm.notes.trim() || undefined };
     if (editingItem) {
-      const outcome = updateInventoryItem(editingItem.id, payload);
+      const outcome = await updateInventoryItem(editingItem.id, payload);
       toast(outcome.message, outcome.ok ? "success" : "error");
       if (!outcome.ok) return;
     } else {
-      addInventoryItem(payload);
+      await addInventoryItem(payload);
       toast(`${itemForm.name} added to inventory.`);
     }
     setItemForm(emptyItemForm());
     setItemModal(false);
   }
 
-  function removeItem(item: InventoryItem) {
+  async function removeItem(item: InventoryItem) {
     if (!confirm(`Delete inventory item "${item.name}"?`)) return;
-    const outcome = deleteInventoryItem(item.id);
+    const outcome = await deleteInventoryItem(item.id);
     toast(outcome.message, outcome.ok ? "success" : "error");
   }
 

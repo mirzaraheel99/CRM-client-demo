@@ -322,6 +322,55 @@ model JobCardStageHistory {
   stageRefNo String?
 }
 
+// Inventory locations are not a stored table -- they're derived from real
+// Branch rows (one "store" per branch, id `store-<branchId>`) and Technician
+// rows (one "van" per technician, id `van-<technicianId>`), so there's never
+// a separate location list to keep in sync as branches/technicians change.
+// InventoryStock/InventoryTransaction.locationId is therefore a soft
+// reference (plain String, like Category) rather than a FK.
+model InventoryItem {
+  id           String   @id @default(cuid())
+  name         String
+  nameAr       String?
+  category     String
+  brand        String
+  partNo       String
+  unit         String?
+  unitPrice    Float
+  reorderLevel Int
+  notes        String?
+
+  stock        InventoryStock[]
+  transactions InventoryTransaction[]
+}
+
+model InventoryStock {
+  id         String        @id @default(cuid())
+  itemId     String
+  item       InventoryItem @relation(fields: [itemId], references: [id])
+  locationId String
+  qty        Int
+
+  @@unique([itemId, locationId])
+}
+
+model InventoryTransaction {
+  id             String        @id @default(cuid())
+  itemId         String
+  item           InventoryItem @relation(fields: [itemId], references: [id])
+  locationId     String
+  jobcardId      String?
+  type           String
+  qty            Int
+  timestamp      DateTime      @default(now())
+  createdBy      String
+  destLocationId String?
+  photoUrl       String?
+
+  @@index([itemId])
+  @@index([jobcardId])
+}
+
 // Custody chain for a part removed from a customer's unit during repair
 // (e.g. a faulty compressor) — this exists to settle "you never gave our
 // old part back" disputes, so it needs to be real, persisted evidence,

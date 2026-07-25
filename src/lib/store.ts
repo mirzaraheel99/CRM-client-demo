@@ -108,10 +108,10 @@ interface DemoState {
   addTechnician: (technician: Omit<Technician, "id">) => Promise<Technician>;
   updateTechnician: (id: string, patch: Partial<Omit<Technician, "id">>) => Promise<ActionResult>;
   deleteTechnician: (id: string) => Promise<ActionResult>;
-  addInventoryItem: (item: Omit<InventoryItem, "id">) => InventoryItem;
-  updateInventoryItem: (id: string, patch: Partial<Omit<InventoryItem, "id">>) => ActionResult;
-  deleteInventoryItem: (id: string) => ActionResult;
-  addInventoryTransaction: (transaction: Omit<InventoryTransaction, "id" | "timestamp">) => ActionResult;
+  addInventoryItem: (item: Omit<InventoryItem, "id">) => Promise<InventoryItem>;
+  updateInventoryItem: (id: string, patch: Partial<Omit<InventoryItem, "id">>) => Promise<ActionResult>;
+  deleteInventoryItem: (id: string) => Promise<ActionResult>;
+  addInventoryTransaction: (transaction: Omit<InventoryTransaction, "id" | "timestamp">) => Promise<ActionResult>;
 
   createServiceOrder: (input: {
     customerId: string;
@@ -158,8 +158,8 @@ interface DemoState {
   confirmAssetReceived: (jobcardId: string, ref: string, receivedBy: string) => Promise<ActionResult>;
   confirmAssetHandover: (jobcardId: string, ref: string, confirmedBy: string) => Promise<ActionResult>;
   savePurchaseBill: (jobcardId: string, bill: Omit<PurchaseBill, "id" | "jobcardId">) => ActionResult;
-  addPartUsed: (jobcardId: string, itemId: string, qty: number) => ActionResult;
-  removePartUsed: (partUsedId: string) => ActionResult;
+  addPartUsed: (jobcardId: string, itemId: string, qty: number) => Promise<ActionResult>;
+  removePartUsed: (partUsedId: string) => Promise<ActionResult>;
   addAttachment: (jobcardId: string, stageName: StageName, label: string, fileUrl?: string) => ActionResult;
   sendCommunication: (jobcardId: string, channel: CommunicationLog["channel"], message: string) => ActionResult;
   retryCommunication: (logId: string) => ActionResult;
@@ -182,10 +182,11 @@ function clone<T>(value: T): T {
 }
 
 // Branches, customers, brands, appliances, technicians, service orders, job
-// cards, removed parts, and estimate line items are now real, server-persisted
-// data (fetched via hydrate() after login) rather than mock seed data, so
-// they start empty here. Everything else below has no backend yet (Phase 2),
-// so it keeps running on the original browser-only mock seed exactly as before.
+// cards, removed parts, estimate line items, and inventory (items, locations,
+// stock, transactions) are now real, server-persisted data (fetched via
+// hydrate() after login) rather than mock seed data, so they start empty
+// here. Everything else below has no backend yet (Phase 2), so it keeps
+// running on the original browser-only mock seed exactly as before.
 const initialSlice = () => ({
   branches: [] as Branch[],
   customers: [] as Customer[],
@@ -195,10 +196,10 @@ const initialSlice = () => ({
   appliances: [] as Appliance[],
   applianceTelemetry: clone(seed.APPLIANCE_TELEMETRY),
   technicians: [] as Technician[],
-  inventoryItems: clone(seed.INVENTORY_ITEMS),
-  inventoryLocations: clone(seed.INVENTORY_LOCATIONS),
-  inventoryStock: clone(seed.INVENTORY_STOCK),
-  inventoryTransactions: clone(seed.INVENTORY_TRANSACTIONS),
+  inventoryItems: [] as InventoryItem[],
+  inventoryLocations: [] as InventoryLocation[],
+  inventoryStock: [] as InventoryStock[],
+  inventoryTransactions: [] as InventoryTransaction[],
   serviceOrders: [] as ServiceOrder[],
   jobCards: [] as JobCard[],
   stageHistory: [] as JobCardStageHistory[],
@@ -366,7 +367,11 @@ export const useStore = create<DemoState>()(
             return fallback;
           }
         };
-        const [branches, customers, brands, categories, units, technicians, appliances, serviceOrders, jobCardsRaw, removedParts, estimateLineItems, rolePermissionRows] = await Promise.all([
+        const [
+          branches, customers, brands, categories, units, technicians, appliances, serviceOrders, jobCardsRaw,
+          removedParts, estimateLineItems, rolePermissionRows,
+          inventoryLocations, inventoryItems, inventoryStock, inventoryTransactions,
+        ] = await Promise.all([
           fetchOr<Branch[]>("/api/branches", state.branches),
           fetchOr<Customer[]>("/api/customers", state.customers),
           fetchOr<Brand[]>("/api/brands", state.brands),
@@ -379,6 +384,10 @@ export const useStore = create<DemoState>()(
           fetchOr<RemovedPart[]>("/api/removed-parts", state.removedParts),
           fetchOr<JobCardEstimateLine[]>("/api/estimate-lines", state.estimateLineItems),
           fetchOr<{ action: string; roles: Role[] }[]>("/api/role-permissions", []),
+          fetchOr<InventoryLocation[]>("/api/inventory-locations", state.inventoryLocations),
+          fetchOr<InventoryItem[]>("/api/inventory-items", state.inventoryItems),
+          fetchOr<InventoryStock[]>("/api/inventory-stock", state.inventoryStock),
+          fetchOr<InventoryTransaction[]>("/api/inventory-transactions", state.inventoryTransactions),
         ]);
         const stageHistory = jobCardsRaw.some((job) => "stageHistory" in job)
           ? jobCardsRaw.flatMap((job) => job.stageHistory ?? [])
@@ -387,6 +396,7 @@ export const useStore = create<DemoState>()(
         set({
           branches, customers, brands, categories, units, technicians, appliances, serviceOrders,
           jobCards: jobCardsRaw, stageHistory, removedParts, estimateLineItems,
+          inventoryLocations, inventoryItems, inventoryStock, inventoryTransactions,
           permissionsVersion: state.permissionsVersion + 1,
           hydrated: true, hydrating: false,
         });
@@ -585,60 +595,37 @@ export const useStore = create<DemoState>()(
           return result(false, err instanceof ApiError ? err.message : "Failed to delete technician.");
         }
       },
-      addInventoryItem: (input) => {
-        const item: InventoryItem = { ...input, id: nextId("item") };
-        set((state) => ({ inventoryItems: [item, ...state.inventoryItems] }));
+      addInventoryItem: async (input) => {
+        const item = await api.post<InventoryItem>("/api/inventory-items", input);
+        await get().hydrate();
         return item;
       },
-      updateInventoryItem: (id, patch) => {
-        const state = get();
-        if (!canPerform(state.role, "manage_inventory")) return result(false, "Your role cannot manage inventory.");
-        if (!state.inventoryItems.some((item) => item.id === id)) return result(false, "Inventory item not found.");
-        set((current) => ({ inventoryItems: current.inventoryItems.map((item) => item.id === id ? { ...item, ...patch } : item) }));
-        return result(true, "Inventory item updated.");
+      updateInventoryItem: async (id, patch) => {
+        try {
+          await api.patch(`/api/inventory-items/${id}`, patch);
+          await get().hydrate();
+          return result(true, "Inventory item updated.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to update inventory item.");
+        }
       },
-      deleteInventoryItem: (id) => {
-        const state = get();
-        if (!canPerform(state.role, "manage_inventory")) return result(false, "Your role cannot manage inventory.");
-        const item = state.inventoryItems.find((candidate) => candidate.id === id);
-        if (!item) return result(false, "Inventory item not found.");
-        const stockQty = state.inventoryStock.filter((s) => s.itemId === id).reduce((sum, s) => sum + s.qty, 0);
-        if (stockQty > 0) return result(false, `Cannot delete: ${stockQty} unit${stockQty === 1 ? "" : "s"} of this item are still in stock.`);
-        const hasTransactions = state.inventoryTransactions.some((t) => t.itemId === id);
-        if (hasTransactions) return result(false, "Cannot delete: this item has recorded stock transactions.");
-        const usedInJobs = state.partsUsed.some((p) => p.itemId === id) || state.estimateLineItems.some((line) => line.itemId === id);
-        if (usedInJobs) return result(false, "Cannot delete: this item is referenced by a job card's parts or estimate.");
-        set((current) => ({ inventoryItems: current.inventoryItems.filter((candidate) => candidate.id !== id) }));
-        return result(true, "Inventory item deleted.");
+      deleteInventoryItem: async (id) => {
+        try {
+          await api.delete(`/api/inventory-items/${id}`);
+          await get().hydrate();
+          return result(true, "Inventory item deleted.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to delete inventory item.");
+        }
       },
-      addInventoryTransaction: (input) => {
-        const state = get();
-        if (!canPerform(state.role, "manage_inventory")) return result(false, "Your role cannot manage inventory.");
-        if (!state.inventoryItems.some((item) => item.id === input.itemId)) return result(false, "Inventory item not found.");
-        if (!state.inventoryLocations.some((location) => location.id === input.locationId)) return result(false, "Inventory location not found.");
-        if (input.qty <= 0) return result(false, "Quantity must be greater than zero.");
-        if (input.type === "transfer" && (!input.destLocationId || input.destLocationId === input.locationId)) return result(false, "Choose a different destination location.");
-        if (input.type === "transfer" && !state.inventoryLocations.some((location) => location.id === input.destLocationId)) return result(false, "Destination location not found.");
-        const sourceStock = state.inventoryStock.find((entry) => entry.itemId === input.itemId && entry.locationId === input.locationId)?.qty ?? 0;
-        if ((input.type === "issue" || input.type === "transfer") && sourceStock < input.qty) return result(false, `Only ${sourceStock} units are available at the source location.`);
-
-        const transaction: InventoryTransaction = { ...input, id: nextId("txn"), timestamp: new Date().toISOString() };
-        set((current) => {
-          const stock = [...current.inventoryStock];
-          const applyDelta = (locationId: string, delta: number) => {
-            const index = stock.findIndex((entry) => entry.itemId === input.itemId && entry.locationId === locationId);
-            if (index >= 0) stock[index] = { ...stock[index], qty: stock[index].qty + delta };
-            else stock.push({ itemId: input.itemId, locationId, qty: delta });
-          };
-          if (input.type === "receive" || input.type === "return" || input.type === "adjust") applyDelta(input.locationId, input.qty);
-          if (input.type === "issue") applyDelta(input.locationId, -input.qty);
-          if (input.type === "transfer" && input.destLocationId) {
-            applyDelta(input.locationId, -input.qty);
-            applyDelta(input.destLocationId, input.qty);
-          }
-          return { inventoryTransactions: [transaction, ...current.inventoryTransactions], inventoryStock: stock };
-        });
-        return result(true, "Inventory transaction recorded.");
+      addInventoryTransaction: async (input) => {
+        try {
+          await api.post("/api/inventory-transactions", input);
+          await get().hydrate();
+          return result(true, "Inventory transaction recorded.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to record inventory transaction.");
+        }
       },
 
       createServiceOrder: async ({ customerId, branchId, lines, shortAddressCode, buildingNo, unitNo, district, postalCode, additionalNo, requestSource, preferredDate, preferredTimeSlot, buyerVatNumber }) => {
@@ -1006,7 +993,7 @@ export const useStore = create<DemoState>()(
         return result(true, "Purchase bill recorded.");
       },
 
-      addPartUsed: (jobcardId, itemId, qty) => {
+      addPartUsed: async (jobcardId, itemId, qty) => {
         const state = get();
         if (!canPerform(state.role, "add_part")) return result(false, "Your role cannot issue parts to jobs.");
         const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
@@ -1025,35 +1012,30 @@ export const useStore = create<DemoState>()(
           .sort((a, b) => Number(b.locationId === preferredLocationId) - Number(a.locationId === preferredLocationId) || b.qty - a.qty);
         const source = stockOptions[0];
         if (!source) return result(false, `Insufficient ${item.name} stock in this job's branch.`);
-        const now = new Date().toISOString();
+        try {
+          await api.post("/api/inventory-transactions", { itemId, locationId: source.locationId, jobcardId, type: "issue", qty });
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to issue part.");
+        }
         const part: JobCardPartUsed = { id: nextId("part"), jobcardId, itemId, locationId: source.locationId, qty, unitPrice: item.unitPrice, totalPrice: item.unitPrice * qty };
-        const transaction: InventoryTransaction = { id: nextId("txn"), itemId, locationId: source.locationId, jobcardId, type: "issue", qty, timestamp: now, createdBy: "Job workflow" };
-        set({
-          partsUsed: [part, ...state.partsUsed],
-          inventoryTransactions: [transaction, ...state.inventoryTransactions],
-          inventoryStock: state.inventoryStock.map((entry) => entry.itemId === itemId && entry.locationId === source.locationId ? { ...entry, qty: entry.qty - qty } : entry),
-          jobCards: state.jobCards.map((candidate) => candidate.id === jobcardId ? { ...candidate, updatedAt: now } : candidate),
-        });
+        set((current) => ({ partsUsed: [part, ...current.partsUsed] }));
+        await get().hydrate();
         return result(true, `${qty} ${item.name} issued to ${job.documentNo}.`);
       },
-      removePartUsed: (partUsedId) => {
+      removePartUsed: async (partUsedId) => {
         const state = get();
         if (!canPerform(state.role, "add_part")) return result(false, "Your role cannot return job parts.");
         const part = state.partsUsed.find((candidate) => candidate.id === partUsedId);
         if (!part) return result(false, "Job part was not found.");
         const job = state.jobCards.find((candidate) => candidate.id === part.jobcardId);
         if (!job || (job.currentStage !== "Diagnosis" && job.currentStage !== "Repair")) return result(false, "Parts can only be returned during Diagnosis or Repair.");
-        const now = new Date().toISOString();
-        const transaction: InventoryTransaction = { id: nextId("txn"), itemId: part.itemId, locationId: part.locationId, jobcardId: part.jobcardId, type: "return", qty: part.qty, timestamp: now, createdBy: "Job workflow" };
-        const existingStock = state.inventoryStock.some((entry) => entry.itemId === part.itemId && entry.locationId === part.locationId);
-        set({
-          partsUsed: state.partsUsed.filter((candidate) => candidate.id !== partUsedId),
-          inventoryTransactions: [transaction, ...state.inventoryTransactions],
-          inventoryStock: existingStock
-            ? state.inventoryStock.map((entry) => entry.itemId === part.itemId && entry.locationId === part.locationId ? { ...entry, qty: entry.qty + part.qty } : entry)
-            : [...state.inventoryStock, { itemId: part.itemId, locationId: part.locationId, qty: part.qty }],
-          jobCards: state.jobCards.map((job) => job.id === part.jobcardId ? { ...job, updatedAt: now } : job),
-        });
+        try {
+          await api.post("/api/inventory-transactions", { itemId: part.itemId, locationId: part.locationId, jobcardId: part.jobcardId, type: "return", qty: part.qty });
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to return part.");
+        }
+        set((current) => ({ partsUsed: current.partsUsed.filter((candidate) => candidate.id !== partUsedId) }));
+        await get().hydrate();
         return result(true, "Part returned to inventory.");
       },
       addAttachment: (jobcardId, stageName, label, fileUrl) => {
@@ -1189,10 +1171,6 @@ export const useStore = create<DemoState>()(
         aliasFieldsEnabled: state.aliasFieldsEnabled,
         permissionsVersion: state.permissionsVersion,
         maintenanceRemindersSent: state.maintenanceRemindersSent,
-        inventoryItems: state.inventoryItems,
-        inventoryLocations: state.inventoryLocations,
-        inventoryStock: state.inventoryStock,
-        inventoryTransactions: state.inventoryTransactions,
         applianceTelemetry: state.applianceTelemetry,
         attachments: state.attachments,
         partsUsed: state.partsUsed,

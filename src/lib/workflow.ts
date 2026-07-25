@@ -1,4 +1,4 @@
-import type { JobCard, Payment, PurchaseBill, Role } from "./types";
+import type { JobCard, Payment, PurchaseBill, RemovedPart, Role } from "./types";
 import { canAdvanceCurrentStage } from "./permissions";
 import { isFieldRequired } from "./requiredFields";
 
@@ -10,6 +10,7 @@ export interface StageRequirement {
 export interface JobFlowContext {
   payments: Payment[];
   purchaseBill?: PurchaseBill;
+  removedParts?: RemovedPart[];
 }
 
 export function paidTotal(payments: Payment[]) {
@@ -53,6 +54,7 @@ export function stageRequirements(job: JobCard, context: JobFlowContext): StageR
       );
     }
     if (isFieldRequired("jobCardStage", "customerSignature")) requirements.push({ label: "Customer signature captured", met: Boolean(job.customerSignature?.trim()) });
+    requirements.push({ label: "All removed parts returned to customer", met: !(context.removedParts ?? []).some((part) => part.returnStatus === "pending") });
     requirements.push({ label: "Asset handover confirmed", met: job.assetHandedOver === true });
     return requirements;
   }

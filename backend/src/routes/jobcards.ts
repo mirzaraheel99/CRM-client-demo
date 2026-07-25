@@ -82,6 +82,9 @@ export default async function jobCardRoutes(fastify: FastifyInstance) {
       if (!body.success) return reply.code(400).send({ ok: false, message: "Signature data is required." });
       const jobCard = await prisma.jobCard.findUnique({ where: { id } });
       if (!jobCard) return reply.code(404).send({ ok: false, message: "Job card not found." });
+      if (!["manager", "admin"].includes(request.currentUser!.role) && request.currentUser!.branchId !== jobCard.branchId) {
+        return reply.code(403).send({ ok: false, message: "You can only act on job cards in your own branch." });
+      }
       await recordAmendmentIfPast(jobCard, "Ready for Handover", request.currentUser!.name, "Customer signature");
       return prisma.jobCard.update({ where: { id }, data: { customerSignature: body.data.customerSignature } });
     }
@@ -92,31 +95,61 @@ export default async function jobCardRoutes(fastify: FastifyInstance) {
     { preHandler: [fastify.authenticate, fastify.requirePermission("create_job")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
-      const body = z.object({ ref: z.string().min(1), receivedBy: z.string().min(1) }).safeParse(request.body);
+      const body = z.object({ ref: z.string().min(1), technicianId: z.string().min(1) }).safeParse(request.body);
       if (!body.success) return reply.code(400).send({ ok: false, message: "Reference and receiving technician are required." });
       const jobCard = await prisma.jobCard.findUnique({ where: { id } });
       if (!jobCard) return reply.code(404).send({ ok: false, message: "Job card not found." });
+      if (!["manager", "admin"].includes(request.currentUser!.role) && request.currentUser!.branchId !== jobCard.branchId) {
+        return reply.code(403).send({ ok: false, message: "You can only act on job cards in your own branch." });
+      }
+      const technician = await prisma.technician.findUnique({ where: { id: body.data.technicianId } });
+      if (!technician) return reply.code(400).send({ ok: false, message: "Choose a valid technician." });
+      if (technician.branchId !== jobCard.branchId) return reply.code(400).send({ ok: false, message: "Technician must belong to the job branch." });
+      const ref = body.data.ref.trim();
+      const conflict = await prisma.jobCard.findFirst({ where: { assetReceivedRef: ref, assetHandedOver: false, id: { not: id } } });
+      if (conflict) return reply.code(400).send({ ok: false, message: `Custody reference "${ref}" is already in use by job ${conflict.documentNo}, which is still in custody.` });
       await recordAmendmentIfPast(jobCard, "Received", request.currentUser!.name, "Asset receipt custody");
       return prisma.jobCard.update({
         where: { id },
-        data: { assetReceivedRef: body.data.ref, assetReceivedBy: body.data.receivedBy, assetReceivedAt: new Date() },
+        data: {
+          assetReceivedRef: ref,
+          assetReceivedBy: technician.name,
+          assetReceivedAt: new Date(),
+          assetReceivedByTechnicianId: technician.id,
+        },
       });
     }
   );
 
   fastify.patch(
     "/api/job-cards/:id/asset-handover",
-    { preHandler: [fastify.authenticate, fastify.requirePermission("finalize_job")] },
+    { preHandler: [fastify.authenticate, fastify.requirePermission("capture_signature")] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
-      const body = z.object({ ref: z.string().min(1), confirmedBy: z.string().min(1) }).safeParse(request.body);
-      if (!body.success) return reply.code(400).send({ ok: false, message: "Reference and receiving technician are required." });
+      const body = z.object({ ref: z.string().min(1), technicianId: z.string().min(1) }).safeParse(request.body);
+      if (!body.success) return reply.code(400).send({ ok: false, message: "Reference and confirming technician are required." });
       const jobCard = await prisma.jobCard.findUnique({ where: { id } });
       if (!jobCard) return reply.code(404).send({ ok: false, message: "Job card not found." });
+      if (!["manager", "admin"].includes(request.currentUser!.role) && request.currentUser!.branchId !== jobCard.branchId) {
+        return reply.code(403).send({ ok: false, message: "You can only act on job cards in your own branch." });
+      }
+      const technician = await prisma.technician.findUnique({ where: { id: body.data.technicianId } });
+      if (!technician) return reply.code(400).send({ ok: false, message: "Choose a valid technician." });
+      if (technician.branchId !== jobCard.branchId) return reply.code(400).send({ ok: false, message: "Technician must belong to the job branch." });
+      const pendingParts = await prisma.removedPart.count({ where: { jobcardId: id, returnStatus: "pending" } });
+      if (pendingParts > 0) {
+        return reply.code(400).send({ ok: false, message: `Cannot hand over: ${pendingParts} removed part(s) are still pending return to the customer.` });
+      }
       await recordAmendmentIfPast(jobCard, "Ready for Handover", request.currentUser!.name, "Asset handover confirmation");
       return prisma.jobCard.update({
         where: { id },
-        data: { assetHandedOver: true, assetHandedOverAt: new Date(), assetHandedOverBy: body.data.confirmedBy, assetHandedOverRef: body.data.ref },
+        data: {
+          assetHandedOver: true,
+          assetHandedOverAt: new Date(),
+          assetHandedOverBy: technician.name,
+          assetHandedOverRef: body.data.ref.trim(),
+          assetHandedOverByTechnicianId: technician.id,
+        },
       });
     }
   );
@@ -214,7 +247,8 @@ export default async function jobCardRoutes(fastify: FastifyInstance) {
         return reply.code(403).send({ ok: false, message: "Your role cannot advance this stage." });
       }
 
-      const blockers = stageBlockers(jobCard);
+      const removedParts = await prisma.removedPart.findMany({ where: { jobcardId: id }, select: { returnStatus: true } });
+      const blockers = stageBlockers(jobCard, removedParts);
       if (blockers.length > 0) {
         return reply.code(400).send({ ok: false, message: `Cannot advance: ${blockers.join(", ")}` });
       }

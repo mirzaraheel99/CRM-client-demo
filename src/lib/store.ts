@@ -166,12 +166,12 @@ interface DemoState {
   setQaApproved: (jobcardId: string, approved: boolean) => Promise<ActionResult>;
   setFinalAmount: (jobcardId: string, amount: number) => Promise<ActionResult>;
   captureCustomerSignature: (jobcardId: string, signature: string) => Promise<ActionResult>;
-  confirmAssetReceived: (jobcardId: string, ref: string, receivedBy: string) => Promise<ActionResult>;
-  confirmAssetHandover: (jobcardId: string, ref: string, confirmedBy: string) => Promise<ActionResult>;
+  confirmAssetReceived: (jobcardId: string, ref: string, technicianId: string) => Promise<ActionResult>;
+  confirmAssetHandover: (jobcardId: string, ref: string, technicianId: string) => Promise<ActionResult>;
   savePurchaseBill: (jobcardId: string, bill: Omit<PurchaseBill, "id" | "jobcardId">) => ActionResult;
   addPartUsed: (jobcardId: string, itemId: string, qty: number) => Promise<ActionResult>;
   removePartUsed: (partUsedId: string) => Promise<ActionResult>;
-  addAttachment: (jobcardId: string, stageName: StageName, label: string, fileUrl?: string) => ActionResult;
+  addAttachment: (jobcardId: string, stageName: StageName, label: string, fileUrl?: string, conditionNotes?: string) => Promise<ActionResult>;
   sendCommunication: (jobcardId: string, channel: CommunicationLog["channel"], message: string) => ActionResult;
   retryCommunication: (logId: string) => ActionResult;
   updateWorkflowStep: (workflowId: string, stepOrder: number, patch: Partial<WorkflowDefinition["steps"][number]>) => ActionResult;
@@ -193,11 +193,11 @@ function clone<T>(value: T): T {
 }
 
 // Branches, customers, brands, appliances, technicians, service orders, job
-// cards, removed parts, estimate line items, and inventory (items, locations,
-// stock, transactions) are now real, server-persisted data (fetched via
-// hydrate() after login) rather than mock seed data, so they start empty
-// here. Everything else below has no backend yet (Phase 2), so it keeps
-// running on the original browser-only mock seed exactly as before.
+// cards, removed parts, attachments, estimate line items, and inventory
+// (items, locations, stock, transactions) are now real, server-persisted data
+// (fetched via hydrate() after login) rather than mock seed data, so they
+// start empty here. Everything else below has no backend yet (Phase 2), so
+// it keeps running on the original browser-only mock seed exactly as before.
 const initialSlice = () => ({
   branches: [] as Branch[],
   customers: [] as Customer[],
@@ -217,7 +217,7 @@ const initialSlice = () => ({
   jobCards: [] as JobCard[],
   stageHistory: [] as JobCardStageHistory[],
   removedParts: [] as RemovedPart[],
-  attachments: clone(seed.ATTACHMENTS),
+  attachments: [] as JobCardAttachment[],
   partsUsed: clone(seed.PARTS_USED),
   estimateLineItems: [] as JobCardEstimateLine[],
   purchaseBills: clone(seed.PURCHASE_BILLS),
@@ -382,7 +382,7 @@ export const useStore = create<DemoState>()(
         };
         const [
           branches, customers, brands, categories, units, unitPackagingCodes, technicians, zones, appliances, serviceOrders, jobCardsRaw,
-          removedParts, estimateLineItems, rolePermissionRows,
+          removedParts, attachments, estimateLineItems, rolePermissionRows,
           inventoryLocations, inventoryItems, inventoryStock, inventoryTransactions,
         ] = await Promise.all([
           fetchOr<Branch[]>("/api/branches", state.branches),
@@ -397,6 +397,7 @@ export const useStore = create<DemoState>()(
           fetchOr<ServiceOrder[]>("/api/service-orders", state.serviceOrders),
           fetchOr<(JobCard & { stageHistory?: JobCardStageHistory[] })[]>("/api/job-cards", state.jobCards),
           fetchOr<RemovedPart[]>("/api/removed-parts", state.removedParts),
+          fetchOr<JobCardAttachment[]>("/api/job-card-attachments", state.attachments),
           fetchOr<JobCardEstimateLine[]>("/api/estimate-lines", state.estimateLineItems),
           fetchOr<{ action: string; roles: Role[] }[]>("/api/role-permissions", []),
           fetchOr<InventoryLocation[]>("/api/inventory-locations", state.inventoryLocations),
@@ -410,7 +411,7 @@ export const useStore = create<DemoState>()(
         syncActionRolesFromServer(rolePermissionRows);
         set({
           branches, customers, brands, categories, units, unitPackagingCodes, technicians, zones, appliances, serviceOrders,
-          jobCards: jobCardsRaw, stageHistory, removedParts, estimateLineItems,
+          jobCards: jobCardsRaw, stageHistory, removedParts, attachments, estimateLineItems,
           inventoryLocations, inventoryItems, inventoryStock, inventoryTransactions,
           permissionsVersion: state.permissionsVersion + 1,
           hydrated: true, hydrating: false,
@@ -1035,30 +1036,42 @@ export const useStore = create<DemoState>()(
           return result(false, err instanceof ApiError ? err.message : "Failed to capture signature.");
         }
       },
-      confirmAssetReceived: async (jobcardId, ref, receivedBy) => {
+      confirmAssetReceived: async (jobcardId, ref, technicianId) => {
         const state = get();
         if (!canPerform(state.role, "create_job")) return result(false, "Your role cannot confirm asset receipt.");
         if (!ref.trim()) return result(false, "A reference/tag number is required.");
-        if (!receivedBy.trim()) return result(false, "The receiving technician is required.");
+        if (!technicianId) return result(false, "The receiving technician is required.");
         const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
         if (!job) return result(false, "Job card not found.");
+        const technician = state.technicians.find((candidate) => candidate.id === technicianId);
+        if (!technician) return result(false, "Choose a valid technician.");
+        if (technician.branchId !== job.branchId) return result(false, "Technician must belong to the job branch.");
+        const ref_ = ref.trim();
+        if (state.jobCards.some((candidate) => candidate.id !== jobcardId && candidate.assetReceivedRef === ref_ && !candidate.assetHandedOver)) {
+          return result(false, `Custody reference "${ref_}" is already in use by another job still in custody.`);
+        }
         try {
-          await api.patch(`/api/job-cards/${jobcardId}/asset-received`, { ref: ref.trim(), receivedBy: receivedBy.trim() });
+          await api.patch(`/api/job-cards/${jobcardId}/asset-received`, { ref: ref_, technicianId });
           await get().hydrate();
           return result(true, "Asset receipt custody confirmed.");
         } catch (err) {
           return result(false, err instanceof ApiError ? err.message : "Failed to confirm asset receipt.");
         }
       },
-      confirmAssetHandover: async (jobcardId, ref, confirmedBy) => {
+      confirmAssetHandover: async (jobcardId, ref, technicianId) => {
         const state = get();
         if (!canPerform(state.role, "capture_signature")) return result(false, "Your role cannot confirm asset handover.");
         if (!ref.trim()) return result(false, "A reference/tag number is required.");
-        if (!confirmedBy.trim()) return result(false, "Confirming staff member is required.");
+        if (!technicianId) return result(false, "The confirming technician is required.");
         const job = state.jobCards.find((candidate) => candidate.id === jobcardId);
         if (!job) return result(false, "Job card not found.");
+        const technician = state.technicians.find((candidate) => candidate.id === technicianId);
+        if (!technician) return result(false, "Choose a valid technician.");
+        if (technician.branchId !== job.branchId) return result(false, "Technician must belong to the job branch.");
+        const pendingParts = state.removedParts.filter((part) => part.jobcardId === jobcardId && part.returnStatus === "pending");
+        if (pendingParts.length > 0) return result(false, `Cannot hand over: ${pendingParts.length} removed part(s) are still pending return to the customer.`);
         try {
-          await api.patch(`/api/job-cards/${jobcardId}/asset-handover`, { ref: ref.trim(), confirmedBy: confirmedBy.trim() });
+          await api.patch(`/api/job-cards/${jobcardId}/asset-handover`, { ref: ref.trim(), technicianId });
           await get().hydrate();
           return result(true, "Asset handover confirmed.");
         } catch (err) {
@@ -1126,12 +1139,17 @@ export const useStore = create<DemoState>()(
         await get().hydrate();
         return result(true, "Part returned to inventory.");
       },
-      addAttachment: (jobcardId, stageName, label, fileUrl) => {
+      addAttachment: async (jobcardId, stageName, label, fileUrl, conditionNotes) => {
         const state = get();
         if (!state.jobCards.some((job) => job.id === jobcardId)) return result(false, "Job card not found.");
-        const attachment: JobCardAttachment = { id: nextId("att"), jobcardId, stageName, fileUrl: fileUrl ?? "#", label, uploadedBy: "You", timestamp: new Date().toISOString() };
-        set({ attachments: [attachment, ...state.attachments] });
-        return result(true, "Attachment added.");
+        try {
+          await api.post(`/api/job-cards/${jobcardId}/attachments`, { stageName, label, fileUrl: fileUrl ?? "#", conditionNotes });
+          const attachments = await api.get<JobCardAttachment[]>("/api/job-card-attachments");
+          set({ attachments });
+          return result(true, "Attachment added.");
+        } catch (err) {
+          return result(false, err instanceof ApiError ? err.message : "Failed to add attachment.");
+        }
       },
       sendCommunication: (jobcardId, channel, message) => {
         const state = get();
@@ -1260,7 +1278,6 @@ export const useStore = create<DemoState>()(
         permissionsVersion: state.permissionsVersion,
         maintenanceRemindersSent: state.maintenanceRemindersSent,
         applianceTelemetry: state.applianceTelemetry,
-        attachments: state.attachments,
         partsUsed: state.partsUsed,
         purchaseBills: state.purchaseBills,
         communicationLogs: state.communicationLogs,

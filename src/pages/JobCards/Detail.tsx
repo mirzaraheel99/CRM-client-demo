@@ -92,8 +92,10 @@ export default function JobCardDetail() {
   const [signatureInput, setSignatureInput] = useState("");
   const [receivedRefInput, setReceivedRefInput] = useState("");
   const [receivedTechSelect, setReceivedTechSelect] = useState("");
+  const [receivedConditionNotes, setReceivedConditionNotes] = useState("");
   const [handoverRefInput, setHandoverRefInput] = useState("");
   const [handoverTechSelect, setHandoverTechSelect] = useState("");
+  const [handoverConditionNotes, setHandoverConditionNotes] = useState("");
   const [billForm, setBillForm] = useState({ billNo: "", billDate: new Date().toISOString().slice(0, 10), vendorName: "" });
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
   // null = "show the live current stage"; set when the user clicks a completed
@@ -116,6 +118,7 @@ export default function JobCardDetail() {
   const stockByItem = useMemo(() => totalStockByItem(branchStock), [branchStock]);
   const jobPayments = useMemo(() => payments.filter((p) => p.jobcardId === id), [payments, id]);
   const jobRemovedParts = useMemo(() => removedParts.filter((p) => p.jobcardId === id), [removedParts, id]);
+  const pendingRemovedParts = useMemo(() => jobRemovedParts.filter((p) => p.returnStatus === "pending"), [jobRemovedParts]);
   const telemetry = useMemo(() => applianceTelemetry.find((t) => t.applianceId === job?.applianceId), [applianceTelemetry, job?.applianceId]);
   const diagnosisSuggestions = useMemo(() => {
     const base = suggestDiagnosis(job?.problemDescription ?? "");
@@ -229,7 +232,7 @@ export default function JobCardDetail() {
 
   const currentStepIdx = workflow?.steps.findIndex((s) => s.stepName === job.currentStage) ?? -1;
   const nextStep = workflow && currentStepIdx >= 0 ? workflow.steps[currentStepIdx + 1] : undefined;
-  const requirements = stageRequirements(job, { payments: jobPayments, purchaseBill: bill });
+  const requirements = stageRequirements(job, { payments: jobPayments, purchaseBill: bill, removedParts: jobRemovedParts });
   const accessBlocker = stageAccessBlocker(job, role);
   const activeStage: StageName = viewedStage ?? job.currentStage;
   const isViewingPastStage = activeStage !== job.currentStage;
@@ -284,13 +287,13 @@ export default function JobCardDetail() {
     if (outcome.ok) onSuccess?.();
   }
 
-  function uploadPhoto(stageName: StageName, file: File) {
+  function uploadPhoto(stageName: StageName, file: File, conditionNotes?: string) {
     if (file.size > 1_500_000) {
       toast("Choose an image smaller than 1.5 MB for this browser demo.", "error");
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => showResult(addAttachment(job!.id, stageName, file.name, String(reader.result)));
+    reader.onload = () => showResult(addAttachment(job!.id, stageName, file.name, String(reader.result), conditionNotes));
     reader.onerror = () => toast("The selected image could not be read.", "error");
     reader.readAsDataURL(file);
   }
@@ -734,7 +737,8 @@ export default function JobCardDetail() {
                         {a.fileUrl !== "#" ? <img src={a.fileUrl} alt={a.label} className="h-full w-full object-cover" /> : <ImagePlus size={20} className="text-[var(--color-ink-muted)]" />}
                       </div>
                       <p className="text-xs font-medium truncate">{a.label}</p>
-                      <p className="text-[11px] text-[var(--color-ink-muted)]">{a.stageName} · {relativeTime(a.timestamp)}</p>
+                      <p className="text-[11px] text-[var(--color-ink-muted)]">{a.stageName} · {relativeTime(a.timestamp)} · {a.uploadedBy}</p>
+                      {a.conditionNotes && <p className="text-[11px] text-[var(--color-ink-secondary)] mt-1">{a.conditionNotes}</p>}
                     </div>
                   ))}
                   {jobAttachments.length === 0 && <p className="col-span-full text-sm text-[var(--color-ink-muted)] py-6 text-center">{bi("No attachments yet.", "لا توجد مرفقات بعد.")}</p>}
@@ -814,14 +818,18 @@ export default function JobCardDetail() {
                       <Field label={bi("Received by (technician)", "استُلم بواسطة (فني)")}>
                         <Select value={receivedTechSelect} onChange={(event) => setReceivedTechSelect(event.target.value)}>
                           <option value="">{bi("Choose technician...", "اختر فنياً...")}</option>
-                          {branchTechnicians.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
+                          {branchTechnicians.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                         </Select>
                       </Field>
+                      <Field label={bi("Condition notes (optional)", "ملاحظات الحالة (اختياري)")}>
+                        <Textarea rows={2} value={receivedConditionNotes} onChange={(event) => setReceivedConditionNotes(event.target.value)} placeholder={bi("Scratches, missing accessories, existing damage...", "خدوش، ملحقات مفقودة، أضرار موجودة مسبقًا...")} />
+                      </Field>
+                      <StagePhotoUpload compact label={bi("Attach condition photo", "إرفاق صورة الحالة")} onFile={(file) => uploadPhoto("Received", file, receivedConditionNotes.trim() || undefined)} />
                       <Button
                         variant="secondary"
                         className="w-full justify-center"
                         disabled={!receivedRefInput.trim() || !receivedTechSelect}
-                        onClick={() => showResult(confirmAssetReceived(job.id, receivedRefInput, receivedTechSelect), () => { setReceivedRefInput(""); setReceivedTechSelect(""); })}
+                        onClick={() => showResult(confirmAssetReceived(job.id, receivedRefInput, receivedTechSelect), () => { setReceivedRefInput(""); setReceivedTechSelect(""); setReceivedConditionNotes(""); })}
                       >
                         {bi("Confirm Asset Received", "تأكيد استلام الجهاز")}
                       </Button>
@@ -912,18 +920,31 @@ export default function JobCardDetail() {
                         </p>
                       ) : (
                         <>
+                          {pendingRemovedParts.length > 0 && (
+                            <p className="flex items-start gap-1.5 rounded-md bg-[var(--color-status-warning)]/10 px-2.5 py-1.5 text-[11px] text-[var(--color-status-warning)]">
+                              <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                              {bi(
+                                `${pendingRemovedParts.length} removed part(s) still owed back to the customer — resolve them in the Parts tab or Asset Custody before handover.`,
+                                `${pendingRemovedParts.length} قطعة مُزالة ما زالت مستحقة للعميل - يجب معالجتها في تبويب القطع أو عهدة الأصول قبل التسليم.`
+                              )}
+                            </p>
+                          )}
                           <Field label={bi("Custody reference / tag no.", "مرجع العهدة / رقم البطاقة")}><Input value={handoverRefInput} onChange={(event) => setHandoverRefInput(event.target.value)} placeholder="e.g. TAG-00231" /></Field>
                           <Field label={bi("Handed over by (technician)", "سُلّم بواسطة (فني)")}>
                             <Select value={handoverTechSelect} onChange={(event) => setHandoverTechSelect(event.target.value)}>
                               <option value="">{bi("Choose technician...", "اختر فنياً...")}</option>
-                              {branchTechnicians.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
+                              {branchTechnicians.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                             </Select>
                           </Field>
+                          <Field label={bi("Condition notes (optional)", "ملاحظات الحالة (اختياري)")}>
+                            <Textarea rows={2} value={handoverConditionNotes} onChange={(event) => setHandoverConditionNotes(event.target.value)} placeholder={bi("Condition of the unit as handed back...", "حالة الجهاز عند التسليم...")} />
+                          </Field>
+                          <StagePhotoUpload compact label={bi("Attach condition photo", "إرفاق صورة الحالة")} onFile={(file) => uploadPhoto("Ready for Handover", file, handoverConditionNotes.trim() || undefined)} />
                           <Button
                             variant="secondary"
                             className="w-full justify-center"
-                            disabled={!handoverRefInput.trim() || !handoverTechSelect}
-                            onClick={() => showResult(confirmAssetHandover(job.id, handoverRefInput, handoverTechSelect), () => { setHandoverRefInput(""); setHandoverTechSelect(""); })}
+                            disabled={!handoverRefInput.trim() || !handoverTechSelect || pendingRemovedParts.length > 0}
+                            onClick={() => showResult(confirmAssetHandover(job.id, handoverRefInput, handoverTechSelect), () => { setHandoverRefInput(""); setHandoverTechSelect(""); setHandoverConditionNotes(""); })}
                           >
                             {bi("Confirm Asset Given to Customer", "تأكيد تسليم الجهاز للعميل")}
                           </Button>

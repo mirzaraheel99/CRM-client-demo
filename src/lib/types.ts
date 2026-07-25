@@ -260,6 +260,7 @@ export interface JobCardAttachment {
   stageName: StageName;
   fileUrl: string;
   label: string;
+  conditionNotes?: string;
   uploadedBy: string;
   timestamp: string;
 }
@@ -390,10 +391,12 @@ export interface JobCard {
   assetReceivedRef?: string;
   assetReceivedBy?: string;
   assetReceivedAt?: string;
+  assetReceivedByTechnicianId?: string | null;
   assetHandedOver: boolean;
   assetHandedOverRef?: string;
   assetHandedOverAt?: string;
   assetHandedOverBy?: string;
+  assetHandedOverByTechnicianId?: string | null;
 }
 
 export interface ActionResult {

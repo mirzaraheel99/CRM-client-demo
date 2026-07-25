@@ -1,4 +1,4 @@
-import type { JobCard } from "@prisma/client";
+import type { JobCard, RemovedPart } from "@prisma/client";
 
 export interface StageRequirement {
   label: string;
@@ -9,7 +9,7 @@ export interface StageRequirement {
 // Payments and PurchaseBill aren't modeled server-side yet (Phase 2), so the
 // two checks that depend on them are stubbed as met — revisit once those
 // tables exist.
-export function stageRequirements(job: JobCard): StageRequirement[] {
+export function stageRequirements(job: JobCard, removedParts: Pick<RemovedPart, "returnStatus">[] = []): StageRequirement[] {
   switch (job.currentStage) {
     case "Received":
       return [
@@ -34,6 +34,7 @@ export function stageRequirements(job: JobCard): StageRequirement[] {
     case "Ready for Handover": {
       const requirements: StageRequirement[] = [
         { label: "Customer signature captured", met: Boolean(job.customerSignature?.trim()) },
+        { label: "All removed parts returned to customer", met: !removedParts.some((part) => part.returnStatus === "pending") },
         { label: "Asset handover confirmed", met: job.assetHandedOver === true },
       ];
       if (job.jobType === "non_warranty" || job.finalAmount != null) {
@@ -49,8 +50,8 @@ export function stageRequirements(job: JobCard): StageRequirement[] {
   }
 }
 
-export function stageBlockers(job: JobCard): string[] {
-  return stageRequirements(job).filter((r) => !r.met).map((r) => r.label);
+export function stageBlockers(job: JobCard, removedParts: Pick<RemovedPart, "returnStatus">[] = []): string[] {
+  return stageRequirements(job, removedParts).filter((r) => !r.met).map((r) => r.label);
 }
 
 const STAGE_ORDER_WARRANTY = ["Received", "Warranty Validation", "Diagnosis", "Repair", "QA", "Ready for Handover", "Delivered"];

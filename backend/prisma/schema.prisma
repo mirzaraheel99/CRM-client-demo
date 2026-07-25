@@ -246,7 +246,9 @@ model Technician {
   avatarColor String   @default("#2a78d6")
   notes       String?
 
-  jobCards JobCard[]
+  jobCards            JobCard[]
+  assetReceivedJobs   JobCard[] @relation("AssetReceivedByTechnician")
+  assetHandedOverJobs JobCard[] @relation("AssetHandedOverByTechnician")
 }
 
 model ServiceOrder {
@@ -314,14 +316,19 @@ model JobCard {
   assetReceivedRef String?
   assetReceivedBy  String?
   assetReceivedAt  DateTime?
+  assetReceivedByTechnicianId String?
+  assetReceivedByTechnician   Technician? @relation("AssetReceivedByTechnician", fields: [assetReceivedByTechnicianId], references: [id], onDelete: SetNull)
   assetHandedOver Boolean  @default(false)
   assetHandedOverRef String?
   assetHandedOverAt DateTime?
   assetHandedOverBy String?
+  assetHandedOverByTechnicianId String?
+  assetHandedOverByTechnician   Technician? @relation("AssetHandedOverByTechnician", fields: [assetHandedOverByTechnicianId], references: [id], onDelete: SetNull)
 
   stageHistory JobCardStageHistory[]
   removedParts RemovedPart[]
   estimateLines EstimateLine[]
+  attachments  JobCardAttachment[]
 
   @@index([currentStage])
 }
@@ -429,4 +436,23 @@ model RemovedPart {
 
   @@index([jobcardId])
   @@index([returnStatus])
+}
+
+// Custody-relevant evidence attached to a job at a given stage -- a photo of
+// the unit's condition on receipt, damage noted at handover, etc. Was
+// browser-local-only state until now, which meant it never reached the
+// server and vanished on a different device/browser -- exactly the kind of
+// gap that matters for a custody trail.
+model JobCardAttachment {
+  id             String   @id @default(cuid())
+  jobcardId      String
+  jobCard        JobCard  @relation(fields: [jobcardId], references: [id])
+  stageName      String
+  fileUrl        String
+  label          String
+  conditionNotes String?
+  uploadedBy     String
+  timestamp      DateTime @default(now())
+
+  @@index([jobcardId])
 }

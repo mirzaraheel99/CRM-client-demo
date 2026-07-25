@@ -42,7 +42,7 @@ export default function TrackingPage() {
   const jobPayments = payments.filter((payment) => payment.jobcardId === job.id);
   const stepIdx = workflow?.steps.findIndex((step) => step.stepName === job.currentStage) ?? -1;
   const needsApproval = job.currentStage === "Customer Approval" && job.customerApproved !== true;
-  const canPay = job.jobType === "non_warranty" && (job.status === "Ready" || job.status === "Delivered") && job.finalAmount != null;
+  const canPay = (job.status === "Ready" || job.status === "Delivered") && (job.finalAmount ?? 0) > 0;
 
   return (
     <div className="min-h-screen bg-[var(--color-surface-page)] text-[var(--color-ink-primary)]">

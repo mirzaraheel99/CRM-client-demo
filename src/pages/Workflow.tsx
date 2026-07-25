@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ArrowRight, CheckCircle2, MessageCircle, Smartphone, Mail, ShieldCheck } from "lucide-react";
 import { useStore } from "../lib/store";
-import { Card, CardHeader, Badge } from "../components/ui";
+import { Card, CardHeader, Badge, ToggleSwitch } from "../components/ui";
 import { toast } from "../lib/toast";
 import { cx } from "../lib/utils";
 import { canAccessPath, canPerform } from "../lib/permissions";
@@ -90,13 +90,10 @@ export default function Workflow() {
               <p className="text-sm font-medium">{bi("Approval required", "تتطلب موافقة")}</p>
               <p className="text-xs text-[var(--color-ink-muted)]">{step.approverRole ? `Approver: ${step.approverRole}` : bi("No approver assigned", "لا يوجد معتمد محدد")}</p>
             </div>
-            <button
-              type="button"
-              onClick={() => { const result = updateWorkflowStep(workflow.id, step.stepOrder, { approvalRequired: !step.approvalRequired }); toast(result.message, result.ok ? "success" : "error"); }}
-              className={cx("h-6 w-11 rounded-full relative transition-colors", step.approvalRequired ? "bg-[var(--color-brand-1)]" : "bg-black/15 dark:bg-white/15")}
-            >
-              <span className={cx("absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform", step.approvalRequired ? "translate-x-5" : "translate-x-0.5")} />
-            </button>
+            <ToggleSwitch
+              checked={step.approvalRequired}
+              onChange={(next) => { const result = updateWorkflowStep(workflow.id, step.stepOrder, { approvalRequired: next }); toast(result.message, result.ok ? "success" : "error"); }}
+            />
           </div>
 
           <div className="border-t pt-3 [border-color:var(--color-border)] space-y-2">
@@ -104,12 +101,10 @@ export default function Workflow() {
             {(["whatsapp", "sms", "email"] as const).map((ch) => (
               <div key={ch} className="flex items-center justify-between">
                 <span className="text-sm capitalize text-[var(--color-ink-secondary)]">{bi(ch, CHANNEL_AR[ch])}</span>
-                <button
-                  onClick={() => { const result = updateWorkflowStep(workflow.id, step.stepOrder, { triggers: { ...step.triggers, [ch]: !step.triggers[ch] } }); toast(result.message, result.ok ? "success" : "error"); }}
-                  className={cx("h-6 w-11 rounded-full transition-colors relative", step.triggers[ch] ? "bg-[var(--color-brand-1)]" : "bg-black/15 dark:bg-white/15")}
-                >
-                  <span className={cx("absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform", step.triggers[ch] ? "translate-x-5" : "translate-x-0.5")} />
-                </button>
+                <ToggleSwitch
+                  checked={step.triggers[ch]}
+                  onChange={(next) => { const result = updateWorkflowStep(workflow.id, step.stepOrder, { triggers: { ...step.triggers, [ch]: next } }); toast(result.message, result.ok ? "success" : "error"); }}
+                />
               </div>
             ))}
           </div>

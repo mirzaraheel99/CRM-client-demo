@@ -54,6 +54,28 @@ export function Badge({ children, tone = "neutral", icon, className }: { childre
   );
 }
 
+// Single shared switch so every on/off toggle in the app (Settings, Workflow
+// Designer, etc.) gets the same knob geometry -- `left-0` anchors the resting
+// position explicitly so the translate-x transform always starts from the
+// same place, instead of each call site reimplementing (and drifting from) it.
+export function ToggleSwitch({ checked, onChange, disabled }: { checked: boolean; onChange: (next: boolean) => void; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={cx(
+        "relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
+        checked ? "bg-[var(--color-brand-1)]" : "bg-black/15 dark:bg-white/15"
+      )}
+    >
+      <span className={cx("absolute left-0 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform", checked ? "translate-x-5" : "translate-x-0.5")} />
+    </button>
+  );
+}
+
 export function Button({
   children, onClick, variant = "primary", size = "md", className, type = "button", disabled,
 }: {

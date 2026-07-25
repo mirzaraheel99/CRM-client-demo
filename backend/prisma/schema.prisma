@@ -206,7 +206,10 @@ model Appliance {
   category          String
   model             String
   modelAr           String?
-  serialNo          String
+  // Nullable: whether a serial number is mandatory is an admin-editable
+  // toggle on the frontend (Settings > Required Fields), so the backend
+  // can't hard-require it here without contradicting that toggle.
+  serialNo          String?
   imeiNo            String?
   purchaseDate      DateTime
   warrantyStatus    String   @default("Unknown")

@@ -1,5 +1,5 @@
 import { useStore } from "../lib/store";
-import { Card, CardHeader, Badge, Button } from "../components/ui";
+import { Card, CardHeader, Badge, Button, ToggleSwitch } from "../components/ui";
 import { toast } from "../lib/toast";
 import { canPerform, getActionRoles, type DemoAction } from "../lib/permissions";
 import { REQUIRED_FIELD_ENTITY_LABEL, REQUIRED_FIELD_DEFS, isFieldRequired, isFieldLocked, type RequiredFieldEntity } from "../lib/requiredFields";
@@ -40,21 +40,6 @@ const ACTION_LABELS: Record<DemoAction, string> = {
   manage_settings: bi("Manage system settings", "إدارة إعدادات النظام"),
   reclassify_warranty: bi("Reject a warranty claim (reclassify)", "رفض مطالبة الضمان (إعادة التصنيف)"),
 };
-
-function ToggleSwitch({ checked, onChange, disabled }: { checked: boolean; onChange: (next: boolean) => void; disabled?: boolean }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${checked ? "bg-[var(--color-brand-1)]" : "bg-black/15 dark:bg-white/15"}`}
-    >
-      <span className={`absolute left-0 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${checked ? "translate-x-5" : "translate-x-0.5"}`} />
-    </button>
-  );
-}
 
 export default function Settings() {
   const { role, aliasFieldsEnabled, setAliasFieldsEnabled, permissionsVersion, updateRolePermission, resetRolePermissions, requiredFieldsVersion, setFieldRequired, resetRequiredFields } = useStore();

@@ -36,7 +36,10 @@ export function stageRequirements(job: JobCard, context: JobFlowContext): StageR
     return [{ label: "Diagnosis notes saved", met: Boolean(job.diagnosisNotes?.trim()) }];
   }
   if (job.currentStage === "Estimate") {
-    return [{ label: "Estimate amount saved", met: (job.estimateAmount ?? 0) > 0 }];
+    if (!isFieldRequired("jobCardStage", "estimateAmount")) return [];
+    // A confirmed $0 (fully covered, nothing to charge) satisfies this just as
+    // well as a positive amount -- what matters is that someone reviewed it.
+    return [{ label: "Estimate confirmed", met: job.estimateAmount != null }];
   }
   if (job.currentStage === "Customer Approval") {
     return [{ label: job.customerApproved === false ? "Customer declined the estimate" : "Customer approval recorded", met: job.customerApproved === true }];

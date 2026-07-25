@@ -944,7 +944,7 @@ export default function JobCardDetail() {
 
               {activeStage === "Ready for Handover" && (
                 <div className="space-y-3 border-t pt-3 [border-color:var(--color-border)]">
-                  {job.jobType === "non_warranty" && canPerform(role, "finalize_job") && (
+                  {(job.jobType === "non_warranty" || (job.estimateAmount ?? 0) > 0) && canPerform(role, "finalize_job") && (
                     <div className="space-y-2">
                       <Field label={bi("Final amount (SAR)", "المبلغ النهائي (ريال)")} required={isFieldRequired("jobCardStage", "finalAmount")}><Input type="number" min={partsTotal} value={finalAmountInput} onChange={(event) => setFinalAmountInput(event.target.value)} /></Field>
                       <Button variant="secondary" className="w-full justify-center" onClick={() => showResult(setFinalAmount(job.id, Number(finalAmountInput)))}>{bi("Confirm Final Amount", "تأكيد المبلغ النهائي")}</Button>
@@ -1013,7 +1013,7 @@ export default function JobCardDetail() {
             </Card>
           )}
 
-          {job.currentStage === "Ready for Handover" && job.jobType === "non_warranty" && (
+          {job.currentStage === "Ready for Handover" && (job.jobType === "non_warranty" || (job.finalAmount ?? 0) > 0) && (
             <PaymentPanel jobcardId={job.id} amount={job.finalAmount} payments={jobPayments} />
           )}
 

@@ -27,7 +27,10 @@ export function stageRequirements(
     case "Diagnosis":
       return [{ label: "Diagnosis notes saved", met: Boolean(job.diagnosisNotes?.trim()) }];
     case "Estimate":
-      return [{ label: "Estimate amount saved", met: (job.estimateAmount ?? 0) > 0 }];
+      // A warranty job can legitimately clear this with a confirmed $0 (fully
+      // covered, nothing to charge) -- what matters is that someone reviewed
+      // it and recorded a decision, not that the amount is positive.
+      return [{ label: "Estimate confirmed", met: job.estimateAmount != null }];
     case "Customer Approval":
       return [{
         label: job.customerApproved === false ? "Customer declined the estimate" : "Customer approval recorded",
@@ -64,7 +67,7 @@ export function stageBlockers(
   return stageRequirements(job, removedParts, attachments).filter((r) => !r.met).map((r) => r.label);
 }
 
-const STAGE_ORDER_WARRANTY = ["Received", "Warranty Validation", "Diagnosis", "Repair", "QA", "Ready for Handover", "Delivered"];
+const STAGE_ORDER_WARRANTY = ["Received", "Warranty Validation", "Diagnosis", "Estimate", "Customer Approval", "Repair", "QA", "Ready for Handover", "Delivered"];
 const STAGE_ORDER_NON_WARRANTY = ["Received", "Diagnosis", "Estimate", "Customer Approval", "Repair", "QA", "Ready for Handover", "Delivered"];
 
 export function nextStage(job: JobCard): string | null {

@@ -710,10 +710,15 @@ export const WORKFLOWS: WorkflowDefinition[] = [
       { stepOrder: 1, stepName: "Received", mandatoryFields: ["customer_id", "appliance_id"], approvalRequired: false, approverRole: null, triggers: { whatsapp: true, sms: true, email: false } },
       { stepOrder: 2, stepName: "Warranty Validation", mandatoryFields: ["purchase_bill", "serial_no", "purchase_date"], approvalRequired: true, approverRole: "supervisor", triggers: { whatsapp: false, sms: false, email: true } },
       { stepOrder: 3, stepName: "Diagnosis", mandatoryFields: ["diagnosis_notes"], approvalRequired: false, approverRole: null, triggers: { whatsapp: false, sms: false, email: false } },
-      { stepOrder: 4, stepName: "Repair", mandatoryFields: ["parts_used", "repair_notes"], approvalRequired: false, approverRole: null, triggers: { whatsapp: false, sms: false, email: false } },
-      { stepOrder: 5, stepName: "QA", mandatoryFields: ["qa_approved"], approvalRequired: true, approverRole: "supervisor", triggers: { whatsapp: false, sms: false, email: false } },
-      { stepOrder: 6, stepName: "Ready for Handover", mandatoryFields: [], approvalRequired: false, approverRole: null, triggers: { whatsapp: true, sms: true, email: true } },
-      { stepOrder: 7, stepName: "Delivered", mandatoryFields: ["customer_signature"], approvalRequired: false, approverRole: null, triggers: { whatsapp: true, sms: true, email: false } },
+      // A warranty repair can still turn up an uncovered charge (e.g. accidental
+      // damage, a non-covered part) -- Estimate/Customer Approval let staff bill
+      // for that instead of forcing every warranty job to be free.
+      { stepOrder: 4, stepName: "Estimate", mandatoryFields: ["estimate_amount"], approvalRequired: false, approverRole: null, triggers: { whatsapp: false, sms: false, email: false } },
+      { stepOrder: 5, stepName: "Customer Approval", mandatoryFields: ["customer_approval_status"], approvalRequired: true, approverRole: "front_desk", triggers: { whatsapp: true, sms: true, email: true } },
+      { stepOrder: 6, stepName: "Repair", mandatoryFields: ["parts_used", "repair_notes"], approvalRequired: false, approverRole: null, triggers: { whatsapp: false, sms: false, email: false } },
+      { stepOrder: 7, stepName: "QA", mandatoryFields: ["qa_approved"], approvalRequired: true, approverRole: "supervisor", triggers: { whatsapp: false, sms: false, email: false } },
+      { stepOrder: 8, stepName: "Ready for Handover", mandatoryFields: [], approvalRequired: false, approverRole: null, triggers: { whatsapp: true, sms: true, email: true } },
+      { stepOrder: 9, stepName: "Delivered", mandatoryFields: ["customer_signature"], approvalRequired: false, approverRole: null, triggers: { whatsapp: true, sms: true, email: false } },
     ],
   },
   {

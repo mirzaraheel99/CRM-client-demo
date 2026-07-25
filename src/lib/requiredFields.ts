@@ -50,7 +50,7 @@ export const REQUIRED_FIELD_DEFS: Record<RequiredFieldEntity, RequiredFieldDef[]
     { key: "brandId", label: "Brand", labelAr: "العلامة التجارية", defaultRequired: true, locked: true },
     { key: "category", label: "Category", labelAr: "الفئة", defaultRequired: false },
     { key: "model", label: "Model", labelAr: "الطراز", defaultRequired: true, locked: true },
-    { key: "serialNo", label: "Serial / unit number", labelAr: "الرقم التسلسلي", defaultRequired: true, locked: true },
+    { key: "serialNo", label: "Serial / unit number", labelAr: "الرقم التسلسلي", defaultRequired: true },
     { key: "purchaseDate", label: "Purchase date", labelAr: "تاريخ الشراء", defaultRequired: true, locked: true },
     { key: "imeiNo", label: "IMEI", labelAr: "الآيمي", defaultRequired: false },
     { key: "purchaseInvoiceNo", label: "Purchase invoice no.", labelAr: "رقم فاتورة الشراء", defaultRequired: false },
@@ -89,6 +89,7 @@ export const REQUIRED_FIELD_DEFS: Record<RequiredFieldEntity, RequiredFieldDef[]
   // advancing" checklist (see stageRequirements in workflow.ts).
   jobCardStage: [
     { key: "diagnosisNotes", label: "Diagnosis notes", labelAr: "ملاحظات التشخيص", defaultRequired: true },
+    { key: "estimateAmount", label: "Estimate confirmed (Estimate stage, zero counts as covered)", labelAr: "تأكيد التقدير (مرحلة التقدير، الصفر يُعد مغطى)", defaultRequired: true },
     { key: "repairNotes", label: "Repair notes", labelAr: "ملاحظات الإصلاح", defaultRequired: true },
     { key: "purchaseBill", label: "Purchase bill (Warranty Validation)", labelAr: "فاتورة الشراء (التحقق من الضمان)", defaultRequired: true },
     { key: "finalAmount", label: "Final amount (non-warranty jobs)", labelAr: "المبلغ النهائي (المهام بدون ضمان)", defaultRequired: true },

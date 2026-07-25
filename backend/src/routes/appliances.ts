@@ -11,7 +11,10 @@ const applianceSchema = z.object({
   category: z.string().min(1),
   model: z.string().min(1),
   modelAr: z.string().optional(),
-  serialNo: z.string().min(1),
+  // Not enforced server-side -- whether it's mandatory is an admin-editable
+  // toggle on the frontend (Settings > Required Fields); the backend accepts
+  // either way, same as every other non-locked appliance field.
+  serialNo: z.string().optional(),
   imeiNo: z.string().optional(),
   purchaseDate: z.string(),
   isSmartConnected: z.boolean().default(false),
@@ -44,7 +47,11 @@ export default async function applianceRoutes(fastify: FastifyInstance) {
       orderBy: { id: "desc" },
       include: { brand: true },
     });
-    return appliances.map((appliance) => ({ ...appliance, warrantyStatus: computeWarrantyStatus(appliance.purchaseDate, appliance.brand.warrantyMonths) }));
+    return appliances.map((appliance) => ({
+      ...appliance,
+      serialNo: appliance.serialNo ?? "",
+      warrantyStatus: computeWarrantyStatus(appliance.purchaseDate, appliance.brand.warrantyMonths),
+    }));
   });
 
   fastify.get("/api/appliances/:id", { preHandler: fastify.authenticate }, async (request, reply) => {
@@ -55,7 +62,11 @@ export default async function applianceRoutes(fastify: FastifyInstance) {
     if (scope && appliance.branchId && appliance.branchId !== scope) {
       return reply.code(404).send({ ok: false, message: "Product not found." });
     }
-    return { ...appliance, warrantyStatus: computeWarrantyStatus(appliance.purchaseDate, appliance.brand.warrantyMonths) };
+    return {
+      ...appliance,
+      serialNo: appliance.serialNo ?? "",
+      warrantyStatus: computeWarrantyStatus(appliance.purchaseDate, appliance.brand.warrantyMonths),
+    };
   });
 
   fastify.post(
@@ -104,7 +115,7 @@ export default async function applianceRoutes(fastify: FastifyInstance) {
           notes: input.notes,
         },
       });
-      return appliance;
+      return { ...appliance, serialNo: appliance.serialNo ?? "" };
     }
   );
 
@@ -142,7 +153,7 @@ export default async function applianceRoutes(fastify: FastifyInstance) {
           installationDate: input.installationDate ? new Date(input.installationDate) : undefined,
         },
       });
-      return appliance;
+      return { ...appliance, serialNo: appliance.serialNo ?? "" };
     }
   );
 

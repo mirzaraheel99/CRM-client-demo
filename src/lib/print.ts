@@ -139,7 +139,7 @@ export function printEstimate({
     <p id="fixflow-decision-status"></p>
   </div>` : ""}
   <div class="terms">
-    <p>This estimate is subject to change if additional faults are found once the unit is opened for repair. Approval is required before repair work begins on non-warranty jobs.</p>
+    <p>This estimate is subject to change if additional faults are found once the unit is opened for repair. Approval is required before repair work begins whenever the estimate includes a charge.</p>
     <ul>
       <li>Prices shown are in Saudi Riyals (SAR) and include 15% VAT unless noted otherwise.</li>
       <li>Parts listed are the technician's best assessment prior to teardown; the final invoice reflects parts actually installed.</li>

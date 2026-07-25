@@ -6,14 +6,6 @@ import { Card, Button, Input, Field } from "../components/ui";
 import { Logo } from "../components/Logo";
 import { bi } from "../lib/domainAr";
 
-const DEMO_ACCOUNTS = [
-  { username: "admin", label: "Admin" },
-  { username: "manager", label: "Manager" },
-  { username: "supervisor", label: "Supervisor" },
-  { username: "technician", label: "Technician" },
-  { username: "frontdesk", label: "Front Desk" },
-];
-
 export default function Login() {
   const currentUser = useStore((state) => state.currentUser);
   const login = useStore((state) => state.login);
@@ -68,22 +60,6 @@ export default function Login() {
             <LogIn size={14} /> {submitting ? bi("Signing in...", "جارٍ تسجيل الدخول...") : bi("Sign in", "تسجيل الدخول")}
           </Button>
         </form>
-
-        <div className="border-t pt-3 [border-color:var(--color-border)]">
-          <p className="text-[11px] text-[var(--color-ink-muted)] mb-2">{bi("Demo accounts (password: demo123)", "حسابات تجريبية (كلمة المرور: demo123)")}</p>
-          <div className="flex flex-wrap gap-1.5">
-            {DEMO_ACCOUNTS.map((account) => (
-              <button
-                key={account.username}
-                type="button"
-                onClick={() => { setUsername(account.username); setPassword("demo123"); }}
-                className="rounded-full border px-2.5 py-1 text-xs text-[var(--color-ink-secondary)] hover:text-[var(--color-brand-1)] hover:border-[var(--color-brand-1)] [border-color:var(--color-border)]"
-              >
-                {account.label}
-              </button>
-            ))}
-          </div>
-        </div>
       </Card>
     </div>
   );
